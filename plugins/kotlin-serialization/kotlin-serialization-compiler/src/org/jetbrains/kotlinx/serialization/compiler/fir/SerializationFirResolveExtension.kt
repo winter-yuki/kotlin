@@ -162,7 +162,7 @@ class SerializationFirResolveExtension(session: FirSession) : FirDeclarationGene
         if (owner == null) return emptyList()
         if (owner.name == SpecialNames.DEFAULT_NAME_FOR_COMPANION_OBJECT && callableId.callableName == SerialEntityNames.SERIALIZER_PROVIDER_NAME)
             return listOf(generateSerializerGetterInCompanion(owner, callableId))
-        if (owner.name != SerialEntityNames.SERIALIZER_CLASS_NAME) return emptyList() // TODO: support getter in companion
+        if (owner.name != SerialEntityNames.SERIALIZER_CLASS_NAME) return emptyList()
         if (callableId.callableName !in setOf(
                 SpecialNames.INIT,
                 SerialEntityNames.SAVE_NAME,
@@ -213,7 +213,7 @@ class SerializationFirResolveExtension(session: FirSession) : FirDeclarationGene
     @OptIn(SymbolInternals::class)
     override fun generateProperties(callableId: CallableId, owner: FirClassSymbol<*>?): List<FirPropertySymbol> {
         if (owner == null) return emptyList()
-        if (owner.name != SerialEntityNames.SERIALIZER_CLASS_NAME) return emptyList() // TODO: support getter in companion
+        if (owner.name != SerialEntityNames.SERIALIZER_CLASS_NAME) return emptyList()
         if (callableId.callableName != SerialEntityNames.SERIAL_DESC_FIELD_NAME) return emptyList()
 
         val target = getFromSupertype(callableId, owner) { it.getProperties(callableId.callableName).filterIsInstance<FirPropertySymbol>() }
