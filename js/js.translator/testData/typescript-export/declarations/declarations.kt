@@ -265,6 +265,7 @@ data class KT39423(
 )
 
 @JsExport
+<<<<<<< HEAD
 object Parent {
     object Nested1 {
         val value: String = "Nested1"
@@ -294,4 +295,13 @@ fun createNested2(): Parent.Nested1.Nested2 {
 @JsExport
 fun createNested3(): Parent.Nested1.Nested2.Companion.Nested3 {
     return Parent.Nested1.Nested2.Companion.Nested3()
+}
+external interface OptionalFieldsInterface {
+    val required: Int
+    @JsOptional val notRequired: Int?
+}
+
+@JsExport
+fun processOptionalInterface(a: OptionalFieldsInterface): String {
+    return "${a.required}${a.notRequired ?: "unknown"}"
 }

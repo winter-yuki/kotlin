@@ -28,7 +28,7 @@ import TestAbstract = JS_TESTS.foo.TestAbstract;
 import TestDataClass = JS_TESTS.foo.TestDataClass;
 import TestEnumClass = JS_TESTS.foo.TestEnumClass;
 import TestInterfaceImpl = JS_TESTS.foo.TestInterfaceImpl;
-import processInterface = JS_TESTS.foo.processInterface;
+import processOptionalInterface = JS_TESTS.foo.processOptionalInterface;
 import OuterClass = JS_TESTS.foo.OuterClass;
 import KT38262 = JS_TESTS.foo.KT38262;
 import JsNameTest = JS_TESTS.foo.JsNameTest;
@@ -37,6 +37,7 @@ import getParent = JS_TESTS.foo.getParent;
 import createNested1 = JS_TESTS.foo.createNested1;
 import createNested2 = JS_TESTS.foo.createNested2;
 import createNested3 = JS_TESTS.foo.createNested3;
+import processInterface = JS_TESTS.foo.processInterface;
 
 function assert(condition: boolean) {
     if (!condition) {
@@ -182,5 +183,11 @@ function box(): string {
     assert(createNested1() === nested1)
     assert(createNested2() !== nested2)
     assert(createNested3() !== nested3)
+
+    assert(processOptionalInterface({ required: 4 }) == "4unknown")
+    assert(processOptionalInterface({ required: 4, notRequired: null }) == "4unknown")
+    assert(processOptionalInterface({ required: 4, notRequired: 5 }) == "45")
+
+
     return "OK";
 }
