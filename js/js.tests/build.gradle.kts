@@ -7,6 +7,7 @@ import org.jetbrains.kotlin.ideaExt.idea
 
 plugins {
     kotlin("jvm")
+    kotlin("plugin.serialization")
     id("jps-compatible")
     id("com.github.node-gradle.node") version "3.2.1"
     id("de.undercouch.download")
@@ -77,6 +78,11 @@ dependencies {
     antLauncherJar(toolsJar())
 
     testRuntimeOnly("org.junit.vintage:junit-vintage-engine:${commonDependencyVersion("org.junit", "junit-bom")}")
+
+    testImplementation(commonDependency("org.jetbrains.kotlinx", "kotlinx-serialization-json"))
+    testImplementation(commonDependency("io.ktor", "ktor-client-core"))
+    testImplementation(commonDependency("io.ktor", "ktor-client-cio"))
+    testImplementation(commonDependency("io.ktor", "ktor-client-websockets"))
 }
 
 val generationRoot = projectDir.resolve("tests-gen")
@@ -210,6 +216,18 @@ fun Test.setupV8() {
     inputs.dir(v8Path)
 }
 
+fun Test.setupNodeJs() {
+    systemProperty("javascript.engine.path.NodeJs", com.github.gradle.node.variant.VariantComputer()
+        .let { variantComputer ->
+            variantComputer
+                .computeNodeDir(node)
+                .let { variantComputer.computeNodeBinDir(it) }
+                .let { variantComputer.computeNodeExec(node, it) }
+                .get()
+        }
+    )
+}
+
 fun Test.setupSpiderMonkey() {
     dependsOn(unzipJsShell)
     val jsShellExecutablePath = File(unzipJsShell.get().destinationDir, "js").absolutePath
@@ -218,6 +236,8 @@ fun Test.setupSpiderMonkey() {
 
 fun Test.setUpJsBoxTests(jsEnabled: Boolean, jsIrEnabled: Boolean) {
     setupV8()
+    if (jsIrEnabled)
+        setupNodeJs()
 
     inputs.files(rootDir.resolve("js/js.engines/src/org/jetbrains/kotlin/js/engine/repl.js"))
 
