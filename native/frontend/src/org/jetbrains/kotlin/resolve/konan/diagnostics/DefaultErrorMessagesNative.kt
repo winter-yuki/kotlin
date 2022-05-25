@@ -42,10 +42,13 @@ private val DIAGNOSTIC_FACTORY_TO_RENDERER by lazy {
         put(ErrorsNative.REDUNDANT_SWIFT_REFINEMENT, "An ObjC refined declaration can't also be refined in Swift")
         put(
             ErrorsNative.INCOMPATIBLE_OBJC_REFINEMENT_OVERRIDE,
-            "Refined declaration overrides non refined declarations from {0}",
+            "Refined declaration overrides declarations with different or no refinement from {0}",
             CommonRenderers.commaSeparated(Renderers.NAME)
         )
-        put(ErrorsNative.INVALID_OBJC_REFINEMENT_TARGETS, "Only properties and functions can be refined")
+        put(
+            ErrorsNative.INVALID_OBJC_REFINEMENT_TARGETS,
+            "Refines annotations are only applicable to annotations with targets FUNCTION and/or PROPERTY"
+        )
     }
 }
 
