@@ -124,15 +124,12 @@ object NativeObjCRefinementChecker : DeclarationChecker {
     }
 
     private fun CallableMemberDescriptor.inheritsRefinedAnnotations(): Pair<Boolean, Boolean> {
-        var (hasObjC, hasSwift) = hasRefinedAnnotations()
+        val (hasObjC, hasSwift) = hasRefinedAnnotations()
         if (hasObjC && hasSwift) return true to true
-        for (descriptor in overriddenDescriptors) {
-            val (isRefinedForObjC, isRefinedInSwift) = descriptor.inheritsRefinedAnnotations()
-            hasObjC = hasObjC || isRefinedForObjC
-            hasSwift = hasSwift || isRefinedInSwift
-            if (hasObjC && hasSwift) return true to true
-        }
-        return hasObjC to hasSwift
+        if (overriddenDescriptors.isEmpty()) return hasObjC to hasSwift
+        // Note: `checkOverrides` requires all overridden descriptors to be either refined or not refined.
+        val (inheritsObjC, inheritsSwift) = overriddenDescriptors.first().inheritsRefinedAnnotations()
+        return (hasObjC || inheritsObjC) to (hasSwift || inheritsSwift)
     }
 
     private fun CallableMemberDescriptor.hasRefinedAnnotations(): Pair<Boolean, Boolean> {
