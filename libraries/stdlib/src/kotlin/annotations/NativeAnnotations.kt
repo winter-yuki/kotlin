@@ -17,6 +17,9 @@ package kotlin.native
 @OptionalExpectation
 public expect annotation class CName(val externName: String = "", val shortName: String = "")
 
+/**
+ * This annotation marks the experimental Objective-C export refinement annotations.
+ */
 @RequiresOptIn
 @Target(AnnotationTarget.ANNOTATION_CLASS)
 @Retention(AnnotationRetention.BINARY)
@@ -24,6 +27,14 @@ public expect annotation class CName(val externName: String = "", val shortName:
 @OptionalExpectation
 public expect annotation class ExperimentalObjCRefinement()
 
+/**
+ * Meta-annotation that instructs the Kotlin compiler to remove the annotated function or property from the public Objective-C API.
+ *
+ * Annotation processors that refine the public Objective-C API can annotate their annotations with this meta-annotation
+ * to have the original declarations automatically removed from the public API.
+ *
+ * Note: only annotations with [AnnotationTarget.FUNCTION] and/or [AnnotationTarget.PROPERTY] are supported.
+ */
 @Target(AnnotationTarget.ANNOTATION_CLASS)
 @Retention(AnnotationRetention.BINARY)
 @MustBeDocumented
@@ -32,7 +43,7 @@ public expect annotation class ExperimentalObjCRefinement()
 public expect annotation class RefinesForObjC()
 
 /**
- * Instructs the Kotlin compiler to remove this property or function from the public Objective-C API.
+ * Instructs the Kotlin compiler to remove this function or property from the public Objective-C API.
  */
 @RefinesForObjC
 @Target(AnnotationTarget.PROPERTY, AnnotationTarget.FUNCTION)
@@ -42,6 +53,15 @@ public expect annotation class RefinesForObjC()
 @ExperimentalObjCRefinement
 public expect annotation class RefinedForObjC()
 
+/**
+ * Meta-annotation that instructs the Kotlin compiler to mark the annotated function or property as
+ * [`swift_private`](https://developer.apple.com/documentation/swift/objective-c_and_c_code_customization/improving_objective-c_api_declarations_for_swift).
+ *
+ * Annotation processors that refine the public API in Swift can annotate their annotations with this meta-annotation
+ * to automatically hide the annotated declarations from Swift.
+ *
+ * Note: only annotations with [AnnotationTarget.FUNCTION] and/or [AnnotationTarget.PROPERTY] are supported.
+ */
 @Target(AnnotationTarget.ANNOTATION_CLASS)
 @Retention(AnnotationRetention.BINARY)
 @MustBeDocumented
@@ -50,7 +70,7 @@ public expect annotation class RefinedForObjC()
 public expect annotation class RefinesInSwift()
 
 /**
- * Instructs the Kotlin compiler to mark this property or function as [`swift_private`](https://developer.apple.com/documentation/swift/objective-c_and_c_code_customization/improving_objective-c_api_declarations_for_swift).
+ * Instructs the Kotlin compiler to mark this function or property as [`swift_private`](https://developer.apple.com/documentation/swift/objective-c_and_c_code_customization/improving_objective-c_api_declarations_for_swift).
  */
 @RefinesInSwift
 @Target(AnnotationTarget.PROPERTY, AnnotationTarget.FUNCTION)
