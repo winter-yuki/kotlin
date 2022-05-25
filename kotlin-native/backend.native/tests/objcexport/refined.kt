@@ -50,3 +50,20 @@ val myBar: Int = 4
 @OptIn(ExperimentalObjCRefinement::class)
 @MyRefinedInSwift
 val myBarRefined: String get() = myBar.toString()
+
+open class RefinedClassA {
+    @OptIn(ExperimentalObjCRefinement::class)
+    @RefinedForObjC
+    open fun foo(): Int = 1
+    @OptIn(ExperimentalObjCRefinement::class)
+    @RefinedInSwift
+    open fun fooRefined(): String = foo().toString()
+}
+
+class RefinedClassB: RefinedClassA() {
+    override fun foo(): Int = 2
+    override fun fooRefined(): String {
+        val foo = foo()
+        return "$foo$foo"
+    }
+}

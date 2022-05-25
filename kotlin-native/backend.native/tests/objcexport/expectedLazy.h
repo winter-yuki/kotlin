@@ -1234,6 +1234,21 @@ __attribute__((swift_name("OverrideMethodsOfAnyKt")))
 + (BOOL)testObj:(id)obj other:(id)other swift:(BOOL)swift error:(NSError * _Nullable * _Nullable)error __attribute__((swift_name("test(obj:other:swift:)")));
 @end;
 
+__attribute__((swift_name("RefinedClassA")))
+@interface KtRefinedClassA : KtBase
+- (instancetype)init __attribute__((swift_name("init()"))) __attribute__((objc_designated_initializer));
++ (instancetype)new __attribute__((availability(swift, unavailable, message="use object initializers instead")));
+- (NSString *)fooRefined __attribute__((swift_private));
+@end;
+
+__attribute__((objc_subclassing_restricted))
+__attribute__((swift_name("RefinedClassB")))
+@interface KtRefinedClassB : KtRefinedClassA
+- (instancetype)init __attribute__((swift_name("init()"))) __attribute__((objc_designated_initializer));
++ (instancetype)new __attribute__((availability(swift, unavailable, message="use object initializers instead")));
+- (NSString *)fooRefined __attribute__((swift_private));
+@end;
+
 __attribute__((objc_subclassing_restricted))
 __attribute__((swift_name("RefinedKt")))
 @interface KtRefinedKt : KtBase
