@@ -359,6 +359,7 @@ class ConstantExpressionEvaluator(
 
         @JvmStatic
         fun getPossiblyErrorConstant(expression: KtExpression, bindingContext: BindingContext): CompileTimeConstant<*>? {
+            if (bindingContext.get(BindingContext.PROCESSED, expression) != true) return null
             return bindingContext.get(BindingContext.COMPILE_TIME_VALUE, expression)
         }
 
