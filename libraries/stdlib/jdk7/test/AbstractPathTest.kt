@@ -5,11 +5,9 @@
 
 package kotlin.jdk7.test
 
-import java.io.IOException
-import java.nio.file.*
-import java.nio.file.attribute.BasicFileAttributes
+import java.nio.file.Path
 import kotlin.io.path.deleteIfExists
-import kotlin.io.path.exists
+import kotlin.io.path.deleteRecursively
 import kotlin.test.*
 
 abstract class AbstractPathTest {
@@ -21,22 +19,8 @@ abstract class AbstractPathTest {
     }
 
     fun Path.cleanupRecursively(): Path {
-        cleanUpActions.add(this to {
-            if (it.exists(LinkOption.NOFOLLOW_LINKS)) Files.walkFileTree(it, cleanupVisitor)
-        })
+        cleanUpActions.add(this to { it.deleteRecursively() })
         return this
-    }
-
-    private val cleanupVisitor = object : SimpleFileVisitor<Path>() {
-        override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
-            file.deleteIfExists()
-            return super.visitFile(file, attrs)
-        }
-
-        override fun postVisitDirectory(dir: Path, exc: IOException?): FileVisitResult {
-            dir.deleteIfExists()
-            return super.postVisitDirectory(dir, exc)
-        }
     }
 
     @AfterTest
@@ -59,6 +43,18 @@ abstract class AbstractPathTest {
             }
         } finally {
             paths.forEach { it.toFile().setReadable(true) }
+        }
+    }
+
+    fun withRestrictedWrite(vararg paths: Path, block: () -> Unit) {
+        try {
+            if (paths.all { it.toFile().setWritable(false) }) {
+                block()
+            } else {
+                System.err.println("Couldn't restrict write access")
+            }
+        } finally {
+            paths.forEach { it.toFile().setWritable(true) }
         }
     }
 }

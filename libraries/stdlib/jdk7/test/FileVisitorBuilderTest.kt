@@ -182,7 +182,7 @@ class FileVisitorBuilderTest : AbstractPathTest() {
     }
 
     @Test
-    fun copyRecursively() {
+    fun copyToRecursively() {
         val srcRoot = createTestFiles().cleanupRecursively()
         val dstRoot = createTempDirectory().cleanupRecursively()
 

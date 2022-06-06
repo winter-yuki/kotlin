@@ -148,6 +148,57 @@ class PathExtensionsTest : AbstractPathTest() {
     }
 
     @Test
+    fun copyToRestrictedReadSource() {
+        val root = createTempDirectory("copyTo-root").cleanupRecursively()
+        val srcDirectory = createTempDirectory(root, "srcDirectory")
+        val dstDirectory = root.resolve("dstDirectory")
+
+        withRestrictedRead(srcDirectory) {
+            srcDirectory.copyTo(dstDirectory)
+            assertFalse(dstDirectory.isReadable())
+
+            dstDirectory.toFile().setReadable(true)
+        }
+    }
+
+    @Test
+    fun copyToRestrictedWriteSource() {
+        val root = createTempDirectory("copyTo-root").cleanupRecursively()
+
+        // copy file
+        val srcFile = createTempFile(root, "srcFile")
+        val dstFile = root.resolve("dstFile")
+
+        withRestrictedWrite(srcFile) {
+            srcFile.copyTo(dstFile)
+            assertFalse(dstFile.isWritable())
+        }
+
+        // copy directory
+        val srcDirectory = createTempDirectory(root, "srcDirectory")
+        val dstDirectory = root.resolve("dstDirectory")
+
+        withRestrictedWrite(srcDirectory) {
+            srcDirectory.copyTo(dstDirectory)
+            assertFalse(dstDirectory.isWritable())
+        }
+
+        // overwrite file
+        withRestrictedRead(dstFile) {
+            srcFile.copyTo(dstFile, overwrite = true)
+            assertTrue(dstFile.isReadable())
+            assertTrue(dstFile.isWritable())
+        }
+
+        // overwrite directory
+        withRestrictedRead(dstDirectory) {
+            srcDirectory.copyTo(dstDirectory, overwrite = true)
+            assertTrue(dstDirectory.isReadable())
+            assertTrue(dstDirectory.isWritable())
+        }
+    }
+
+    @Test
     fun copyToNameWithoutParent() {
         val currentDir = Path("").absolute()
         val srcFile = createTempFile().cleanup()
