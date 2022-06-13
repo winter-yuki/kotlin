@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <cstddef>
 
 #include "Allocator.hpp"
@@ -28,7 +29,6 @@ namespace gc {
 class FinalizerProcessor;
 
 // Stop-the-world mark + concurrent sweep. The GC runs in a separate thread, finalizers run in another thread of their own.
-// TODO: Also make mark concurrent.
 class ConcurrentMarkAndSweep : private Pinned {
 public:
     class ObjectData {
@@ -41,19 +41,26 @@ public:
             kBlack, // Objects encountered during mark phase.
         };
 
-        Color color() const noexcept { return static_cast<Color>(getPointerBits(next_, colorMask)); }
-        void setColor(Color color) noexcept { next_ = setPointerBits(clearPointerBits(next_, colorMask), static_cast<unsigned>(color)); }
+        Color color() const noexcept { return static_cast<Color>(getPointerBits(next_.load(), colorMask)); }
+        void setColor(Color color) noexcept { next_ = setPointerBits(clearPointerBits(next_.load(), colorMask), static_cast<unsigned>(color)); }
+        bool atomicSetToBlack() noexcept {
+            ObjectData* before = next_.load();
+            if (getPointerBits(before, colorMask) != static_cast<unsigned>(Color::kWhite))
+                return false;
+            ObjectData* black = setPointerBits(before, static_cast<unsigned>(Color::kBlack));
+            return next_.compare_exchange_strong(before, black);
+        }
 
-        ObjectData* next() const noexcept { return clearPointerBits(next_, colorMask); }
+        ObjectData* next() const noexcept { return clearPointerBits(next_.load(), colorMask); }
         void setNext(ObjectData* next) noexcept {
             RuntimeAssert(!hasPointerBits(next, colorMask), "next must be untagged: %p", next);
-            auto bits = getPointerBits(next_, colorMask);
+            auto bits = getPointerBits(next_.load(), colorMask);
             next_ = setPointerBits(next, bits);
         }
 
     private:
         // Color is encoded in low bits.
-        ObjectData* next_ = nullptr;
+        std::atomic<ObjectData*> next_ = nullptr;
     };
 
     struct MarkQueueTraits {
@@ -79,6 +86,7 @@ public:
         void ScheduleAndWaitFullGCWithFinalizers() noexcept;
 
         void OnOOM(size_t size) noexcept;
+        void Mark() noexcept;
 
         Allocator CreateAllocator() noexcept { return Allocator(gc::Allocator(), *this); }
 
@@ -109,6 +117,7 @@ private:
     std_support::unique_ptr<FinalizerProcessor> finalizerProcessor_;
 
     MarkQueue markQueue_;
+    std::atomic<unsigned> aliveHeapSetBytes_ = 0;
 };
 
 } // namespace gc
