@@ -79,6 +79,10 @@ internal object CreateFreshTypeVariableSubstitutorStage : ResolutionStage() {
                 }
             }
         }
+        if (csBuilder.hasContradiction) {
+            sink.yieldDiagnostic(InapplicableCandidate)
+            return
+        }
     }
 }
 
