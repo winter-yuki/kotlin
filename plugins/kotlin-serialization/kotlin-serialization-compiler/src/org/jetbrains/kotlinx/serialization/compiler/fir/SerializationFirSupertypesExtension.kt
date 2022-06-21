@@ -10,10 +10,7 @@ import org.jetbrains.kotlin.fir.declarations.FirClassLikeDeclaration
 import org.jetbrains.kotlin.fir.declarations.FirRegularClass
 import org.jetbrains.kotlin.fir.extensions.FirDeclarationPredicateRegistrar
 import org.jetbrains.kotlin.fir.extensions.FirSupertypeGenerationExtension
-import org.jetbrains.kotlin.fir.extensions.predicate.AnnotatedWith
-import org.jetbrains.kotlin.fir.extensions.predicate.DeclarationPredicate
-import org.jetbrains.kotlin.fir.extensions.predicate.or
-import org.jetbrains.kotlin.fir.extensions.predicate.under
+import org.jetbrains.kotlin.fir.extensions.predicate.*
 import org.jetbrains.kotlin.fir.extensions.predicateBasedProvider
 import org.jetbrains.kotlin.fir.resolve.defaultType
 import org.jetbrains.kotlin.fir.resolve.getContainingDeclaration
@@ -34,7 +31,7 @@ class SerializationFirSupertypesExtension(session: FirSession) : FirSupertypeGen
         private val serializerFor: DeclarationPredicate =
             AnnotatedWith(setOf(SerializationAnnotations.serializerAnnotationFqName)) // @Serializer(for=...)
         private val generatedSerializer: DeclarationPredicate =
-            under(SerializationAnnotations.serializableAnnotationFqName) // @Serializable X.$serializer
+            ancestorAnnotated(SerializationAnnotations.serializableAnnotationFqName) // @Serializable X.$serializer
         private val PREDICATE = serializerFor or generatedSerializer
     }
 

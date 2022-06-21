@@ -5,6 +5,7 @@
 
 package org.jetbrains.kotlinx.serialization.compiler.fir
 
+import org.jetbrains.kotlin.GeneratedDeclarationKey
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.descriptors.EffectiveVisibility
 import org.jetbrains.kotlin.descriptors.Modality
@@ -13,14 +14,15 @@ import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.analysis.checkers.getContainingDeclarationSymbol
 import org.jetbrains.kotlin.fir.copy
 import org.jetbrains.kotlin.fir.declarations.FirDeclarationOrigin
-import org.jetbrains.kotlin.fir.declarations.FirPluginKey
 import org.jetbrains.kotlin.fir.declarations.FirResolvePhase
 import org.jetbrains.kotlin.fir.declarations.builder.*
 import org.jetbrains.kotlin.fir.declarations.impl.FirResolvedDeclarationStatusImpl
+import org.jetbrains.kotlin.fir.declarations.origin
 import org.jetbrains.kotlin.fir.declarations.utils.addDefaultBoundIfNecessary
 import org.jetbrains.kotlin.fir.declarations.utils.superConeTypes
 import org.jetbrains.kotlin.fir.extensions.FirDeclarationGenerationExtension
 import org.jetbrains.kotlin.fir.extensions.FirDeclarationPredicateRegistrar
+import org.jetbrains.kotlin.fir.extensions.MemberGenerationContext
 import org.jetbrains.kotlin.fir.extensions.predicate.AnnotatedWith
 import org.jetbrains.kotlin.fir.extensions.predicateBasedProvider
 import org.jetbrains.kotlin.fir.moduleData
@@ -43,7 +45,7 @@ import org.jetbrains.kotlinx.serialization.compiler.resolve.SerialEntityNames
 import org.jetbrains.kotlinx.serialization.compiler.resolve.SerializationAnnotations
 import org.jetbrains.kotlinx.serialization.compiler.resolve.SerializationPackages
 
-object SerializationPluginKey : FirPluginKey() {
+object SerializationPluginKey : GeneratedDeclarationKey() {
     override fun toString(): String {
         return "KotlinxSerializationPlugin"
     }
@@ -158,8 +160,8 @@ class SerializationFirResolveExtension(session: FirSession) : FirDeclarationGene
 
     // TODO: support @Serializer(for)
     @OptIn(SymbolInternals::class)
-    override fun generateFunctions(callableId: CallableId, owner: FirClassSymbol<*>?): List<FirNamedFunctionSymbol> {
-        if (owner == null) return emptyList()
+    override fun generateFunctions(callableId: CallableId, context: MemberGenerationContext?): List<FirNamedFunctionSymbol> {
+        val owner = context?.owner ?: return emptyList()
         if (owner.name == SpecialNames.DEFAULT_NAME_FOR_COMPANION_OBJECT && callableId.callableName == SerialEntityNames.SERIALIZER_PROVIDER_NAME)
             return listOf(generateSerializerGetterInCompanion(owner, callableId))
         if (owner.name != SerialEntityNames.SERIALIZER_CLASS_NAME) return emptyList()
@@ -176,7 +178,7 @@ class SerializationFirResolveExtension(session: FirSession) : FirDeclarationGene
         val copy = buildSimpleFunctionCopy(original) {
             symbol = FirNamedFunctionSymbol(callableId)
             origin = SerializationPluginKey.origin
-            status = original.status.copy(newModality = Modality.FINAL)
+            status = original.status.copy(modality = Modality.FINAL)
 
         }
         return listOf(copy.symbol)
@@ -211,8 +213,8 @@ class SerializationFirResolveExtension(session: FirSession) : FirDeclarationGene
     }
 
     @OptIn(SymbolInternals::class)
-    override fun generateProperties(callableId: CallableId, owner: FirClassSymbol<*>?): List<FirPropertySymbol> {
-        if (owner == null) return emptyList()
+    override fun generateProperties(callableId: CallableId, context: MemberGenerationContext?): List<FirPropertySymbol> {
+        val owner = context?.owner ?: return emptyList()
         if (owner.name != SerialEntityNames.SERIALIZER_CLASS_NAME) return emptyList()
         if (callableId.callableName != SerialEntityNames.SERIAL_DESC_FIELD_NAME) return emptyList()
 
@@ -221,15 +223,16 @@ class SerializationFirResolveExtension(session: FirSession) : FirDeclarationGene
         val copy = buildPropertyCopy(original) {
             symbol = FirPropertySymbol(callableId)
             origin = SerializationPluginKey.origin
-            status = original.status.copy(newModality = Modality.FINAL)
+            status = original.status.copy(modality = Modality.FINAL)
             getter = buildPropertyAccessor {
-                status = original.status.copy(newModality = Modality.FINAL)
+                status = original.status.copy(modality = Modality.FINAL)
                 symbol = FirPropertyAccessorSymbol()
                 origin = SerializationPluginKey.origin
                 moduleData = session.moduleData
                 isGetter = true
                 returnTypeRef = original.returnTypeRef
                 dispatchReceiverType = owner.defaultType()
+                propertySymbol = this@buildPropertyCopy.symbol
             }
         }
         return listOf(copy.symbol)
@@ -241,8 +244,8 @@ class SerializationFirResolveExtension(session: FirSession) : FirDeclarationGene
             .filterIsInstance<FirRegularClassSymbol>()
     }
 
-    override fun generateConstructors(owner: FirClassSymbol<*>): List<FirConstructorSymbol> {
-        val constructor = buildConstructor(owner.classId, isInner = false, SerializationPluginKey)
+    override fun generateConstructors(context: MemberGenerationContext): List<FirConstructorSymbol> {
+        val constructor = buildConstructor(context.owner.classId, isInner = false, SerializationPluginKey)
         return listOf(constructor.symbol)
     }
 
