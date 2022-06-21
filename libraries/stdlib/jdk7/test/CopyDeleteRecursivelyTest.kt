@@ -515,6 +515,37 @@ class CopyDeleteRecursivelyTest : AbstractPathTest() {
     }
 
     @Test
+    fun copyIgnoreExistingDirectoriesFollowSymlinks() {
+        val dir1 = createTestFiles().cleanupRecursively()
+        val dir2 = createTempDirectory().cleanupRecursively()
+        val dir3 = createTempDirectory().cleanupRecursively().also {
+            it.resolve("1").createDirectory()
+            it.resolve("1/3").tryCreateSymbolicLinkTo(dir2) ?: return
+        }
+
+        dir1.copyToRecursively(dir3, followLinks = true)
+        val expected = listOf("") + referenceFilenames
+        testVisitedFiles(expected, dir3.walk(PathWalkOption.INCLUDE_DIRECTORIES, PathWalkOption.FOLLOW_LINKS), dir3)
+    }
+
+    @Test
+    fun copyIgnoreExistingDirectoriesNoFollowSymlinks() {
+        val dir1 = createTestFiles().cleanupRecursively()
+        val dir2 = createTempDirectory().cleanupRecursively()
+        val dir3 = createTempDirectory().cleanupRecursively().also {
+            it.resolve("1").createDirectory()
+            it.resolve("1/3").tryCreateSymbolicLinkTo(dir2) ?: return
+        }
+
+        val error = assertFailsWith<java.nio.file.FileSystemException> {
+            dir1.copyToRecursively(dir3, followLinks = false)
+        }
+        assertIs<java.nio.file.FileAlreadyExistsException>(error.suppressedExceptions.single())
+        val expected = listOf("") + referenceFilenames.filterNot { it.startsWith("1/3/") }
+        testVisitedFiles(expected, dir3.walkIncludeDirectories(), dir3)
+    }
+
+    @Test
     fun copyOverwriteFollowSymlinks() {
         val dir1 = createTestFiles().cleanupRecursively()
         val dir2 = createTestFiles().cleanupRecursively().also { it.resolve("8/link").tryCreateSymbolicLinkTo(dir1) ?: return }

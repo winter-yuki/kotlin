@@ -1133,7 +1133,9 @@ public fun fileVisitor(builderAction: FileVisitorBuilder.() -> Unit): FileVisito
 
 /**
  * Copies this file with all its children to the specified destination [target] path.
- * Note that if this function fails, then partial copying may have taken place.
+ * Note that if this function throws, partial copying may have taken place.
+ *
+ * If a custom implementation of [copyAction] is provided, consider making it consistent with [followLinks] value.
  *
  * Unlike `File.copyRecursively`, if some directories on the way to the [target] are missing, then they won't be created automatically.
  * You can use the following approach to ensure that required intermediate directories are created:
@@ -1151,9 +1153,8 @@ public fun fileVisitor(builderAction: FileVisitorBuilder.() -> Unit): FileVisito
  * @param target the destination path to copy recursively this file to.
  * @param followLinks `true` to traverse for copying content of the directory a symbolic link points to.
  * @param copyAction the function to call for copying source files/directories to their destination path rooted in [target].
- * By default, it throws if the destination file already exists,
- * it doesn't preserve copied file attributes such as creation/modification date, permissions, etc.,
- * and it copies symbolic links met, not the files they point to. -- Update after discussion.
+ * By default, it throws if the destination file already exists and
+ * doesn't preserve copied file attributes such as creation/modification date, etc.
  * @throws NoSuchFileException if the file located by this path does not exist.
  * @throws IOException if any file in the tree can't be copied for any reason.
  */
@@ -1162,7 +1163,7 @@ public fun Path.copyToRecursively(
     followLinks: Boolean,
     copyAction: (source: Path, target: Path) -> CopyActionResult = { src, dst ->
         val options = LinkFollowing.toLinkOptions(followLinks)
-        if (!src.isDirectory(*options) || !dst.isDirectory(LinkOption.NOFOLLOW_LINKS)) {
+        if ((src.isDirectory(*options) && dst.isDirectory(*options)).not()) {
             src.copyTo(dst, *options)
         }
         // else: do nothing, the destination directory already exists
@@ -1180,10 +1181,10 @@ public fun Path.copyToRecursively(
         // * REPLACE_EXISTING: If the target file exists and is a symbolic link,
         // * then the symbolic link itself, not the target of the link, is replaced.
         // For src it is not known if links are followed in copyAction
-        val dst = target.resolve(src.relativeToOrSelf(this))
+        val dst = target.resolve(src.relativeToOrSelf(this)) // src might already be relativized
         copyAction(src, dst)
     }.onFile { _, src ->
-        val dst = target.resolve(src.relativeToOrSelf(this))
+        val dst = target.resolve(src.relativeToOrSelf(this)) // src might already be relativized
         copyAction(src, dst)
     }.onFail { _, exception ->
         suppressedExceptions.add(exception)
@@ -1204,7 +1205,7 @@ public enum class CopyActionResult {
 
 /**
  * Delete this file with all its children.
- * Note that if this function throws then partial deletion may have taken place.
+ * Note that if this function throws, partial deletion may have taken place.
  *
  * This function does nothing if the file located by this path does not exist.
  *
