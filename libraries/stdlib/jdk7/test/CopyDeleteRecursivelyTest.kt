@@ -360,7 +360,6 @@ class CopyDeleteRecursivelyTest : AbstractPathTest() {
         }
     }
 
-    // TODO: Fix cleanupRecursively that fails when a restricted source is copied
     @Test
     fun copyRestrictedWriteInSource() {
         val src = createTestFiles().cleanupRecursively()
@@ -407,6 +406,50 @@ class CopyDeleteRecursivelyTest : AbstractPathTest() {
         src.resolve("1/3").deleteRecursively()
         dst.resolve("1/3").deleteRecursively()
         compareDirectories(src, dst)
+    }
+
+    @Test
+    fun copyBrokenBaseSymlink() {
+        val basedir = createTempDirectory().cleanupRecursively()
+        val target = basedir.resolve("target")
+        val link = basedir.resolve("link").tryCreateSymbolicLinkTo(target) ?: return
+        val dst = basedir.resolve("dst")
+
+        // the same behavior as link.copyTo(dst, LinkOption.NOFOLLOW_LINKS)
+        link.copyToRecursively(dst, followLinks = false)
+        assertTrue(dst.isSymbolicLink())
+        assertTrue(dst.exists(LinkOption.NOFOLLOW_LINKS))
+        assertFalse(dst.exists())
+
+        // the same behavior as link.copyTo(dst)
+        dst.deleteExisting()
+        assertFailsWith<java.nio.file.NoSuchFileException> {
+            link.copyToRecursively(dst, followLinks = true)
+        }
+        assertFalse(dst.exists(LinkOption.NOFOLLOW_LINKS))
+    }
+
+    @Test
+    fun copyBrokenSymlink() {
+        val src = createTestFiles().cleanupRecursively()
+        val dst = createTempDirectory().cleanupRecursively().resolve("dst")
+        val target = createTempDirectory().cleanupRecursively().resolve("target")
+        src.resolve("8/link").tryCreateSymbolicLinkTo(target) ?: return
+        val dstLink = dst.resolve("8/link")
+
+        // the same behavior as link.copyTo(dst, LinkOption.NOFOLLOW_LINKS)
+        src.copyToRecursively(dst, followLinks = false)
+        assertTrue(dstLink.isSymbolicLink())
+        assertTrue(dstLink.exists(LinkOption.NOFOLLOW_LINKS))
+        assertFalse(dstLink.exists())
+
+        // the same behavior as link.copyTo(dst)
+        dst.deleteRecursively()
+        val error = assertFailsWith<java.nio.file.FileSystemException> {
+            src.copyToRecursively(dst, followLinks = true)
+        }
+        assertIs<java.nio.file.NoSuchFileException>(error.suppressedExceptions.single())
+        assertFalse(dstLink.exists(LinkOption.NOFOLLOW_LINKS))
     }
 
     @Test
