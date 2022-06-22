@@ -358,7 +358,7 @@ interface IrBuilderExtension {
         irClass: IrClass,
         serialProperties: List<SerializableProperty>,
         instance: IrValueParameter,
-        bindingContext: BindingContext
+        bindingContext: BindingContext?
     ): (ValueParameterDescriptor) -> IrExpression? {
         fun SerializableProperty.irGet(): IrExpression {
             val ownerType = instance.symbol.owner.type
@@ -378,8 +378,9 @@ interface IrBuilderExtension {
                 .filter { it.backingField != null }.filter { !serialPropertiesMap.containsKey(it.descriptor) }
                 .associateBy { it.symbol.descriptor }
 
-        return {
-            val propertyDescriptor = bindingContext[BindingContext.VALUE_PARAMETER_AS_PROPERTY, it]
+        return { vpd ->
+            val propertyDescriptor = irClass.properties.find { it.name == vpd.name }?.descriptor
+//            val propertyDescriptor = bindingContext!!.get(BindingContext.VALUE_PARAMETER_AS_PROPERTY, vpd)
             if (propertyDescriptor != null) {
                 val value = serialPropertiesMap[propertyDescriptor]
                 value?.irGet() ?: transientPropertiesMap[propertyDescriptor]?.let { prop ->

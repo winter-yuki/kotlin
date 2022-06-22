@@ -47,10 +47,9 @@ internal typealias FunctionWithArgs = Pair<IrFunctionSymbol, List<IrExpression>>
 open class SerializerIrGenerator(
     val irClass: IrClass,
     final override val compilerContext: SerializationPluginContext,
-    bindingContext: BindingContext,
     metadataPlugin: SerializationDescriptorSerializerPlugin?,
     private val serialInfoJvmGenerator: SerialInfoImplJvmIrGenerator,
-) : SerializerCodegen(irClass.descriptor, bindingContext, metadataPlugin), IrBuilderExtension {
+) : SerializerCodegen(irClass.descriptor, null, metadataPlugin), IrBuilderExtension {
     protected val serializableIrClass = compilerContext.symbolTable.referenceClass(serializableDescriptor).owner
     protected val irAnySerialDescProperty = anySerialDescProperty?.let { compilerContext.symbolTable.referenceProperty(it) }
 
@@ -474,9 +473,8 @@ open class SerializerIrGenerator(
                 compilerContext.referenceConstructors(serializableDescriptor.fqNameSafe).single { it.owner.isPrimary }
             val params = ctor.owner.valueParameters
 
-
             val variableByParamReplacer: (ValueParameterDescriptor) -> IrExpression? = {
-                val propertyDescriptor = bindingContext[BindingContext.VALUE_PARAMETER_AS_PROPERTY, it]
+                val propertyDescriptor = bindingContext?.get(BindingContext.VALUE_PARAMETER_AS_PROPERTY, it) // TODO
                 if (propertyDescriptor != null) {
                     val serializable = serialPropertiesMap[propertyDescriptor]
                     (serializable ?: transientsPropertiesMap[propertyDescriptor])?.get()
@@ -489,8 +487,13 @@ open class SerializerIrGenerator(
 
             // constructor args:
             val ctorArgs = params.map { parameter ->
+                val targetName = parameter.name
+                val propSrc = serializableIrClass.properties.find { it.name == targetName }!! // todo: check with tests
+                val propertyDescriptor = propSrc.descriptor
+//                val (propertyDescriptor, serialProperty) = serialPropertiesMap.entries.find { it.value.name == targetName }!!
+
                 val parameterDescriptor = parameter.descriptor as ValueParameterDescriptor
-                val propertyDescriptor = bindingContext[BindingContext.VALUE_PARAMETER_AS_PROPERTY, parameterDescriptor]!!
+//                val propertyDescriptor = bindingContext?.get(BindingContext.VALUE_PARAMETER_AS_PROPERTY, parameterDescriptor)
                 val serialProperty = serialPropertiesMap[propertyDescriptor]
 
                 // null if transient
@@ -560,15 +563,14 @@ open class SerializerIrGenerator(
         fun generate(
             irClass: IrClass,
             context: SerializationPluginContext,
-            bindingContext: BindingContext,
             metadataPlugin: SerializationDescriptorSerializerPlugin?,
             serialInfoJvmGenerator: SerialInfoImplJvmIrGenerator,
         ) {
             val serializableDesc = getSerializableClassDescriptorBySerializer(irClass.symbol.descriptor) ?: return
             val generator = when {
-                serializableDesc.isEnumWithLegacyGeneratedSerializer() -> SerializerForEnumsGenerator(irClass, context, bindingContext, serialInfoJvmGenerator)
-                serializableDesc.isInlineClass() -> SerializerForInlineClassGenerator(irClass, context, bindingContext, serialInfoJvmGenerator)
-                else -> SerializerIrGenerator(irClass, context, bindingContext, metadataPlugin, serialInfoJvmGenerator)
+                serializableDesc.isEnumWithLegacyGeneratedSerializer() -> SerializerForEnumsGenerator(irClass, context, serialInfoJvmGenerator)
+                serializableDesc.isInlineClass() -> SerializerForInlineClassGenerator(irClass, context, serialInfoJvmGenerator)
+                else -> SerializerIrGenerator(irClass, context, metadataPlugin, serialInfoJvmGenerator)
             }
             generator.generate()
             irClass.patchDeclarationParents(irClass.parent)

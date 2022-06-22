@@ -5,23 +5,25 @@
 
 package org.jetbrains.kotlinx.serialization.compiler.backend.ir
 
-import org.jetbrains.kotlin.ir.deepCopyWithVariables
 import org.jetbrains.kotlin.backend.common.lower.irThrow
 import org.jetbrains.kotlin.codegen.CompilationException
 import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.ir.IrStatement
 import org.jetbrains.kotlin.ir.builders.*
 import org.jetbrains.kotlin.ir.declarations.*
-import org.jetbrains.kotlin.ir.expressions.*
+import org.jetbrains.kotlin.ir.deepCopyWithVariables
+import org.jetbrains.kotlin.ir.expressions.IrExpression
+import org.jetbrains.kotlin.ir.expressions.IrExpressionBody
+import org.jetbrains.kotlin.ir.expressions.IrStatementOrigin
 import org.jetbrains.kotlin.ir.expressions.impl.IrDelegatingConstructorCallImpl
 import org.jetbrains.kotlin.ir.types.IrSimpleType
 import org.jetbrains.kotlin.ir.types.IrTypeProjection
 import org.jetbrains.kotlin.ir.types.classOrNull
 import org.jetbrains.kotlin.ir.types.isString
 import org.jetbrains.kotlin.ir.util.*
-import org.jetbrains.kotlin.ir.visitors.IrElementTransformerVoid
 import org.jetbrains.kotlin.js.resolve.diagnostics.findPsi
-import org.jetbrains.kotlin.resolve.BindingContext
+import org.jetbrains.kotlin.name.ClassId
+import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.resolve.descriptorUtil.fqNameSafe
 import org.jetbrains.kotlin.resolve.descriptorUtil.module
 import org.jetbrains.kotlin.util.OperatorNameConventions
@@ -40,17 +42,25 @@ import org.jetbrains.kotlinx.serialization.compiler.resolve.SerialEntityNames.SE
 
 class SerializableIrGenerator(
     val irClass: IrClass,
-    override val compilerContext: SerializationPluginContext,
-    bindingContext: BindingContext
-) : SerializableCodegen(irClass.descriptor, bindingContext), IrBuilderExtension {
+    override val compilerContext: SerializationPluginContext
+) : SerializableCodegen(irClass.descriptor, null), IrBuilderExtension {
 
-    private val serialDescClass: ClassDescriptor = serializableDescriptor.module
-        .getClassFromSerializationDescriptorsPackage(SerialEntityNames.SERIAL_DESCRIPTOR_CLASS)
+    private val serialDescriptorClass = compilerContext.referenceClass(
+        ClassId(
+            SerializationPackages.descriptorsPackageFqName,
+            Name.identifier(SerialEntityNames.SERIAL_DESCRIPTOR_CLASS)
+        )
+    )!!.owner
 
-    private val serialDescImplClass: ClassDescriptor = serializableDescriptor
-        .getClassFromInternalSerializationPackage(SerialEntityNames.SERIAL_DESCRIPTOR_CLASS_IMPL)
+    private val serialDescriptorImplClass = compilerContext.referenceClass(
+        ClassId(
+            SerializationPackages.internalPackageFqName,
+            Name.identifier(SerialEntityNames.SERIAL_DESCRIPTOR_CLASS_IMPL)
+        )
+    )!!.owner
 
-    private val addElementFun = serialDescImplClass.referenceFunctionSymbol(CallingConventions.addElement)
+    private val addElementFun =
+        serialDescriptorImplClass.findDeclaration<IrFunction> { it.name.toString() == CallingConventions.addElement }!!.symbol
 
     private fun IrClass.hasSerializableOrMetaAnnotationWithoutArgs(): Boolean {
         val annot = getAnnotation(SerializationAnnotations.serializableAnnotationFqName)
@@ -216,7 +226,7 @@ class SerializableIrGenerator(
     }
 
     private fun IrBlockBodyBuilder.createCachedDescriptorProperty(companionObject: IrClass): IrProperty {
-        val serialDescIrType = serialDescClass.defaultType.toIrType()
+        val serialDescIrType = serialDescriptorClass.defaultType
 
         return createCompanionValProperty(companionObject, serialDescIrType, CACHED_DESCRIPTOR_FIELD_NAME) {
             val serialDescVar = irTemporary(
@@ -231,7 +241,7 @@ class SerializableIrGenerator(
     }
 
     private fun IrBlockBodyBuilder.getInstantiateDescriptorExpr(): IrExpression {
-        val classConstructors = compilerContext.referenceConstructors(serialDescImplClass.fqNameSafe)
+        val classConstructors = compilerContext.referenceConstructors(serialDescriptorImplClass.kotlinFqName) //todo: remove reference
         val serialClassDescImplCtor = classConstructors.single { it.owner.isPrimary }
         return irInvoke(
             null, serialClassDescImplCtor,
@@ -371,12 +381,11 @@ class SerializableIrGenerator(
         fun generate(
             irClass: IrClass,
             context: SerializationPluginContext,
-            bindingContext: BindingContext
         ) {
             val serializableClass = irClass.descriptor
 
             if (serializableClass.isInternalSerializable) {
-                SerializableIrGenerator(irClass, context, bindingContext).generate()
+                SerializableIrGenerator(irClass, context).generate()
                 irClass.patchDeclarationParents(irClass.parent)
             } else if (serializableClass.serializableAnnotationIsUseless) {
                 throw CompilationException(

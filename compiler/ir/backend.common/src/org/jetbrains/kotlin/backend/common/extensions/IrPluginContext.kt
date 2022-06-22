@@ -29,6 +29,7 @@ interface IrPluginContext : IrGeneratorContext {
     val moduleDescriptor: ModuleDescriptor
 
     @ObsoleteDescriptorBasedAPI
+    @Deprecated("", level = DeprecationLevel.ERROR)
     val bindingContext: BindingContext
 
     val symbolTable: ReferenceSymbolTable

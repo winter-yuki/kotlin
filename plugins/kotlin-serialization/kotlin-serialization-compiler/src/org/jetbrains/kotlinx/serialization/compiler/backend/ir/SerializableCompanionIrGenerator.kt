@@ -35,19 +35,17 @@ import org.jetbrains.kotlinx.serialization.compiler.resolve.*
 class SerializableCompanionIrGenerator(
     val irClass: IrClass,
     override val compilerContext: SerializationPluginContext,
-    bindingContext: BindingContext
-) : SerializableCompanionCodegen(irClass.descriptor, bindingContext), IrBuilderExtension {
+) : SerializableCompanionCodegen(irClass.descriptor, null), IrBuilderExtension {
 
     companion object {
         fun generate(
             irClass: IrClass,
             context: SerializationPluginContext,
-            bindingContext: BindingContext
         ) {
             val companionDescriptor = irClass.descriptor
             val serializableClass = getSerializableClassDescriptorByCompanion(companionDescriptor) ?: return
             if (serializableClass.shouldHaveGeneratedMethodsInCompanion) {
-                SerializableCompanionIrGenerator(irClass, context, bindingContext).generate()
+                SerializableCompanionIrGenerator(irClass, context).generate()
                 irClass.patchDeclarationParents(irClass.parent)
             }
         }

@@ -15,7 +15,7 @@ import org.jetbrains.kotlinx.serialization.compiler.resolve.SerialEntityNames.SE
 
 abstract class SerializableCompanionCodegen(
     protected val companionDescriptor: ClassDescriptor,
-    bindingContext: BindingContext
+    bindingContext: BindingContext?
 ) : AbstractSerialGenerator(bindingContext, companionDescriptor) {
     protected val serializableDescriptor: ClassDescriptor = getSerializableClassDescriptorByCompanion(companionDescriptor)!!
 
