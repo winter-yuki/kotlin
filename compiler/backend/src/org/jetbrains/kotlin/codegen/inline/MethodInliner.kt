@@ -31,6 +31,7 @@ import org.jetbrains.kotlin.types.KotlinType
 import org.jetbrains.kotlin.types.isNullable
 import org.jetbrains.kotlin.types.typeUtil.isAny
 import org.jetbrains.kotlin.types.typeUtil.isAnyOrNullableAny
+import org.jetbrains.kotlin.types.typeUtil.representativeUpperBound
 import org.jetbrains.kotlin.utils.SmartList
 import org.jetbrains.kotlin.utils.SmartSet
 import org.jetbrains.kotlin.utils.addToStdlib.safeAs
@@ -427,7 +428,7 @@ class MethodInliner(
         val typeParameter =
             underlyingType.constructor.declarationDescriptor as? TypeParameterDescriptor ?: return false
 
-        val upperBound = typeParameter.upperBounds.firstOrNull() ?: return false
+        val upperBound = typeParameter.representativeUpperBound
 
         return if (isNullable()) {
             !underlyingType.isNullable() && upperBound.isAny()
