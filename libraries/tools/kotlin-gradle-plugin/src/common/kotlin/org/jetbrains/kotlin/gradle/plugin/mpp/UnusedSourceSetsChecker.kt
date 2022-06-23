@@ -8,6 +8,7 @@ package org.jetbrains.kotlin.gradle.plugin.mpp
 import org.gradle.api.Project
 import org.jetbrains.kotlin.gradle.dsl.kotlinExtension
 import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
+import org.jetbrains.kotlin.gradle.plugin.extraProperties
 
 object UnusedSourceSetsChecker {
     const val WARNING_PREFIX_ONE =
@@ -15,6 +16,8 @@ object UnusedSourceSetsChecker {
 
     const val WARNING_PREFIX_MANY =
         "The following Kotlin source sets were"
+
+    internal const val ANDROID_SOURCE_IS_ORPHAN = "Android-source-set-orphan"
 
     const val WARNING_INTRO = "configured but not added to any Kotlin compilation"
 
@@ -39,7 +42,9 @@ object UnusedSourceSetsChecker {
         project.gradle.taskGraph.whenReady { _ ->
             val compilationsBySourceSet = CompilationSourceSetUtil.compilationsBySourceSets(project)
             val unusedSourceSets = project.kotlinExtension.sourceSets.filter {
-                compilationsBySourceSet[it]?.isEmpty() ?: true
+                val isOrphanAndroidSourceSet = it.extraProperties.has(ANDROID_SOURCE_IS_ORPHAN) &&
+                        it.extraProperties[ANDROID_SOURCE_IS_ORPHAN] == true
+                !isOrphanAndroidSourceSet && compilationsBySourceSet[it]?.isEmpty() ?: true
             }
             if (unusedSourceSets.isNotEmpty()) {
                 reportUnusedSourceSets(project, unusedSourceSets.toSet())

@@ -14,15 +14,20 @@ import org.jetbrains.kotlin.gradle.internal.Kapt3GradleSubplugin
 import org.jetbrains.kotlin.gradle.plugin.*
 import org.jetbrains.kotlin.gradle.plugin.AbstractAndroidProjectHandler.Companion.kotlinSourceSetNameForAndroidSourceSet
 import org.jetbrains.kotlin.gradle.plugin.addConvention
+import org.jetbrains.kotlin.gradle.plugin.mpp.UnusedSourceSetsChecker.ANDROID_SOURCE_IS_ORPHAN
 import org.jetbrains.kotlin.gradle.plugin.sources.KotlinSourceSetFactory.Companion.defaultSourceFolder
 
 internal fun syncKotlinAndAndroidSourceSets(target: KotlinAndroidTarget) {
     val project = target.project
     val android = project.extensions.getByName("android") as BaseExtension
+    val kotlinExtension = project.kotlinExtension
 
+    val createdKotlinSourceSets = mutableSetOf<String>()
     android.sourceSets.all { androidSourceSet ->
         val kotlinSourceSetName = kotlinSourceSetNameForAndroidSourceSet(target, androidSourceSet.name)
-        val kotlinSourceSet = project.kotlinExtension.sourceSets.maybeCreate(kotlinSourceSetName)
+        createdKotlinSourceSets.add(kotlinSourceSetName)
+        val kotlinSourceSet = kotlinExtension.sourceSets.maybeCreate(kotlinSourceSetName)
+        kotlinSourceSet.extraProperties.set(ANDROID_SOURCE_IS_ORPHAN, true)
         androidSourceSet.addKotlinSources(kotlinSourceSet)
 
         createDefaultDependsOnEdges(target, kotlinSourceSet, androidSourceSet)
@@ -31,6 +36,19 @@ internal fun syncKotlinAndAndroidSourceSets(target: KotlinAndroidTarget) {
 
         ifKaptEnabled(project) {
             Kapt3GradleSubplugin.createAptConfigurationIfNeeded(project, androidSourceSet.name)
+        }
+    }
+
+    // Marking KotlinSource sets that are present in Android variants as non-orphan
+    // AGP could create 'AndroidSourceSet' without corresponding variant that does not participate in
+    // any compilation
+    target.compilations.all { compilation ->
+        compilation.androidVariant.sourceSets.forEach {
+            kotlinExtension
+                .sourceSets
+                .getByName(kotlinSourceSetNameForAndroidSourceSet(target, it.name))
+                .extraProperties
+                .set(ANDROID_SOURCE_IS_ORPHAN, false)
         }
     }
 }
