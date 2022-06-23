@@ -30315,6 +30315,11 @@ public class LightAnalysisModeTestGenerated extends AbstractLightAnalysisModeTes
                 runTest("compiler/testData/codegen/box/ranges/expression/openRange.kt");
             }
 
+            @TestMetadata("openRangeUntil.kt")
+            public void testOpenRangeUntil() throws Exception {
+                runTest("compiler/testData/codegen/box/ranges/expression/openRangeUntil.kt");
+            }
+
             @TestMetadata("overflowZeroDownToMaxValue.kt")
             public void testOverflowZeroDownToMaxValue() throws Exception {
                 runTest("compiler/testData/codegen/box/ranges/expression/overflowZeroDownToMaxValue.kt");
@@ -31207,6 +31212,11 @@ public class LightAnalysisModeTestGenerated extends AbstractLightAnalysisModeTes
                 runTest("compiler/testData/codegen/box/ranges/literal/openRange.kt");
             }
 
+            @TestMetadata("openRangeUntil.kt")
+            public void testOpenRangeUntil() throws Exception {
+                runTest("compiler/testData/codegen/box/ranges/literal/openRangeUntil.kt");
+            }
+
             @TestMetadata("overflowZeroDownToMaxValue.kt")
             public void testOverflowZeroDownToMaxValue() throws Exception {
                 runTest("compiler/testData/codegen/box/ranges/literal/overflowZeroDownToMaxValue.kt");
@@ -31435,6 +31445,11 @@ public class LightAnalysisModeTestGenerated extends AbstractLightAnalysisModeTes
                     runTest("compiler/testData/codegen/box/ranges/unsigned/expression/openRange.kt");
                 }
 
+                @TestMetadata("openRangeUntil.kt")
+                public void testOpenRangeUntil() throws Exception {
+                    runTest("compiler/testData/codegen/box/ranges/unsigned/expression/openRangeUntil.kt");
+                }
+
                 @TestMetadata("overflowZeroDownToMaxValue.kt")
                 public void testOverflowZeroDownToMaxValue() throws Exception {
                     runTest("compiler/testData/codegen/box/ranges/unsigned/expression/overflowZeroDownToMaxValue.kt");
@@ -31596,6 +31611,11 @@ public class LightAnalysisModeTestGenerated extends AbstractLightAnalysisModeTes
                 @TestMetadata("openRange.kt")
                 public void testOpenRange() throws Exception {
                     runTest("compiler/testData/codegen/box/ranges/unsigned/literal/openRange.kt");
+                }
+
+                @TestMetadata("openRangeUntil.kt")
+                public void testOpenRangeUntil() throws Exception {
+                    runTest("compiler/testData/codegen/box/ranges/unsigned/literal/openRangeUntil.kt");
                 }
 
                 @TestMetadata("overflowZeroDownToMaxValue.kt")
