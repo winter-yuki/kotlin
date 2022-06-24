@@ -171,7 +171,7 @@ public interface BindingContext {
 
     WritableSlice<ScriptDescriptor, LexicalScope> SCRIPT_SCOPE = Slices.createSimpleSlice();
 
-    WritableSlice<KtExpression, Boolean> VARIABLE_REASSIGNMENT = Slices.createSimpleSetSlice();
+    WritableSlice<KtExpression, Boolean> VARIABLE_REASSIGNMENT =  new BasicWritableSlice<>(CONSERVATIVE_SET_INCLUSION_SEMANTICS);
     WritableSlice<ValueParameterDescriptor, Boolean> AUTO_CREATED_IT = Slices.createSimpleSetSlice();
 
     WritableSlice<Pair<AnonymousFunctionDescriptor, Integer>, Boolean> SUSPEND_LAMBDA_PARAMETER_USED = Slices.createSimpleSlice();
