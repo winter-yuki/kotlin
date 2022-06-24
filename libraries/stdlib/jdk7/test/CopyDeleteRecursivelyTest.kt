@@ -6,6 +6,7 @@
 package kotlin.jdk7.test
 
 import java.nio.file.*
+import java.nio.file.attribute.BasicFileAttributeView
 import kotlin.io.path.*
 import kotlin.jdk7.test.PathTreeWalkTest.Companion.createTestFiles
 import kotlin.jdk7.test.PathTreeWalkTest.Companion.referenceFilenames
@@ -593,6 +594,47 @@ class CopyDeleteRecursivelyTest : AbstractPathTest() {
         assertFailsWith<java.nio.file.FileSystemException> {
             // throws with message "Too many levels of symbolic links"
             src.copyToRecursively(dst, followLinks = true)
+        }
+    }
+
+    @Test
+    fun canDeleteCurrentlyOpenDirectory() {
+        val basedir = createTempDirectory().cleanupRecursively()
+        val relativePath = basedir.relativeTo(basedir)
+        Files.newDirectoryStream(basedir).use { directoryStream ->
+            if (directoryStream is SecureDirectoryStream) {
+                println("Secure, relativePath: $relativePath")
+                directoryStream.deleteDirectory(basedir)
+            } else {
+                println("Insecure, relativePath: $relativePath")
+                basedir.deleteIfExists()
+            }
+        }
+        println("Was deleted: ${basedir.notExists()}")
+    }
+
+    @Test
+    fun isDirectoryEntryInRelativePath() {
+        val basedir = createTestFiles().cleanupRecursively()
+        Files.newDirectoryStream(basedir).use { directoryStream ->
+            if (directoryStream is SecureDirectoryStream) {
+                println("Secure")
+            } else {
+                println("Not secure")
+            }
+            directoryStream.forEach {
+                println(it)
+            }
+            if (directoryStream is SecureDirectoryStream) {
+                for (path in directoryStream) {
+                    val attributes = directoryStream.getFileAttributeView(path, BasicFileAttributeView::class.java).readAttributes()
+                    if (attributes.isDirectory) {
+                        directoryStream.newDirectoryStream(path).forEach {
+                            println("    $it")
+                        }
+                    }
+                }
+            }
         }
     }
 }
