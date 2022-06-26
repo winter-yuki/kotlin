@@ -1221,13 +1221,21 @@ public fun Path.deleteRecursively(): Unit {
 
     SecurePathTreeWalk(followLinks = false).onFile { secureDirectoryStream, file ->
         if (secureDirectoryStream != null) {
-            secureDirectoryStream.deleteFile(file) // deletes symlink itself, not its target
+            try {
+                secureDirectoryStream.deleteFile(file) // deletes symlink itself, not its target
+            } catch (_: NoSuchFileException) {
+                // ignore
+            }
         } else {
             file.deleteIfExists() // deletes symlink itself, not its target
         }
     }.onLeaveDirectory { secureDirectoryStream, dir ->
         if (secureDirectoryStream != null) {
-            secureDirectoryStream.deleteDirectory(dir)
+            try {
+                secureDirectoryStream.deleteDirectory(dir)
+            } catch (_: NoSuchFileException) {
+                // ignore
+            }
         } else {
             dir.deleteIfExists()
         }
