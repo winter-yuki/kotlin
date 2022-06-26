@@ -1177,14 +1177,18 @@ public fun Path.copyToRecursively(
 
     val suppressedExceptions = mutableListOf<Throwable>()
 
-    SecurePathTreeWalk(followLinks).onEnterDirectory { _, src ->
+    SecurePathTreeWalk(followLinks).onEnterDirectory { _, source ->
         // * REPLACE_EXISTING: If the target file exists and is a symbolic link,
         // * then the symbolic link itself, not the target of the link, is replaced.
         // For src it is not known if links are followed in copyAction
-        val dst = target.resolve(src.relativeToOrSelf(this)) // src might already be relativized
+        val relativePath = source.relativeToOrSelf(this) // source might already be relativized
+        val src = this.resolve(relativePath)
+        val dst = target.resolve(relativePath)
         copyAction(src, dst)
-    }.onFile { _, src ->
-        val dst = target.resolve(src.relativeToOrSelf(this)) // src might already be relativized
+    }.onFile { _, source ->
+        val relativePath = source.relativeToOrSelf(this) // source might already be relativized
+        val src = this.resolve(relativePath)
+        val dst = target.resolve(relativePath)
         copyAction(src, dst)
     }.onFail { _, exception ->
         suppressedExceptions.add(exception)
