@@ -696,17 +696,19 @@ class CopyDeleteRecursivelyTest : AbstractPathTest() {
             } else {
                 println("Not secure")
             }
-            directoryStream.forEach {
-                println(it)
-            }
             if (directoryStream is SecureDirectoryStream) {
                 for (path in directoryStream) {
+                    println(path)
                     val attributes = directoryStream.getFileAttributeView(path, BasicFileAttributeView::class.java).readAttributes()
                     if (attributes.isDirectory) {
                         directoryStream.newDirectoryStream(path).forEach {
                             println("    $it")
                         }
                     }
+                }
+            } else {
+                directoryStream.forEach {
+                    println(it)
                 }
             }
         }
