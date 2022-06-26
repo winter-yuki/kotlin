@@ -1,3 +1,10 @@
+public final class kotlin/io/path/CopyActionResult : java/lang/Enum {
+	public static final field CONTINUE Lkotlin/io/path/CopyActionResult;
+	public static final field TERMINATE Lkotlin/io/path/CopyActionResult;
+	public static fun valueOf (Ljava/lang/String;)Lkotlin/io/path/CopyActionResult;
+	public static fun values ()[Lkotlin/io/path/CopyActionResult;
+}
+
 public abstract interface annotation class kotlin/io/path/ExperimentalPathApi : java/lang/annotation/Annotation {
 }
 
@@ -19,10 +26,13 @@ public final class kotlin/io/path/PathWalkOption : java/lang/Enum {
 public final class kotlin/io/path/PathsKt {
 	public static final fun appendText (Ljava/nio/file/Path;Ljava/lang/CharSequence;Ljava/nio/charset/Charset;)V
 	public static synthetic fun appendText$default (Ljava/nio/file/Path;Ljava/lang/CharSequence;Ljava/nio/charset/Charset;ILjava/lang/Object;)V
+	public static final fun copyToRecursively (Ljava/nio/file/Path;Ljava/nio/file/Path;ZLkotlin/jvm/functions/Function2;)V
+	public static synthetic fun copyToRecursively$default (Ljava/nio/file/Path;Ljava/nio/file/Path;ZLkotlin/jvm/functions/Function2;ILjava/lang/Object;)V
 	public static final fun createTempDirectory (Ljava/nio/file/Path;Ljava/lang/String;[Ljava/nio/file/attribute/FileAttribute;)Ljava/nio/file/Path;
 	public static synthetic fun createTempDirectory$default (Ljava/nio/file/Path;Ljava/lang/String;[Ljava/nio/file/attribute/FileAttribute;ILjava/lang/Object;)Ljava/nio/file/Path;
 	public static final fun createTempFile (Ljava/nio/file/Path;Ljava/lang/String;Ljava/lang/String;[Ljava/nio/file/attribute/FileAttribute;)Ljava/nio/file/Path;
 	public static synthetic fun createTempFile$default (Ljava/nio/file/Path;Ljava/lang/String;Ljava/lang/String;[Ljava/nio/file/attribute/FileAttribute;ILjava/lang/Object;)Ljava/nio/file/Path;
+	public static final fun deleteRecursively (Ljava/nio/file/Path;)V
 	public static final fun fileAttributeViewNotAvailable (Ljava/nio/file/Path;Ljava/lang/Class;)Ljava/lang/Void;
 	public static final fun fileVisitor (Lkotlin/jvm/functions/Function1;)Ljava/nio/file/FileVisitor;
 	public static final fun getExtension (Ljava/nio/file/Path;)Ljava/lang/String;
