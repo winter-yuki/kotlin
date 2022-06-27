@@ -1177,18 +1177,46 @@ public fun Path.copyToRecursively(
 
     val suppressedExceptions = mutableListOf<Throwable>()
 
+    val parent: Path? = this.parent
+
     SecurePathTreeWalk(followLinks).onEnterDirectory { _, source ->
         // * REPLACE_EXISTING: If the target file exists and is a symbolic link,
         // * then the symbolic link itself, not the target of the link, is replaced.
         // For src it is not known if links are followed in copyAction
-        val relativePath = source.relativeToOrSelf(this) // source might already be relativized
-        val src = this.resolve(relativePath)
-        val dst = target.resolve(relativePath)
+        val src = if (parent == null) {
+            source
+        } else {
+            val relativePath = source.relativeToOrSelf(parent) // source might already be relativized
+            parent.resolve(relativePath)
+        }
+        val dst = target.resolve(src.relativeToOrSelf(this))
+
+        println("# copyToRecursively [onEnterDirectory]")
+        println("this: $this")
+        println("parent: $parent")
+        println("source: $source")
+        println("src: $src")
+        println("dst: $dst")
+        println()
+
         copyAction(src, dst)
     }.onFile { _, source ->
-        val relativePath = source.relativeToOrSelf(this) // source might already be relativized
-        val src = this.resolve(relativePath)
-        val dst = target.resolve(relativePath)
+        val src = if (parent == null) {
+            source
+        } else {
+            val relativePath = source.relativeToOrSelf(parent) // source might already be relativized
+            parent.resolve(relativePath)
+        }
+        val dst = target.resolve(src.relativeToOrSelf(this))
+
+        println("# copyToRecursively [onFile]")
+        println("this: $this")
+        println("parent: $parent")
+        println("source: $source")
+        println("src: $src")
+        println("dst: $dst")
+        println()
+
         copyAction(src, dst)
     }.onFail { _, exception ->
         suppressedExceptions.add(exception)
