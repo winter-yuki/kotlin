@@ -84,7 +84,7 @@ internal class SecurePathTreeWalk private constructor(
             directoryStream?.use { stream ->
                 if (stream is SecureDirectoryStream<Path>) {
                     useInsecure = false
-                    stream.handleEntry(path.relativeTo(parent))
+                    stream.handleEntry(path.fileName)
                 }
             }
         }
@@ -97,7 +97,7 @@ internal class SecurePathTreeWalk private constructor(
     // secure walk
 
     private fun SecureDirectoryStream<Path>.walkEntries() {
-        forEach { handleEntry(it) }
+        forEach { handleEntry(it.fileName) }
     }
 
     private fun SecureDirectoryStream<Path>.handleEntry(entry: Path) {
@@ -114,7 +114,7 @@ internal class SecurePathTreeWalk private constructor(
         beforeWalkingEntries(this, path, key)
 
         try {
-            this.newDirectoryStream(path).use { it.walkEntries() }
+            this.newDirectoryStream(path, *linkOptions).use { it.walkEntries() }
         } catch (exception: Exception) {
             onFail?.invoke(path, exception)
         }
