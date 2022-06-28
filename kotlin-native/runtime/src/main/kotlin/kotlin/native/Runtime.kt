@@ -51,10 +51,16 @@ public class FileFailedToInitializeException : RuntimeException {
 public typealias ReportUnhandledExceptionHook = Function1<Throwable, Unit>
 
 /**
- * Install custom unhandled exception hook. Returns old hook, or null if it was not specified.
- * Hook is invoked whenever there's uncaught exception reaching boundaries of the Kotlin world,
+ * Install an uncaught exception handler. Returns the old handler, or `null` if no user-defined handlers were set.
+ *
+ * The handler is invoked whenever there's an uncaught exception reaching boundaries of the Kotlin world,
  * i.e. top level main(), or when Objective-C to Kotlin call not marked with @Throws throws an exception.
- * Hook must be a frozen lambda, so that it could be called from any thread/worker.
+ * The handler is also invoked by [processUnhandledException].
+ *
+ * To terminate the application on an uncaught exception, call [terminateWithUnhandledException] from the handler.
+ * Note: when no user-defined handler is set, the application always terminates on an uncaught exception.
+ *
+ * With the legacy MM the handler must be a frozen lambda, so that it could be called from any thread/worker.
  */
 @OptIn(FreezingIsDeprecated::class)
 public fun setUnhandledExceptionHook(hook: ReportUnhandledExceptionHook?): ReportUnhandledExceptionHook? {
