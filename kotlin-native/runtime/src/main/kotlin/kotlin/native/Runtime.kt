@@ -51,16 +51,16 @@ public class FileFailedToInitializeException : RuntimeException {
 public typealias ReportUnhandledExceptionHook = Function1<Throwable, Unit>
 
 /**
- * Install an uncaught exception handler. Returns the old handler, or `null` if no user-defined handlers were set.
+ * Install an unhandled exception hook. Returns the old hook, or `null` if no user-defined hooks were set.
  *
- * The handler is invoked whenever there's an uncaught exception reaching boundaries of the Kotlin world,
+ * The hook is invoked whenever there's an uncaught exception reaching boundaries of the Kotlin world,
  * i.e. top level main(), or when Objective-C to Kotlin call not marked with @Throws throws an exception.
- * The handler is also invoked by [processUnhandledException].
+ * The hook is also invoked by [processUnhandledException].
  *
- * To terminate the application on an uncaught exception, call [terminateWithUnhandledException] from the handler.
- * Note: when no user-defined handler is set, the application always terminates on an uncaught exception.
+ * To terminate the application on an unhandled exception, call [terminateWithUnhandledException] from the hook.
+ * Note: when no user-defined hook is set, the application always terminates on an unhandled exception.
  *
- * With the legacy MM the handler must be a frozen lambda, so that it could be called from any thread/worker.
+ * With the legacy MM the hook must be a frozen lambda, so that it could be called from any thread/worker.
  */
 @OptIn(FreezingIsDeprecated::class)
 public fun setUnhandledExceptionHook(hook: ReportUnhandledExceptionHook?): ReportUnhandledExceptionHook? {
@@ -72,7 +72,7 @@ public fun setUnhandledExceptionHook(hook: ReportUnhandledExceptionHook?): Repor
 }
 
 /**
- * Returns a user-defined uncaught exception handler set by [setUnhandledExceptionHook] or `null` if no user-defined handlers were set.
+ * Returns a user-defined unhandled exception hook set by [setUnhandledExceptionHook] or `null` if no user-defined hooks were set.
  */
 @ExperimentalStdlibApi
 @SinceKotlin("1.6")
