@@ -688,6 +688,42 @@ class CopyDeleteRecursivelyTest : AbstractPathTest() {
     }
 
     @Test
+    fun canSecureDirectoryStreamDeleteFileOutsideOfDirectory() {
+        val basedir = createTempDirectory().cleanupRecursively()
+        val fileToDelete = createTempFile().cleanup()
+        val dirToDelete = createTempDirectory().cleanupRecursively()
+
+        val directoryStream = Files.newDirectoryStream(basedir)
+        if (directoryStream is SecureDirectoryStream) {
+            println("Secure")
+            directoryStream.deleteFile(fileToDelete)
+            println("Could delete file: " + fileToDelete.exists())
+            directoryStream.deleteDirectory(dirToDelete)
+            println("Could delete directory: " + dirToDelete.exists())
+        } else {
+            println("Insecure")
+        }
+    }
+
+    @Test
+    fun canSecureDirectoryStreamDeleteFileDeepInsideDirectory() {
+        val basedir = createTestFiles().cleanupRecursively()
+        val fileToDelete = basedir.resolve("1/3/5.txt")
+        val dirToDelete = basedir.resolve("1/2")
+
+        val directoryStream = Files.newDirectoryStream(basedir)
+        if (directoryStream is SecureDirectoryStream) {
+            println("Secure")
+            directoryStream.deleteFile(fileToDelete)
+            println("Could delete file: " + fileToDelete.exists())
+            directoryStream.deleteDirectory(dirToDelete)
+            println("Could delete directory: " + dirToDelete.exists())
+        } else {
+            println("Insecure")
+        }
+    }
+
+    @Test
     fun isDirectoryEntryInRelativePath() {
         val basedir = createTestFiles().cleanupRecursively()
         Files.newDirectoryStream(basedir).use { directoryStream ->
