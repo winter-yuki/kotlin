@@ -316,5 +316,6 @@ class SplayBenchmarkUsingWorkers {
     fun splayTearDownWorkers() {
         val futures = Array(numberOfWorkers) {i -> workers[i].execute(TransferMode.SAFE, { splayTrees[i] }, {it.splayTearDown()})};
         futures.forEach{it.consume {}};
+        workers.forEach { it.requestTermination().result }
     }
 }
