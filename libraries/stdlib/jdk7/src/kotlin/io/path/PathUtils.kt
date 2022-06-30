@@ -1214,12 +1214,14 @@ public fun Path.copyToRecursively(
 
 public enum class CopyActionResult {
     CONTINUE,
-    TERMINATE
+    TERMINATE,
+    SKIP_SUBTREE
 }
 
 private fun CopyActionResult.toFileVisitResult() = when (this) {
     CopyActionResult.CONTINUE -> FileVisitResult.CONTINUE
     CopyActionResult.TERMINATE -> FileVisitResult.TERMINATE
+    CopyActionResult.SKIP_SUBTREE -> FileVisitResult.SKIP_SUBTREE
 }
 
 /**
