@@ -1178,11 +1178,14 @@ public fun Path.copyToRecursively(
         throw NoSuchFileException(this.toString(), target.toString(), "The source file doesn't exist.")
     }
 
+    val maxCollectedExceptions = 10_000
     val suppressedExceptions = mutableListOf<Throwable>()
 
     @Suppress("UNUSED_PARAMETER")
     fun suppressException(path: Path, exception: Exception): FileVisitResult {
-        suppressedExceptions.add(exception)
+        if (suppressedExceptions.size < maxCollectedExceptions) {
+            suppressedExceptions.add(exception)
+        }
         return FileVisitResult.CONTINUE
     }
 
