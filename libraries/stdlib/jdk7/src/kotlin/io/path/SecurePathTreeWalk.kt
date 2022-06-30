@@ -10,26 +10,18 @@ import java.nio.file.attribute.BasicFileAttributeView
 import java.nio.file.attribute.BasicFileAttributes
 
 internal class SecurePathTreeWalk private constructor(
-    private val linkOptions: Array<LinkOption>,
     private var onFile: ((SecureDirectoryStream<Path>?, Path) -> Unit)?,
-    private var onEnter: ((SecureDirectoryStream<Path>?, Path) -> Unit)?,
     private var onLeave: ((SecureDirectoryStream<Path>?, Path) -> Unit)?,
     private var onFail: ((f: Path, e: Exception) -> Unit)?,
 ) {
-    constructor(followLinks: Boolean) : this(
-        linkOptions = LinkFollowing.toLinkOptions(followLinks),
+    constructor() : this(
         onFile = null,
-        onEnter = null,
         onLeave = null,
         onFail = null
     )
 
     fun onFile(function: (SecureDirectoryStream<Path>?, Path) -> Unit): SecurePathTreeWalk {
         return this.apply { onFile = function }
-    }
-
-    fun onEnterDirectory(function: (SecureDirectoryStream<Path>?, Path) -> Unit): SecurePathTreeWalk {
-        return this.apply { onEnter = function }
     }
 
     fun onLeaveDirectory(function: (SecureDirectoryStream<Path>?, Path) -> Unit): SecurePathTreeWalk {
@@ -54,12 +46,10 @@ internal class SecurePathTreeWalk private constructor(
 
     private var stack: PathNode? = null
 
-    private fun beforeWalkingEntries(stream: SecureDirectoryStream<Path>?, path: Path, key: Any?) {
+    private fun beforeWalkingEntries(path: Path, key: Any?) {
         stack = PathNode(path, key, stack)
         if (stack!!.createsCycle())
             throw FileSystemLoopException(path.toString())
-
-        tryInvoke(onEnter, stream, path)
     }
 
     private fun afterWalkingEntries(stream: SecureDirectoryStream<Path>?, path: Path) {
@@ -96,10 +86,6 @@ internal class SecurePathTreeWalk private constructor(
 
     // secure walk
 
-    private fun SecureDirectoryStream<Path>.walkEntries() {
-        forEach { handleEntry(it.fileName) }
-    }
-
     private fun SecureDirectoryStream<Path>.handleEntry(entry: Path) {
         val attributes = directoryAttributesOrNull(entry)
 
@@ -111,10 +97,14 @@ internal class SecurePathTreeWalk private constructor(
     }
 
     private fun SecureDirectoryStream<Path>.enterDirectory(path: Path, key: Any?) {
-        beforeWalkingEntries(this, path, key)
+        beforeWalkingEntries(path, key)
 
         try {
-            this.newDirectoryStream(path, *linkOptions).use { it.walkEntries() }
+            this.newDirectoryStream(path, LinkOption.NOFOLLOW_LINKS).use {
+                for (entry in it) {
+                    handleEntry(entry.fileName)
+                }
+            }
         } catch (exception: Exception) {
             onFail?.invoke(path, exception)
         }
@@ -125,7 +115,7 @@ internal class SecurePathTreeWalk private constructor(
     /** If the given [path] is a directory, returns its attributes. Returns `null` otherwise. */
     private fun SecureDirectoryStream<Path>.directoryAttributesOrNull(path: Path): BasicFileAttributes? {
         return try {
-            getFileAttributeView(path, BasicFileAttributeView::class.java, *linkOptions).readAttributes().takeIf { it.isDirectory }
+            getFileAttributeView(path, BasicFileAttributeView::class.java, LinkOption.NOFOLLOW_LINKS).readAttributes().takeIf { it.isDirectory }
         } catch (exception: Exception) {
             // ignore
             null
@@ -133,10 +123,6 @@ internal class SecurePathTreeWalk private constructor(
     }
 
     // insecure walk
-
-    private fun DirectoryStream<Path>.insecureWalkEntries() {
-        forEach { insecureHandleEntry(it) }
-    }
 
     private fun insecureHandleEntry(entry: Path) {
         val attributes = insecureDirectoryAttributesOrNull(entry)
@@ -149,10 +135,14 @@ internal class SecurePathTreeWalk private constructor(
     }
 
     private fun insecureEnterDirectory(path: Path, key: Any?) {
-        beforeWalkingEntries(null, path, key)
+        beforeWalkingEntries(path, key)
 
         try {
-            Files.newDirectoryStream(path).use { it.insecureWalkEntries() }
+            Files.newDirectoryStream(path).use {
+                for (entry in it) {
+                    insecureHandleEntry(entry)
+                }
+            }
         } catch (exception: Exception) {
             onFail?.invoke(path, exception)
         }
@@ -163,7 +153,7 @@ internal class SecurePathTreeWalk private constructor(
     /** If the given [path] is a directory, returns its attributes. Returns `null` otherwise. */
     private fun insecureDirectoryAttributesOrNull(path: Path): BasicFileAttributes? {
         return try {
-            path.readAttributes<BasicFileAttributes>(*linkOptions).takeIf { it.isDirectory }
+            path.readAttributes<BasicFileAttributes>(LinkOption.NOFOLLOW_LINKS).takeIf { it.isDirectory }
         } catch (exception: Exception) {
             // ignore
             null

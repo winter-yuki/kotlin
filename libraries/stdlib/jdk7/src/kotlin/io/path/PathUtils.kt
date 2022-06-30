@@ -1243,7 +1243,7 @@ public fun Path.deleteRecursively(): Unit {
     val suppressedExceptions = mutableListOf<Throwable>()
     val notEmptyDirectoriesToSkip = hashSetOf<Path>()
 
-    SecurePathTreeWalk(followLinks = false).onFile { secureDirectoryStream, file ->
+    SecurePathTreeWalk().onFile { secureDirectoryStream, file ->
         if (secureDirectoryStream != null) {
             try {
                 secureDirectoryStream.deleteFile(file) // deletes symlink itself, not its target
