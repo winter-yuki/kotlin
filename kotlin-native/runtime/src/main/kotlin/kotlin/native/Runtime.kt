@@ -51,16 +51,17 @@ public class FileFailedToInitializeException : RuntimeException {
 public typealias ReportUnhandledExceptionHook = Function1<Throwable, Unit>
 
 /**
- * Install an unhandled exception hook. Returns the old hook, or `null` if no user-defined hooks were set.
+ * Installs an unhandled exception hook and returns an old hook, or `null` if no user-defined hooks were previously set.
  *
- * The hook is invoked whenever there's an uncaught exception reaching boundaries of the Kotlin world,
- * i.e. top level main(), or when Objective-C to Kotlin call not marked with @Throws throws an exception.
- * The hook is also invoked by [processUnhandledException].
+ * The hook is invoked whenever there is an uncaught exception reaching the boundaries of the Kotlin world,
+ * i.e. top-level `main()`, worker boundary, or when Objective-C to Kotlin call not marked with `@Throws` throws an exception.
  *
- * To terminate the application on an unhandled exception, call [terminateWithUnhandledException] from the hook.
- * Note: when no user-defined hook is set, the application always terminates on an unhandled exception.
+ * The hook is in full control of how to process an unhandled exception and proceed further.
+ * For hooks that terminate an application, it is recommended to use [terminateWithUnhandledException] to
+ * be consistent with a default behaviour when no hooks are set.
  *
- * With the legacy MM the hook must be a frozen lambda, so that it could be called from any thread/worker.
+ * Set or default hook is also invoked by [processUnhandledException].
+ * With the legacy MM the hook must be a frozen lambda so that it could be called from any thread/worker.
  */
 @OptIn(FreezingIsDeprecated::class)
 public fun setUnhandledExceptionHook(hook: ReportUnhandledExceptionHook?): ReportUnhandledExceptionHook? {
