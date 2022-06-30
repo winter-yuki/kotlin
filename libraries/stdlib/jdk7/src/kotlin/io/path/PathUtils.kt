@@ -1162,8 +1162,11 @@ public fun Path.copyToRecursively(
     target: Path,
     followLinks: Boolean,
     copyAction: (source: Path, target: Path) -> CopyActionResult = { src, dst ->
+        if (dst.isSymbolicLink())
+            throw FileAlreadyExistsException(dst.toString())
+
         val options = LinkFollowing.toLinkOptions(followLinks)
-        if ((src.isDirectory(*options) && dst.isDirectory(*options)).not()) {
+        if ((src.isDirectory(*options) && dst.isDirectory(LinkOption.NOFOLLOW_LINKS)).not()) {
             src.copyTo(dst, *options)
         }
         // else: do nothing, the destination directory already exists
