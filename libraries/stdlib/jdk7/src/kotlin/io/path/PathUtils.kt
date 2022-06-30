@@ -1158,6 +1158,7 @@ public fun fileVisitor(builderAction: FileVisitorBuilder.() -> Unit): FileVisito
  * @throws NoSuchFileException if the file located by this path does not exist.
  * @throws IOException if any file in the tree can't be copied for any reason.
  */
+@ExperimentalPathApi
 public fun Path.copyToRecursively(
     target: Path,
     followLinks: Boolean,
@@ -1170,7 +1171,6 @@ public fun Path.copyToRecursively(
             src.copyTo(dst, *options)
         }
         // else: do nothing, the destination directory already exists
-        // TODO: Maybe copy attributes and permissions then? See how `cp` utility overrides
         CopyActionResult.CONTINUE
     }
 ): Unit {
@@ -1180,50 +1180,29 @@ public fun Path.copyToRecursively(
 
     val suppressedExceptions = mutableListOf<Throwable>()
 
-    val parent: Path? = this.parent
-
-    SecurePathTreeWalk(followLinks).onEnterDirectory { _, source ->
-        // * REPLACE_EXISTING: If the target file exists and is a symbolic link,
-        // * then the symbolic link itself, not the target of the link, is replaced.
-        // For src it is not known if links are followed in copyAction
-        val src = if (parent == null) {
-            source
-        } else {
-            val relativePath = source.relativeToOrSelf(parent) // source might already be relativized
-            parent.resolve(relativePath)
-        }
-        val dst = target.resolve(src.relativeToOrSelf(this))
-
-        println("# copyToRecursively [onEnterDirectory]")
-        println("this: $this")
-        println("parent: $parent")
-        println("source: $source")
-        println("src: $src")
-        println("dst: $dst")
-        println()
-
-        copyAction(src, dst)
-    }.onFile { _, source ->
-        val src = if (parent == null) {
-            source
-        } else {
-            val relativePath = source.relativeToOrSelf(parent) // source might already be relativized
-            parent.resolve(relativePath)
-        }
-        val dst = target.resolve(src.relativeToOrSelf(this))
-
-        println("# copyToRecursively [onFile]")
-        println("this: $this")
-        println("parent: $parent")
-        println("source: $source")
-        println("src: $src")
-        println("dst: $dst")
-        println()
-
-        copyAction(src, dst)
-    }.onFail { _, exception ->
+    @Suppress("UNUSED_PARAMETER")
+    fun suppressException(path: Path, exception: Exception): FileVisitResult {
         suppressedExceptions.add(exception)
-    }.walk(this)
+        return FileVisitResult.CONTINUE
+    }
+
+    @Suppress("UNUSED_PARAMETER")
+    fun copy(path: Path, attributes: BasicFileAttributes): FileVisitResult {
+        val relativePath = path.relativeTo(this@copyToRecursively)
+        val destination = target.resolve(relativePath)
+        return try {
+            copyAction(path, destination).toFileVisitResult()
+        } catch (exception: Exception) {
+            suppressException(path, exception)
+            FileVisitResult.SKIP_SUBTREE
+        }
+    }
+
+    visitFileTree(followLinks = followLinks) {
+        onPreVisitDirectory(::copy)
+        onVisitFile(::copy)
+        onVisitFileFailed(::suppressException)
+    }
 
     if (suppressedExceptions.isNotEmpty()) {
         throw FileSystemException("Failed to copy one or more files. See suppressed exceptions for details.").apply {
@@ -1236,6 +1215,11 @@ public fun Path.copyToRecursively(
 public enum class CopyActionResult {
     CONTINUE,
     TERMINATE
+}
+
+private fun CopyActionResult.toFileVisitResult() = when (this) {
+    CopyActionResult.CONTINUE -> FileVisitResult.CONTINUE
+    CopyActionResult.TERMINATE -> FileVisitResult.TERMINATE
 }
 
 /**
