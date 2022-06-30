@@ -230,6 +230,13 @@ class RingLauncher : Launcher() {
                     "LocalObjects.localArray" to BenchmarkEntryWithInit.create(::LocalObjectsBenchmark, { localArray() }),
                     "ComplexArrays.outerProduct" to BenchmarkEntryWithInit.create(::ComplexArraysBenchmark, { outerProduct() }),
             )
+
+    init {
+        @OptIn(kotlin.ExperimentalStdlibApi::class)
+        if (!isExperimentalMM()) {
+            baseBenchmarksSet -= listOf("SplayWithWorkers")
+        }
+    }
 }
 
 fun main(args: Array<String>) {
