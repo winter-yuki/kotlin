@@ -108,7 +108,7 @@ class K2Native : CLICompiler<K2NativeCompilerArguments>() {
 
     val K2NativeCompilerArguments.isUsefulWithoutFreeArgs: Boolean
         get() = listTargets || listPhases || checkDependencies || !includes.isNullOrEmpty() ||
-                !librariesToCache.isNullOrEmpty() || libraryToAddToCache != null || !exportedLibraries.isNullOrEmpty()
+                libraryToAddToCache != null || !exportedLibraries.isNullOrEmpty()
 
     fun Array<String>?.toNonNullList(): List<String> {
         return this?.asList<String>() ?: listOf<String>()
@@ -276,7 +276,6 @@ class K2Native : CLICompiler<K2NativeCompilerArguments>() {
                 put(OBJC_GENERICS, !arguments.noObjcGenerics)
                 put(DEBUG_PREFIX_MAP, parseDebugPrefixMap(arguments, configuration))
 
-                put(LIBRARIES_TO_CACHE, parseLibrariesToCache(arguments, configuration, outputKind))
                 val libraryToAddToCache = parseLibraryToAddToCache(arguments, configuration, outputKind)
                 if (libraryToAddToCache != null && !arguments.outputName.isNullOrEmpty())
                     configuration.report(ERROR, "$ADD_CACHE already implicitly sets output file name")
@@ -504,24 +503,6 @@ private fun parseCachedLibraries(
         libraryAndCache[0] to libraryAndCache[1]
     }
 }.toMap()
-
-private fun parseLibrariesToCache(
-        arguments: K2NativeCompilerArguments,
-        configuration: CompilerConfiguration,
-        outputKind: CompilerOutputKind
-): List<String> {
-    val input = arguments.librariesToCache?.asList().orEmpty()
-
-    return if (input.isNotEmpty() && !outputKind.isCache) {
-        configuration.report(ERROR, "$MAKE_CACHE can't be used when not producing cache")
-        emptyList()
-    } else if (input.isNotEmpty() && !arguments.libraryToAddToCache.isNullOrEmpty()) {
-        configuration.report(ERROR, "supplied both $MAKE_CACHE and $ADD_CACHE options")
-        emptyList()
-    } else {
-        input
-    }
-}
 
 private fun parseLibraryToAddToCache(
         arguments: K2NativeCompilerArguments,
