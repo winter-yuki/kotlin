@@ -110,7 +110,7 @@ open class CompileToBitcodeExtension @Inject constructor(val project: Project) {
         compilationDatabase.target(konanTarget) {
             entry {
                 val args = listOf(execClang.resolveExecutable(compileTask.compiler.get())) + compileTask.compilerFlags.get() + execClang.clangArgsForCppRuntime(konanTarget.name)
-                directory.set(compileTask.outputDirectory)
+                directory.set(compileTask.inputFiles.dir)
                 files.setFrom(compileTask.inputFiles)
                 arguments.set(args)
                 output.set(compileTask.outputFile.asFile.map { it.absolutePath })
