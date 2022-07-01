@@ -20,6 +20,7 @@ import org.jetbrains.kotlin.test.services.impl.TemporaryDirectoryManagerImpl
 import org.jetbrains.kotlin.test.utils.ReplacingSourceTransformer
 import org.jetbrains.kotlin.types.AbstractTypeChecker
 import org.jetbrains.kotlin.types.FlexibleTypeImpl
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.TestInfo
 
@@ -49,15 +50,9 @@ abstract class AbstractKotlinCompilerTest {
         }
     }
 
-    protected val configuration: TestConfigurationBuilder.() -> Unit = {
-        defaultConfiguration()
-        useAdditionalService { createApplicationDisposableProvider() }
-        useAdditionalService { createKotlinStandardLibrariesPathProvider() }
-        configure(this)
-    }
-
     abstract fun TestConfigurationBuilder.configuration()
-    private lateinit var testInfo: KotlinTestInfo
+
+    private var testInfo: KotlinTestInfo? = null
 
     open fun createApplicationDisposableProvider(): ApplicationDisposableProvider {
         return ExecutionListenerBasedDisposableProvider()
@@ -78,19 +73,30 @@ abstract class AbstractKotlinCompilerTest {
         )
     }
 
+    @AfterEach
+    fun dispose() {
+        testInfo = null
+    }
+
     fun initTestInfo(testInfo: KotlinTestInfo) {
         this.testInfo = testInfo
     }
 
     open fun configure(builder: TestConfigurationBuilder) {
         with(builder) {
-            testInfo = this@AbstractKotlinCompilerTest.testInfo
+            defaultConfiguration()
+
+            useAdditionalService { createApplicationDisposableProvider() }
+            useAdditionalService { createKotlinStandardLibrariesPathProvider() }
+
+            testInfo = this@AbstractKotlinCompilerTest.testInfo ?: error("Should be initialized during test start")
+
+            configuration()
         }
-        builder.configuration()
     }
 
     open fun runTest(@TestDataFile filePath: String) {
-        testRunner(filePath, configuration).runTest(filePath)
+        testRunner(filePath) { configure(builder = this) }.runTest(filePath)
     }
 
     open fun runTest(
@@ -102,7 +108,7 @@ abstract class AbstractKotlinCompilerTest {
             override fun revert(file: TestFile, actualContent: String): String = contentModifier.revertForFile(actualContent)
         }
         testRunner(filePath) {
-            configuration.invoke(this)
+            configure(this)
             useSourcePreprocessor(::SourceTransformer)
         }.runTest(filePath)
     }
