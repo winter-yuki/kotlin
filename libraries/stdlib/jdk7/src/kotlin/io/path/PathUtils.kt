@@ -1240,35 +1240,7 @@ private fun CopyActionResult.toFileVisitResult() = when (this) {
  * @throws IOException if any file in the tree can't be deleted for any reason.
  */
 public fun Path.deleteRecursively(): Unit {
-    val suppressedExceptions = mutableListOf<Throwable>()
-    val notEmptyDirectoriesToSkip = hashSetOf<Path>()
-
-    SecurePathTreeWalk().onFile { secureDirectoryStream, file ->
-        if (secureDirectoryStream != null) {
-            try {
-                secureDirectoryStream.deleteFile(file) // deletes symlink itself, not its target
-            } catch (_: NoSuchFileException) {
-                // ignore
-            }
-        } else {
-            file.deleteIfExists() // deletes symlink itself, not its target
-        }
-    }.onLeaveDirectory { secureDirectoryStream, dir ->
-        if (secureDirectoryStream != null) {
-            try {
-                secureDirectoryStream.deleteDirectory(dir)
-            } catch (_: NoSuchFileException) {
-                // ignore
-            }
-        } else {
-            dir.deleteIfExists()
-        }
-    }.onFail { path, exception ->
-        if ((exception is DirectoryNotEmptyException && path in notEmptyDirectoriesToSkip).not()) {
-            suppressedExceptions.add(exception)
-        }
-        path.parent?.let { notEmptyDirectoriesToSkip.add(it) }
-    }.walk(this)
+    val suppressedExceptions = RecursiveDeleteExecutor().delete(this)
 
     if (suppressedExceptions.isNotEmpty()) {
         throw FileSystemException("Failed to delete one or more files. See suppressed exceptions for details.").apply {
