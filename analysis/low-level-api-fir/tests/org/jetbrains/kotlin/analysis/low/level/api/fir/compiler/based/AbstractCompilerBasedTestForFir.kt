@@ -9,6 +9,7 @@ package org.jetbrains.kotlin.analysis.low.level.api.fir.compiler.based
 import org.jetbrains.kotlin.analysis.low.level.api.fir.api.DiagnosticCheckerFilter
 import org.jetbrains.kotlin.analysis.low.level.api.fir.api.getOrBuildFirFile
 import org.jetbrains.kotlin.analysis.low.level.api.fir.createFirResolveSessionForNoCaching
+import org.jetbrains.kotlin.analysis.low.level.api.fir.test.base.FirLowLevelCompilerBasedTestConfigurator
 import org.jetbrains.kotlin.analysis.low.level.api.fir.transformers.LLFirLazyTransformer
 import org.jetbrains.kotlin.analysis.test.framework.AbstractCompilerBasedTest
 import org.jetbrains.kotlin.analysis.test.framework.base.registerAnalysisApiBaseTestServices
@@ -17,8 +18,6 @@ import org.jetbrains.kotlin.analysis.test.framework.project.structure.ktModulePr
 import org.jetbrains.kotlin.platform.jvm.JvmPlatforms
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.test.TestInfrastructureInternals
-import org.jetbrains.kotlin.test.ExecutionListenerBasedDisposableProvider
-import org.jetbrains.kotlin.test.bind
 import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
 import org.jetbrains.kotlin.test.builders.firHandlersStep
 import org.jetbrains.kotlin.test.builders.testConfiguration
@@ -32,8 +31,6 @@ import org.jetbrains.kotlin.test.model.TestModule
 import org.jetbrains.kotlin.test.services.TestServices
 import org.jetbrains.kotlin.test.services.compilerConfigurationProvider
 import org.jetbrains.kotlin.test.services.isKtFile
-import org.jetbrains.kotlin.test.services.*
-import org.jetbrains.kotlin.analysis.low.level.api.fir.test.base.FirLowLevelCompilerBasedTestConfigurator
 
 abstract class AbstractCompilerBasedTestForFir : AbstractCompilerBasedTest() {
     @OptIn(TestInfrastructureInternals::class)
@@ -86,11 +83,10 @@ abstract class AbstractCompilerBasedTestForFir : AbstractCompilerBasedTest() {
     }
 
     override fun runTest(filePath: String) {
-        val configuration = testConfiguration(filePath, configuration)
-
-        if (ignoreTest(filePath, configuration)) {
+        if (ignoreTest(filePath, testConfiguration(filePath) { configure(this) })) {
             return
         }
+
         val oldEnableDeepEnsure = LLFirLazyTransformer.enableDeepEnsure
         try {
             LLFirLazyTransformer.enableDeepEnsure = true
