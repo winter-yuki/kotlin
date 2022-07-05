@@ -105,11 +105,14 @@ internal class TaskOutputsBackup(
             zip.setLevel(Deflater.NO_COMPRESSION)
             outputPath
                 .walkTopDown()
-                .filter { !it.isDirectory }
+                .filter { !it.isDirectory || (it.listFiles() ?: error("$it is not a directory")).isEmpty() }
                 .forEach { file ->
-                    val entry = ZipEntry(file.relativeTo(outputPath).invariantSeparatorsPath)
+                    val suffix = if (file.isDirectory) "/" else ""
+                    val entry = ZipEntry(file.relativeTo(outputPath).invariantSeparatorsPath + suffix)
                     zip.putNextEntry(entry)
-                    file.inputStream().buffered().use { it.copyTo(zip) }
+                    if (!file.isDirectory) {
+                        file.inputStream().buffered().use { it.copyTo(zip) }
+                    }
                     zip.closeEntry()
                 }
             zip.flush()
