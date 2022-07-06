@@ -147,7 +147,10 @@ class ConfigurationsTest : MultiplatformExtensionTest() {
                 }
             }
         }
-        with(project.evaluate()) {
+
+        project.evaluate()
+
+        with(project) {
             assertContainsDependencies("jsCompilationApi", "test:compilation-dependency", "test:source-set-dependency")
             assertContainsDependencies("jsMainApi", "test:source-set-dependency")
             assertNotContainsDependencies("jsMainApi", "test:compilation-dependency")
@@ -164,17 +167,17 @@ class ConfigurationsTest : MultiplatformExtensionTest() {
             }
         }
 
-        with(project.evaluate()) {
-            kotlinExtension.targets.flatMap { it.compilations }.forEach { compilation ->
-                val compilationSourceSets = compilation.allKotlinSourceSets
-                val compilationConfigurationNames = compilation.relatedConfigurationNames
-                val sourceSetConfigurationNames = compilationSourceSets.flatMapTo(mutableSetOf()) { it.relatedConfigurationNames }
+        project.evaluate()
 
-                assert(compilationConfigurationNames.none { it in sourceSetConfigurationNames }) {
-                    """A name clash between source set and compilation configurations detected for the following configurations:
-                        |${compilationConfigurationNames.filter { it in sourceSetConfigurationNames }.joinToString()}
-                    """.trimMargin()
-                }
+        project.kotlinExtension.targets.flatMap { it.compilations }.forEach { compilation ->
+            val compilationSourceSets = compilation.allKotlinSourceSets
+            val compilationConfigurationNames = compilation.relatedConfigurationNames
+            val sourceSetConfigurationNames = compilationSourceSets.flatMapTo(mutableSetOf()) { it.relatedConfigurationNames }
+
+            assert(compilationConfigurationNames.none { it in sourceSetConfigurationNames }) {
+                """A name clash between source set and compilation configurations detected for the following configurations:
+                    |${compilationConfigurationNames.filter { it in sourceSetConfigurationNames }.joinToString()}
+                """.trimMargin()
             }
         }
     }
@@ -189,25 +192,25 @@ class ConfigurationsTest : MultiplatformExtensionTest() {
             }
         }
 
-        with(project.evaluate()) {
-            for (sourceSet in kotlinExtension.sourceSets) {
-                val configurationNames = listOf(
-                    sourceSet.implementationConfigurationName,
-                    sourceSet.apiConfigurationName,
-                    sourceSet.compileOnlyConfigurationName,
-                    sourceSet.runtimeOnlyConfigurationName,
-                )
+        project.evaluate()
 
-                for (name in configurationNames) {
-                    val extendsFrom = configurations.getByName(name).extendsFrom
-                    assert(extendsFrom.isEmpty()) {
-                        "Configuration $name is not expected to be extending anything, but it extends: ${
-                            extendsFrom.joinToString(
-                                prefix = "[",
-                                postfix = "]"
-                            ) { it.name }
-                        }"
-                    }
+        for (sourceSet in project.kotlinExtension.sourceSets) {
+            val configurationNames = listOf(
+                sourceSet.implementationConfigurationName,
+                sourceSet.apiConfigurationName,
+                sourceSet.compileOnlyConfigurationName,
+                sourceSet.runtimeOnlyConfigurationName,
+            )
+
+            for (name in configurationNames) {
+                val extendsFrom = project.configurations.getByName(name).extendsFrom
+                assert(extendsFrom.isEmpty()) {
+                    "Configuration $name is not expected to be extending anything, but it extends: ${
+                        extendsFrom.joinToString(
+                            prefix = "[",
+                            postfix = "]"
+                        ) { it.name }
+                    }"
                 }
             }
         }
