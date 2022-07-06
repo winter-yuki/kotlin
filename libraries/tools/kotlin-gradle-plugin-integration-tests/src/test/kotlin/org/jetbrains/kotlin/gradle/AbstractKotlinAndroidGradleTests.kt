@@ -784,6 +784,15 @@ open class KotlinAndroid71GradleIT : KotlinAndroid70GradleIT() {
             }
         }
     }
+
+    @Test
+    fun `test associate compilation dependencies are passed correctly to android test compilations`() {
+        with(Project("kt-49877")) {
+            build("allTests") {
+                assertSuccessful()
+            }
+        }
+    }
 }
 
 abstract class KotlinAndroid3GradleIT : AbstractKotlinAndroidGradleTests() {
