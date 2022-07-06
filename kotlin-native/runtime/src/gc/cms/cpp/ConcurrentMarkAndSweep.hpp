@@ -48,7 +48,9 @@ public:
             if (getPointerBits(before, colorMask) != static_cast<unsigned>(Color::kWhite))
                 return false;
             ObjectData* black = setPointerBits(before, static_cast<unsigned>(Color::kBlack));
-            return next_.compare_exchange_strong(before, black);
+            bool success = next_.compare_exchange_strong(before, black);
+            RuntimeAssert(success || hasPointerBits(before, colorMask), "next_ must have been marked black");
+            return success;
         }
 
         ObjectData* next() const noexcept { return clearPointerBits(next_.load(), colorMask); }
