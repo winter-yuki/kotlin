@@ -1,3 +1,5 @@
+// This test only fails on native because the test framework compiles all
+// the files in this directory together which leads to redeclaration errors.
 // IGNORE_BACKEND: NATIVE
 // IGNORE_BACKEND: JS_IR
 // MODULE: lib
