@@ -6,8 +6,14 @@
 package org.jetbrains.kotlin.test.services
 
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.text.StringUtilRt
+import com.intellij.openapi.vfs.StandardFileSystems
+import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.psi.PsiManager
+import com.intellij.testFramework.LightVirtualFile
 import org.jetbrains.kotlin.KtInMemoryTextSourceFile
 import org.jetbrains.kotlin.fir.lightTree.LightTree2Fir
+import org.jetbrains.kotlin.idea.KotlinLanguage
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.sourceFiles.LightTreeFile
 import org.jetbrains.kotlin.test.model.TestFile
@@ -87,8 +93,10 @@ class SourceFileProviderImpl(val testServices: TestServices, override val prepro
 }
 
 fun SourceFileProvider.getKtFileForSourceFile(testFile: TestFile, project: Project): KtFile {
-// TODO
-//    return TestCheckerUtil.createCheckAndReturnPsiFile(
+    val realFile = getRealFileForSourceFile(testFile)
+    StandardFileSystems.local().findFileByPath(realFile.path)
+        ?.let { PsiManager.getInstance(project).findFile(it) as? KtFile }
+        ?.let { return it }
     return KtTestUtil.createFile(
         testFile.name,
         getContentOfSourceFile(testFile),
