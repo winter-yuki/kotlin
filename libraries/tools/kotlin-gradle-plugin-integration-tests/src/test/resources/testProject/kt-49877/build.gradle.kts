@@ -4,7 +4,6 @@ plugins {
 }
 
 repositories {
-    maven("$rootDir/../repo")
     mavenLocal()
     mavenCentral()
     google()
