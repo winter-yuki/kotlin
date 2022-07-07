@@ -27,11 +27,20 @@ struct MarkStats {
     size_t aliveHeapSet = 0;
     // How many objects are alive in bytes. Note: this does not include overhead of malloc/mimalloc itself.
     size_t aliveHeapSetBytes = 0;
+    // How many roots are were marked.
+    size_t rootSetSize = 0;
+
+    void merge(MarkStats other) {
+        aliveHeapSet += other.aliveHeapSet;
+        aliveHeapSetBytes += other.aliveHeapSetBytes;
+        rootSetSize += other.rootSetSize;
+    }
 };
 
 template <typename Traits>
 MarkStats Mark(typename Traits::MarkQueue& markQueue) noexcept {
     MarkStats stats;
+    stats.rootSetSize = markQueue.size();
     auto timeStart = konan::getTimeMicros();
     while (!Traits::isEmpty(markQueue)) {
         ObjHeader* top = Traits::dequeue(markQueue);

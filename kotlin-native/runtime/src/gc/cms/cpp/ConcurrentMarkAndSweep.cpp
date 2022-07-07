@@ -97,7 +97,7 @@ void gc::ConcurrentMarkAndSweep::ThreadData::Mark() noexcept {
     MarkQueue markQueue_;
     gc::collectRootSetForThread<MarkTraits>(markQueue_, *threadRegistry.CurrentThreadData());
     MarkStats stats = gc::Mark<MarkTraits>(markQueue_);
-    gc_.aliveHeapSetBytes_ += stats.aliveHeapSetBytes;
+    gc_.MergeMarkStats(stats);
 }
 
 gc::ConcurrentMarkAndSweep::ConcurrentMarkAndSweep(
@@ -154,7 +154,7 @@ bool gc::ConcurrentMarkAndSweep::PerformFullGC(int64_t epoch) noexcept {
     mm::WaitForThreadsReadyToMark();
     auto timeSuspendUs = konan::getTimeMicros();
     RuntimeLogDebug({kTagGC}, "Suspended all threads in %" PRIu64 " microseconds", timeSuspendUs - timeStartUs);
-    aliveHeapSetBytes_ = 0;
+    lastGCMarkStats = MarkStats();
 
     auto& scheduler = gcScheduler_;
     scheduler.gcData().OnPerformFullGC();
@@ -170,14 +170,15 @@ bool gc::ConcurrentMarkAndSweep::PerformFullGC(int64_t epoch) noexcept {
     auto objectsCountBefore = objectFactory_.GetSizeUnsafe();
 
     auto markStats = gc::Mark<MarkTraits>(markQueue_);
-    aliveHeapSetBytes_ += markStats.aliveHeapSetBytes;
+    MergeMarkStats(markStats);
 
     RuntimeLogDebug({kTagGC}, "Waiting for marking in threads");
     mm::WaitForThreadsMarking();
+    RuntimeLogInfo({kTagGC}, "Collected root set of size %zu", lastGCMarkStats.rootSetSize);
     auto timeMarkingUs = konan::getTimeMicros();
     RuntimeLogDebug({kTagGC}, "Marked all threads in %" PRIu64 " microseconds", timeMarkingUs - timeStartUs);
 
-    scheduler.gcData().UpdateAliveSetBytes(aliveHeapSetBytes_);
+    scheduler.gcData().UpdateAliveSetBytes(lastGCMarkStats.aliveHeapSetBytes);
 
     gc::SweepExtraObjects<SweepTraits>(mm::GlobalData::Instance().extraObjectDataFactory());
     auto timeSweepExtraObjectsUs = konan::getTimeMicros();
@@ -215,3 +216,11 @@ bool gc::ConcurrentMarkAndSweep::PerformFullGC(int64_t epoch) noexcept {
     return true;
 }
 
+namespace {
+    [[clang::no_destroy]] std::mutex markStatsMutex;
+} // namespace
+
+void gc::ConcurrentMarkAndSweep::MergeMarkStats(gc::MarkStats stats) noexcept {
+    std::unique_lock lock(markStatsMutex);
+    lastGCMarkStats.merge(stats);
+}

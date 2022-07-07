@@ -11,6 +11,7 @@
 #include "Allocator.hpp"
 #include "GCScheduler.hpp"
 #include "IntrusiveList.hpp"
+#include "MarkAndSweepUtils.hpp"
 #include "ObjectFactory.hpp"
 #include "ScopedThread.hpp"
 #include "Types.h"
@@ -109,6 +110,7 @@ public:
 private:
     // Returns `true` if GC has happened, and `false` if not (because someone else has suspended the threads).
     bool PerformFullGC(int64_t epoch) noexcept;
+    void MergeMarkStats(MarkStats stats) noexcept;
 
     mm::ObjectFactory<ConcurrentMarkAndSweep>& objectFactory_;
     GCScheduler& gcScheduler_;
@@ -119,7 +121,7 @@ private:
     std_support::unique_ptr<FinalizerProcessor> finalizerProcessor_;
 
     MarkQueue markQueue_;
-    std::atomic<unsigned> aliveHeapSetBytes_ = 0;
+    MarkStats lastGCMarkStats;
 };
 
 } // namespace gc
