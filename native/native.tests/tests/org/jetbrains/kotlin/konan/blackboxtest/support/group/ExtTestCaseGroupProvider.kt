@@ -91,7 +91,14 @@ internal class ExtTestCaseGroupProvider : TestCaseGroupProvider, TestDisposable(
         /** Tests that should be compiled and executed as standalone tests. */
         private val standalones: Set<File> = listOf(
             // Comparison of type information obtained with reflection against non-patched string literal:
-            "compiler/testData/codegen/box/annotations/instances/annotationToString.kt"
+            "compiler/testData/codegen/box/annotations/instances/annotationToString.kt",
+            // These tests define the same class names and compiling them together therefore leads to
+            // compilation errors. They pass individually.
+            "compiler/testData/codegen/box/sameFileInSourceAndDependencies/classDeclaration.kt",
+            "compiler/testData/codegen/box/sameFileInSourceAndDependencies/lateinitMemberPropertyDeclaration.kt",
+            "compiler/testData/codegen/box/sameFileInSourceAndDependencies/memberFunctionDeclaration.kt",
+            "compiler/testData/codegen/box/sameFileInSourceAndDependencies/memberFunctionWithDefaultArgumentsDeclaration.kt",
+            "compiler/testData/codegen/box/sameFileInSourceAndDependencies/memberPropertyDeclaration.kt",
         ).mapToSet(::getAbsoluteFile)
     }
 }
