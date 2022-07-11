@@ -24,7 +24,15 @@ allprojects {
         kotlinOptions.freeCompilerArgs = [ "-Xskip-metadata-version-check" ]
         kotlinOptions.sourceMap = true
         kotlinOptions.sourceMapPrefix = "./"
-        kotlinOptions.sourceMapEmbedSources = "always"
+    }
+}
+
+project("lib") {
+    compileKotlin2Js.kotlinOptions {
+        outputFile = "${buildDir}/kotlin2js/main/lib.js"
+        if (findProperty("kotlin.js.useIrBackend")?.toBoolean() == true) {
+            freeCompilerArgs += ["-Xir-produce-klib-dir", "-Xir-only"]
+        }
     }
 }
 
@@ -32,6 +40,12 @@ project("app") {
     dependencies {
         implementation project(":lib")
     }
+
+    compileKotlin2Js.kotlinOptions {
+        outputFile = "${buildDir}/kotlin2js/main/app.js"
+
+        if (findProperty("kotlin.js.useIrBackend")?.toBoolean() == true) {
+            freeCompilerArgs += ["-Xir-produce-js"]
+        }
+    }
 }
-
-
