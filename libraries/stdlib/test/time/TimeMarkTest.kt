@@ -99,7 +99,7 @@ class TimeMarkTest {
         wait(waitDuration)
         val elapsed = pastMark.elapsedNow()
         assertTrue(elapsed > longDuration)
-        assertTrue(elapsed >= longDuration + waitDuration)
+        assertTrue(elapsed >= longDuration + waitDuration, "$elapsed, $longDuration, $waitDuration") // TODO: fails on thread wait?
     }
 
     @Test
