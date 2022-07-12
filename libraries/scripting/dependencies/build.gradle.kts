@@ -3,8 +3,6 @@ plugins {
     id("jps-compatible")
 }
 
-project.updateJvmTarget("1.8")
-
 dependencies {
     api(kotlinStdlib())
     api(project(":kotlin-scripting-common"))

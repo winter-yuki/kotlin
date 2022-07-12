@@ -3,7 +3,7 @@ plugins {
     id("jps-compatible")
 }
 
-project.updateJvmTarget("1.8") // Should this project be removed altogether ?
+// Should this project be removed altogether ?
 
 dependencies {
     api(kotlinStdlib())
