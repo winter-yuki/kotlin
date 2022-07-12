@@ -7,6 +7,7 @@ package org.jetbrains.kotlin.fir.pipeline
 
 import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension
 import org.jetbrains.kotlin.backend.jvm.serialization.JvmIdSignatureDescriptor
+import org.jetbrains.kotlin.builtins.DefaultBuiltIns
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.backend.Fir2IrConverter
 import org.jetbrains.kotlin.fir.backend.Fir2IrExtensions
@@ -46,6 +47,7 @@ fun FirSession.convertToIr(
         FirJvmVisibilityConverter,
         Fir2IrJvmSpecialAnnotationSymbolProvider(),
         irGeneratorExtensions,
-        generateSignatures = false
+        generateSignatures = false,
+        builtIns = DefaultBuiltIns.Instance // TODO: consider passing externally
     )
 }
