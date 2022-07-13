@@ -42,9 +42,10 @@ class FirRenderer(
     resolvePhaseRenderer: FirResolvePhaseRenderer? = null,
     private val typeRenderer: ConeTypeRenderer = ConeTypeRendererForDebugging(),
     private val valueParameterRenderer: FirValueParameterRenderer = FirValueParameterRenderer(),
-) : FirPrinter(builder) {
+) {
 
     private val visitor = Visitor()
+    private val printer = FirPrinter(builder)
 
     companion object {
         fun noAnnotationBodiesAccessorAndArguments(): FirRenderer =
@@ -76,7 +77,7 @@ class FirRenderer(
         components.typeRenderer = typeRenderer
         components.valueParameterRenderer = valueParameterRenderer
         @Suppress("LeakingThis")
-        components.printer = this
+        components.printer = printer
         annotationRenderer?.components = components
         bodyRenderer?.components = components
         callArgumentsRenderer.components = components
@@ -95,7 +96,7 @@ class FirRenderer(
 
     fun renderElementAsString(element: FirElement): String {
         element.accept(visitor)
-        return toString()
+        return printer.toString()
     }
 
     fun renderElementWithTypeAsString(element: FirElement): String {
@@ -106,7 +107,7 @@ class FirRenderer(
 
     fun renderAsCallableDeclarationString(callableDeclaration: FirCallableDeclaration): String {
         visitor.visitCallableDeclaration(callableDeclaration)
-        return toString()
+        return printer.toString()
     }
 
     fun renderMemberDeclarationClass(firClass: FirClass) {
@@ -176,6 +177,22 @@ class FirRenderer(
         }
     }
 
+    private fun print(s: Any) {
+        printer.print(s)
+    }
+
+    private fun println(s: Any) {
+        printer.println(s)
+    }
+
+    private fun newLine() {
+        printer.newLine()
+    }
+
+    private fun renderSeparated(elements: List<FirElement>, visitor: Visitor) {
+        printer.renderSeparated(elements, visitor)
+    }
+
     inner class Visitor internal constructor() : FirVisitorVoid() {
 
         override fun visitElement(element: FirElement) {
@@ -184,12 +201,12 @@ class FirRenderer(
 
         override fun visitFile(file: FirFile) {
             println("FILE: ${file.name}")
-            pushIndent()
+            printer.pushIndent()
             annotationRenderer?.render(file)
             visitPackageDirective(file.packageDirective)
             file.imports.forEach { it.accept(this) }
             file.declarations.forEach { it.accept(this) }
-            popIndent()
+            printer.popIndent()
         }
 
         override fun visitAnnotation(annotation: FirAnnotation) {
@@ -304,7 +321,7 @@ class FirRenderer(
 
         override fun visitField(field: FirField) {
             visitVariable(field)
-            println()
+            newLine()
         }
 
         override fun visitProperty(property: FirProperty) {
@@ -328,7 +345,7 @@ class FirRenderer(
             visitCallableDeclaration(simpleFunction)
             bodyRenderer?.render(simpleFunction)
             if (simpleFunction.body == null) {
-                println()
+                newLine()
             }
         }
 
@@ -411,7 +428,7 @@ class FirRenderer(
             visitMemberDeclaration(typeAlias)
             print(" = ")
             typeAlias.expandedTypeRef.accept(this)
-            println()
+            newLine()
         }
 
         override fun visitTypeParameter(typeParameter: FirTypeParameter) {
@@ -498,11 +515,11 @@ class FirRenderer(
                 whenExpression.subject?.accept(this)
             }
             println(") {")
-            pushIndent()
+            printer.pushIndent()
             for (branch in whenExpression.branches) {
                 branch.accept(this)
             }
-            popIndent()
+            printer.popIndent()
             println("}")
         }
 
