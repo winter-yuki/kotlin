@@ -1,4 +1,4 @@
-/*
+-LABEL/*
  * Copyright 2010-2022 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
@@ -9,7 +9,7 @@ fun interface Foo {
 
 fun baz(x: Int): Int = x.hashCode()
 
-// CHECK: define void @"kfun:#main(){}"()
+// CHECK-LABEL: define void @"kfun:#main(){}"()
 // CHECK-NOT: Int-box
 // CHECK-NOT: Int-unbox
 // CHECK: ret void
