@@ -116,6 +116,9 @@ public abstract class AbstractClassBuilder implements ClassBuilder {
     @Override
     public void done() {
         getVisitor().visitSource(sourceName, debugInfo);
+        if (debugInfo != null) {
+            getVisitor().visitAttribute(new KotlinSourceDebugExtension(debugInfo));
+        }
         getVisitor().visitEnd();
     }
 
