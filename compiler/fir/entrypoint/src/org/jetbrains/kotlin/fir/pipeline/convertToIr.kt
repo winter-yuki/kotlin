@@ -48,6 +48,6 @@ fun FirSession.convertToIr(
         Fir2IrJvmSpecialAnnotationSymbolProvider(),
         irGeneratorExtensions,
         generateSignatures = false,
-        builtIns = DefaultBuiltIns.Instance // TODO: consider passing externally
+        kotlinBuiltIns = DefaultBuiltIns.Instance // TODO: consider passing externally
     )
 }

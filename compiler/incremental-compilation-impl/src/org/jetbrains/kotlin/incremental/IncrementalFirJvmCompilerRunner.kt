@@ -287,7 +287,7 @@ class IncrementalFirJvmCompilerRunner(
                 Fir2IrJvmSpecialAnnotationSymbolProvider(),
                 irGenerationExtensions,
                 generateSignatures = false,
-                builtIns = DefaultBuiltIns.Instance // TODO: consider passing externally
+                kotlinBuiltIns = DefaultBuiltIns.Instance // TODO: consider passing externally
             )
 
             performanceManager?.notifyIRTranslationFinished()

@@ -411,9 +411,9 @@ class Fir2IrConverter(
             specialSymbolProvider: Fir2IrSpecialSymbolProvider,
             irGenerationExtensions: Collection<IrGenerationExtension>,
             generateSignatures: Boolean,
-            builtIns: KotlinBuiltIns
+            kotlinBuiltIns: KotlinBuiltIns
         ): Fir2IrResult {
-            val moduleDescriptor = FirModuleDescriptor(session, builtIns)
+            val moduleDescriptor = FirModuleDescriptor(session, kotlinBuiltIns)
             val signatureComposer = FirBasedSignatureComposer(mangler)
             val wrappedSignaturer = WrappedDescriptorSignatureComposer(signaturer, signatureComposer)
             val symbolTable = SymbolTable(wrappedSignaturer, irFactory)
