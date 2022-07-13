@@ -24,6 +24,7 @@ import org.jetbrains.kotlin.gradle.plugin.mpp.kotlinSourceSetsIncludingDefault
 import org.jetbrains.kotlin.gradle.plugin.sources.withDependsOnClosure
 import org.jetbrains.kotlin.gradle.targets.native.internal.CInteropCommonizerTask.CInteropGist
 import org.jetbrains.kotlin.gradle.tasks.CInteropProcess
+import org.jetbrains.kotlin.gradle.utils.cachedProperty
 import org.jetbrains.kotlin.konan.target.KonanTarget
 import java.io.File
 import javax.inject.Inject
@@ -76,7 +77,7 @@ internal open class CInteropCommonizerTask
 
     override val outputDirectory: File = project.buildDir.resolve("classes/kotlin/commonizer")
 
-    private val runnerSettings = KotlinNativeCommonizerToolRunner.Settings(project)
+    private val runnerSettings = objectFactory.cachedProperty(project.provider { KotlinNativeCommonizerToolRunner.Settings(project) } )
 
     private val konanHome = project.file(project.konanHome)
     private val commonizerLogLevel = project.commonizerLogLevel
@@ -135,7 +136,7 @@ internal open class CInteropCommonizerTask
 
         val commonizerRunner = KotlinNativeCommonizerToolRunner(
             context = KotlinToolRunner.GradleExecutionContext.fromTaskContext(objectFactory, execOperations, logger),
-            settings = runnerSettings
+            settings = runnerSettings.get()
         )
 
         GradleCliCommonizer(commonizerRunner).commonizeLibraries(

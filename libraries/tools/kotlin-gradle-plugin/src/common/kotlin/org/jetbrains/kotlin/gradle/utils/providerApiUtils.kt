@@ -106,3 +106,12 @@ internal inline fun <reified T> Project.listProperty(noinline itemsProvider: () 
 
 internal inline fun <reified T> Project.setProperty(noinline itemsProvider: () -> Iterable<T>): SetProperty<T> =
     objects.setProperty(T::class.java).apply { set(provider(itemsProvider)) }
+
+internal inline fun <reified T> ObjectFactory.cachedProperty(provider: Provider<T>): Property<T> =
+    this
+        .property<T>()
+        .value(provider)
+        .apply {
+            disallowChanges()
+            finalizeValueOnRead()
+        }

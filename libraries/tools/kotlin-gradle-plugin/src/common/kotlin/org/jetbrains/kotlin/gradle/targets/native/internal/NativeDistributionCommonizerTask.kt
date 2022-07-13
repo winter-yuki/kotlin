@@ -19,6 +19,7 @@ import org.jetbrains.kotlin.compilerRunner.registerCommonizerClasspathConfigurat
 import org.jetbrains.kotlin.gradle.dsl.multiplatformExtensionOrNull
 import org.jetbrains.kotlin.gradle.plugin.PropertiesProvider.Companion.kotlinPropertiesProvider
 import org.jetbrains.kotlin.gradle.plugin.getKotlinPluginVersion
+import org.jetbrains.kotlin.gradle.utils.cachedProperty
 import org.jetbrains.kotlin.konan.library.KONAN_DISTRIBUTION_COMMONIZED_LIBS_DIR
 import org.jetbrains.kotlin.konan.library.KONAN_DISTRIBUTION_KLIB_DIR
 import java.io.File
@@ -37,7 +38,7 @@ internal open class NativeDistributionCommonizerTask
         project.collectAllSharedCommonizerTargetsFromBuild()
     }
 
-    private val runnerSettings = KotlinNativeCommonizerToolRunner.Settings(project)
+    private val runnerSettings = objectFactory.cachedProperty(project.provider { KotlinNativeCommonizerToolRunner.Settings(project) } )
 
     private val logLevel = project.commonizerLogLevel
 
@@ -62,7 +63,7 @@ internal open class NativeDistributionCommonizerTask
     protected fun run() {
         val commonizerRunner = KotlinNativeCommonizerToolRunner(
             context = KotlinToolRunner.GradleExecutionContext.fromTaskContext(objectFactory, execOperations, logger),
-            settings = runnerSettings
+            settings = runnerSettings.get()
         )
 
         commonizerCache.writeCacheForUncachedTargets(commonizerTargets) { todoOutputTargets ->
