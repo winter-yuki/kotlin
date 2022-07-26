@@ -157,6 +157,7 @@ interface ConeTypeContext : TypeSystemContext, TypeSystemOptimizationContext, Ty
             is ConeStubType -> constructor
             is ConeDefinitelyNotNullType -> original.typeConstructor()
             is ConeIntegerLiteralType -> this
+            is ConeSelfType -> this
             else -> error("?: $this")
         }
     }
@@ -255,6 +256,7 @@ interface ConeTypeContext : TypeSystemContext, TypeSystemOptimizationContext, Ty
             }
             is ConeIntegerLiteralType -> 0
             is ConeStubTypeConstructor -> 0
+            is ConeSelfType -> 0
             else -> unknownConstructorError()
         }
     }
@@ -295,6 +297,7 @@ interface ConeTypeContext : TypeSystemContext, TypeSystemOptimizationContext, Ty
             is ConeCapturedTypeConstructor -> supertypes.orEmpty()
             is ConeIntersectionType -> intersectedTypes
             is ConeIntegerLiteralType -> supertypes
+            is ConeSelfType -> emptyList()
             else -> unknownConstructorError()
         }
     }
@@ -352,7 +355,8 @@ interface ConeTypeContext : TypeSystemContext, TypeSystemOptimizationContext, Ty
     override fun TypeConstructorMarker.isDenotable(): Boolean {
         return when (this) {
             is ConeClassLikeLookupTag,
-            is ConeTypeParameterLookupTag -> true
+            is ConeTypeParameterLookupTag,
+            is ConeSelfType -> true
 
             is ConeStubTypeConstructor,
             is ConeCapturedTypeConstructor,
@@ -373,6 +377,15 @@ interface ConeTypeContext : TypeSystemContext, TypeSystemOptimizationContext, Ty
         return fir.modality == Modality.FINAL &&
                 fir.classKind != ClassKind.ENUM_ENTRY &&
                 fir.classKind != ClassKind.ANNOTATION_CLASS
+    }
+
+    override fun SimpleTypeMarker.isSelfType(): Boolean {
+        return this is ConeSelfType
+    }
+
+    override fun SimpleTypeMarker.originIfSelfType(): SimpleTypeMarker {
+        require(this is ConeSelfType)
+        return original
     }
 
     override fun captureFromExpression(type: KotlinTypeMarker): KotlinTypeMarker? {
@@ -412,6 +425,7 @@ interface ConeTypeContext : TypeSystemContext, TypeSystemOptimizationContext, Ty
         if (this is ConeIntegerLiteralType) return true
         if (this is ConeStubType) return true
         if (this is ConeDefinitelyNotNullType) return true
+        if (this is ConeSelfType) return true
         require(this is ConeLookupTagBasedType)
         val typeConstructor = this.typeConstructor()
         return typeConstructor is ConeClassLikeLookupTag ||

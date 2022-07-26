@@ -1,0 +1,14 @@
+FILE: noThis.kt
+    public final fun f(x: R|kotlin/Int|): <ERROR TYPE REF: Self type is allowed only in method declaration> {
+        ^f Null(null)!!
+    }
+    public final fun g(x: <ERROR TYPE REF: Self type is allowed only in method declaration>): <ERROR TYPE REF: Self type is allowed only in method declaration> {
+        ^g Null(null)!!
+    }
+    public final fun <ERROR TYPE REF: Self type is allowed only in method declaration>.h(): R|kotlin/Int| {
+        ^h Int(42)
+    }
+    context(<ERROR TYPE REF: Self type is allowed only in method declaration>)
+    public final fun contexted(): R|kotlin/Unit| {
+        ^contexted Q|kotlin/Unit|
+    }

@@ -319,6 +319,14 @@ interface ClassicTypeSystemContext : TypeSystemInferenceExtensionContext, TypeSy
                 classDescriptor.kind != ClassKind.ANNOTATION_CLASS
     }
 
+    override fun SimpleTypeMarker.isSelfType(): Boolean {
+        error("True self types not supported")
+    }
+
+    override fun SimpleTypeMarker.originIfSelfType(): SimpleTypeMarker {
+        error("True self types not supported")
+    }
+
     override fun TypeConstructorMarker.isFinalClassOrEnumEntryOrAnnotationClassConstructor(): Boolean {
         require(this is TypeConstructor, this::errorMessage)
         val classDescriptor = declarationDescriptor

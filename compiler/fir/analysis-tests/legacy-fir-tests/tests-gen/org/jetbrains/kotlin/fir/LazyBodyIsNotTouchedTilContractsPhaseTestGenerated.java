@@ -3278,6 +3278,59 @@ public class LazyBodyIsNotTouchedTilContractsPhaseTestGenerated extends Abstract
         }
     }
 
+    @TestMetadata("compiler/fir/analysis-tests/testData/resolve/self")
+    @TestDataPath("$PROJECT_ROOT")
+    @RunWith(JUnit3RunnerWithInners.class)
+    public static class Self extends AbstractLazyBodyIsNotTouchedTilContractsPhaseTest {
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        public void testAllFilesPresentInSelf() throws Exception {
+            KtTestUtil.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/fir/analysis-tests/testData/resolve/self"), Pattern.compile("^([^.]+)\\.kt$"), null, true);
+        }
+
+        @TestMetadata("contravariant.kt")
+        public void testContravariant() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/self/contravariant.kt");
+        }
+
+        @TestMetadata("covariant.kt")
+        public void testCovariant() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/self/covariant.kt");
+        }
+
+        @TestMetadata("explicitReturn.kt")
+        public void testExplicitReturn() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/self/explicitReturn.kt");
+        }
+
+        @TestMetadata("noThis.kt")
+        public void testNoThis() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/self/noThis.kt");
+        }
+
+        @TestMetadata("qualifiedAccess.kt")
+        public void testQualifiedAccess() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/self/qualifiedAccess.kt");
+        }
+
+        @TestMetadata("returnOverride.kt")
+        public void testReturnOverride() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/self/returnOverride.kt");
+        }
+
+        @TestMetadata("selfAndClass.kt")
+        public void testSelfAndClass() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/self/selfAndClass.kt");
+        }
+
+        @TestMetadata("values.kt")
+        public void testValues() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/self/values.kt");
+        }
+    }
+
     @TestMetadata("compiler/fir/analysis-tests/testData/resolve/smartcasts")
     @TestDataPath("$PROJECT_ROOT")
     @RunWith(JUnit3RunnerWithInners.class)

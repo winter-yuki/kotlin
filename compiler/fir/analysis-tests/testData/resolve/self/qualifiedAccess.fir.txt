@@ -1,0 +1,41 @@
+FILE: qualifiedAccess.kt
+    public abstract class S : R|kotlin/Any| {
+        public constructor(): R|S| {
+            super<R|kotlin/Any|>()
+        }
+
+        public final fun p(): R|SelfType(S)| {
+            ^p this@R|/S|
+        }
+
+        public final fun q(): R|SelfType(S)?| {
+            ^q Null(null)
+        }
+
+    }
+    public final class D : R|S| {
+        public constructor(): R|D| {
+            super<R|S|>()
+        }
+
+        public final fun a(): R|SelfType(D)| {
+            ^a this@R|/D|
+        }
+
+        public final fun b(): R|SelfType(D)?| {
+            ^b this@R|/D|
+        }
+
+        public final fun c(): R|SelfType(D)?| {
+            ^c this@R|/D|
+        }
+
+    }
+    public final fun test(): R|kotlin/Unit| {
+        lval d: R|D| = R|/D.D|()
+        lval d1: R|D| = R|<local>/d|.R|/D.a|()
+        lval d2: R|D| = R|<local>/d|.R|/S.p|()
+        lval d3: R|D?| = R|<local>/d|.R|/D.b|()
+        lval d4: R|D?| = R|<local>/d|.R|/S.q|()
+        lval d5: R|D| = R|<local>/d|.R|/S.p|().<Unresolved name: a>#().<Unresolved name: q>#()
+    }

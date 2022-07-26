@@ -2,7 +2,7 @@
 
 import org.jetbrains.annotations.NotNull;
 
-public abstract class ObjectPattern<T, Self extends ObjectPattern<T, Self>> {
+public abstract class ObjectPattern<T, Self1 extends ObjectPattern<T, Self1>> {
     protected ObjectPattern(@NotNull Class<T> aClass) {
 
     }
@@ -29,10 +29,10 @@ fun uExpression(): UExpressionPattern.Capture<UExpression> = expressionCapture(U
 
 fun <T : UExpression> expressionCapture(clazz: Class<T>): UExpressionPattern.Capture<T> = UExpressionPattern.Capture(clazz)
 
-open class UElementPattern<T : UElement, Self : UElementPattern<T, Self>>(clazz: Class<T>) : ObjectPattern<T, Self>(clazz) {
-    fun filter(filter: (T) -> Boolean): Self = this <!UNCHECKED_CAST!>as Self<!>
+open class UElementPattern<T : UElement, Self1 : UElementPattern<T, Self1>>(clazz: Class<T>) : ObjectPattern<T, Self1>(clazz) {
+    fun filter(filter: (T) -> Boolean): Self1 = this <!UNCHECKED_CAST!>as Self1<!>
 }
 
-open class UExpressionPattern<T : UExpression, Self : UExpressionPattern<T, Self>>(clazz: Class<T>) : UElementPattern<T, Self>(clazz) {
+open class UExpressionPattern<T : UExpression, Self1 : UExpressionPattern<T, Self1>>(clazz: Class<T>) : UElementPattern<T, Self1>(clazz) {
     open class Capture<T : UExpression>(clazz: Class<T>) : UExpressionPattern<T, Capture<T>>(clazz)
 }

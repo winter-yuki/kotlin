@@ -91,6 +91,7 @@ private fun ConeKotlinType.scope(useSiteSession: FirSession, scopeSession: Scope
         is ConeDefinitelyNotNullType -> original.scope(useSiteSession, scopeSession, requiredPhase)
         is ConeIntegerConstantOperatorType -> scopeSession.getOrBuildScopeForIntegerConstantOperatorType(useSiteSession, this)
         is ConeIntegerLiteralConstantType -> error("ILT should not be in receiver position")
+        is ConeSelfType -> original.scope(useSiteSession, scopeSession, requiredPhase)
         else -> null
     }
 }

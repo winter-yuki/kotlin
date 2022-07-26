@@ -1,0 +1,33 @@
+FILE: covariant.kt
+    public abstract class A : R|kotlin/Any| {
+        public constructor(): R|A| {
+            super<R|kotlin/Any|>()
+        }
+
+        public final fun a(b: R|B|): R|SelfType(A)| {
+            ^a R|<local>/b|.R|/B.f|()
+        }
+
+        public final fun b(b: R|B|): R|SelfType(A)?| {
+            ^b R|<local>/b|.R|/B.g|()
+        }
+
+        public final fun c(b: R|B|): R|SelfType(A)?| {
+            ^c R|<local>/b|.R|/B.f|()
+        }
+
+    }
+    public final class B : R|A| {
+        public constructor(): R|B| {
+            super<R|A|>()
+        }
+
+        public final fun f(): R|SelfType(B)| {
+            ^f this@R|/B|
+        }
+
+        public final fun g(): R|SelfType(B)?| {
+            ^g Null(null)
+        }
+
+    }

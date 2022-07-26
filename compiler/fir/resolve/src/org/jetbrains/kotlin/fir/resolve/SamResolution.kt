@@ -80,6 +80,7 @@ class FirSamResolverImpl(
             -> null
             // TODO: Thing of getting rid of this branch since ConeLookupTagBasedType should be a sealed class
             is ConeLookupTagBasedType -> null
+            is ConeSelfType -> TODO()
         }
     }
 

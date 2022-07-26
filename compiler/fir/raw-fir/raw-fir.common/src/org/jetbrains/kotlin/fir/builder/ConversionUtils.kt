@@ -22,6 +22,7 @@ import org.jetbrains.kotlin.fir.declarations.builder.*
 import org.jetbrains.kotlin.fir.declarations.impl.FirDeclarationStatusImpl
 import org.jetbrains.kotlin.fir.declarations.impl.FirDefaultPropertyAccessor
 import org.jetbrains.kotlin.fir.diagnostics.ConeDiagnostic
+import org.jetbrains.kotlin.fir.diagnostics.ConeSimpleDiagnostic
 import org.jetbrains.kotlin.fir.diagnostics.DiagnosticKind
 import org.jetbrains.kotlin.fir.expressions.*
 import org.jetbrains.kotlin.fir.expressions.builder.*
@@ -33,10 +34,13 @@ import org.jetbrains.kotlin.fir.references.builder.buildImplicitThisReference
 import org.jetbrains.kotlin.fir.references.builder.buildResolvedNamedReference
 import org.jetbrains.kotlin.fir.references.builder.buildSimpleNamedReference
 import org.jetbrains.kotlin.fir.symbols.constructStarProjectedType
-import org.jetbrains.kotlin.fir.symbols.impl.*
-import org.jetbrains.kotlin.fir.types.ConeClassLikeType
-import org.jetbrains.kotlin.fir.types.ConeStarProjection
-import org.jetbrains.kotlin.fir.types.FirTypeRef
+import org.jetbrains.kotlin.fir.symbols.impl.FirClassSymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirDelegateFieldSymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirPropertyAccessorSymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirValueParameterSymbol
+import org.jetbrains.kotlin.fir.types.*
+import org.jetbrains.kotlin.fir.types.builder.FirErrorTypeRefBuilder
+import org.jetbrains.kotlin.fir.types.builder.FirResolvedTypeRefBuilder
 import org.jetbrains.kotlin.fir.types.builder.buildImplicitTypeRef
 import org.jetbrains.kotlin.fir.types.builder.buildResolvedTypeRef
 import org.jetbrains.kotlin.fir.types.impl.*
@@ -588,3 +592,30 @@ data class CalleeAndReceiver(
     val receiverExpression: FirExpression? = null,
     val isImplicitInvoke: Boolean = false
 )
+
+fun createConeSelfTypeBuilder(
+    dispatchReceiver: ConeClassLikeType?,
+    source: KtSourceElement,
+    isNullable: Boolean
+): FirAnnotationContainerBuilder =
+    if (dispatchReceiver != null) {
+        FirResolvedTypeRefBuilder().apply {
+            this.source = source
+            this.type = ConeSelfType(dispatchReceiver, ConeNullability.create(isNullable))
+        }
+    } else {
+        FirErrorTypeRefBuilder().apply {
+            this.source = source
+            this.diagnostic = ConeSimpleDiagnostic(
+                "Self type is allowed only in method declaration",
+                DiagnosticKind.NoThis
+            )
+        }
+    }
+
+fun createConeSelfType(dispatchReceiver: ConeClassLikeType?, source: KtSourceElement, isNullable: Boolean): FirTypeRef =
+    when (val builder = createConeSelfTypeBuilder(dispatchReceiver, source, isNullable)) {
+        is FirResolvedTypeRefBuilder -> builder.build()
+        is FirErrorTypeRefBuilder -> builder.build()
+        else -> error("Unreachable code reached")
+    }

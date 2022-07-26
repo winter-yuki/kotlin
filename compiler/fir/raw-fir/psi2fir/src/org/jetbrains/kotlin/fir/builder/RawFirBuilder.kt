@@ -1695,6 +1695,7 @@ open class RawFirBuilder(
             )
         }
 
+        @OptIn(org.jetbrains.kotlin.fir.FirImplementationDetail::class)
         override fun visitTypeReference(typeReference: KtTypeReference, data: Unit): FirElement {
             val typeElement = typeReference.typeElement
             val source = typeReference.toFirSourceElement()
@@ -1737,26 +1738,32 @@ open class RawFirBuilder(
                 is KtUserType -> {
                     var referenceExpression = unwrappedElement.referenceExpression
                     if (referenceExpression != null) {
-                        FirUserTypeRefBuilder().apply {
-                            this.source = source
-                            isMarkedNullable = isNullable
-                            var ktQualifier: KtUserType? = unwrappedElement
+                        // TODO baseSession.languageVersionSettings.supportsFeature(LanguageFeature.SelfTypes)
+                        if (referenceExpression.getReferencedNameAsName() == ConeSelfType.SELF_NAME) {
+                            val dispatchReceiver = context.dispatchReceiverTypesStack.lastOrNull()
+                            createConeSelfTypeBuilder(dispatchReceiver, source, isNullable)
+                        } else {
+                            FirUserTypeRefBuilder().apply {
+                                this.source = source
+                                isMarkedNullable = isNullable
+                                var ktQualifier: KtUserType? = unwrappedElement
 
-                            do {
-                                val firQualifier = FirQualifierPartImpl(
-                                    referenceExpression!!.toFirSourceElement(),
-                                    referenceExpression!!.getReferencedNameAsName(),
-                                    FirTypeArgumentListImpl(ktQualifier?.typeArgumentList?.toKtPsiSourceElement() ?: source).apply {
-                                        typeArguments.appendTypeArguments(ktQualifier!!.typeArguments)
-                                    }
-                                )
-                                qualifier.add(firQualifier)
+                                do {
+                                    val firQualifier = FirQualifierPartImpl(
+                                        referenceExpression!!.toFirSourceElement(),
+                                        referenceExpression!!.getReferencedNameAsName(),
+                                        FirTypeArgumentListImpl(ktQualifier?.typeArgumentList?.toKtPsiSourceElement() ?: source).apply {
+                                            typeArguments.appendTypeArguments(ktQualifier!!.typeArguments)
+                                        }
+                                    )
+                                    qualifier.add(firQualifier)
 
-                                ktQualifier = ktQualifier!!.qualifier
-                                referenceExpression = ktQualifier?.referenceExpression
-                            } while (referenceExpression != null)
+                                    ktQualifier = ktQualifier!!.qualifier
+                                    referenceExpression = ktQualifier?.referenceExpression
+                                } while (referenceExpression != null)
 
-                            qualifier.reverse()
+                                qualifier.reverse()
+                            }
                         }
                     } else {
                         FirErrorTypeRefBuilder().apply {

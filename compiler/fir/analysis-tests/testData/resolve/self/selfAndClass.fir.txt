@@ -1,0 +1,65 @@
+FILE: selfAndClass.kt
+    public abstract class Q : R|kotlin/Any| {
+        public constructor(): R|Q| {
+            super<R|kotlin/Any|>()
+        }
+
+        public final fun a(): R|SelfType(Q)| {
+            ^a Null(null)!!
+        }
+
+        public final fun b(): R|SelfType(Q)?| {
+            ^b Null(null)!!
+        }
+
+        public final fun xx(p: R|P|): R|Q| {
+            ^xx R|<local>/p|.R|/P.x|()
+        }
+
+        public final fun yy(p: R|P|): R|Q?| {
+            ^yy R|<local>/p|.R|/P.y|()
+        }
+
+        public final fun zz(p: R|P|): R|Q?| {
+            ^zz R|<local>/p|.R|/P.x|()
+        }
+
+    }
+    public final class P : R|Q| {
+        public constructor(): R|P| {
+            super<R|Q|>()
+        }
+
+        public final fun aa(): R|P| {
+            ^aa this@R|/P|.R|/Q.a|()
+        }
+
+        public final fun bb(): R|P?| {
+            ^bb this@R|/P|.R|/Q.b|()
+        }
+
+        public final fun cc(): R|P?| {
+            ^cc this@R|/P|.R|/Q.a|()
+        }
+
+        public final fun dd(): R|Q| {
+            ^dd this@R|/P|.R|/Q.a|()
+        }
+
+        public final fun ee(): R|Q?| {
+            ^ee this@R|/P|.R|/Q.b|()
+        }
+
+        public final fun ff(): R|Q?| {
+            ^ff this@R|/P|.R|/Q.a|()
+        }
+
+        public final fun x(): R|SelfType(P)| {
+            ^x Null(null)!!
+        }
+
+        public final fun y(): R|SelfType(P)?| {
+            ^y Null(null)!!
+        }
+
+    }

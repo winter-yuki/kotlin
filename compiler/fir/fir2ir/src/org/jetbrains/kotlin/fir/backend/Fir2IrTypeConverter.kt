@@ -213,6 +213,7 @@ class Fir2IrTypeConverter(
             }
             is ConeStubType -> createErrorType()
             is ConeIntegerLiteralType -> createErrorType()
+            is ConeSelfType -> TODO()
         }
     }
 

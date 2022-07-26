@@ -221,6 +221,14 @@ interface IrTypeSystemContext : TypeSystemContext, TypeSystemCommonSuperTypesCon
         return classSymbol.owner.run { modality == Modality.FINAL && kind != ClassKind.ENUM_CLASS && kind != ClassKind.ANNOTATION_CLASS }
     }
 
+    override fun SimpleTypeMarker.isSelfType(): Boolean {
+        TODO("Not yet implemented")
+    }
+
+    override fun SimpleTypeMarker.originIfSelfType(): SimpleTypeMarker {
+        TODO("Not yet implemented")
+    }
+
     /*
      * fun <T> foo(x: Array<T>) {}
      * fun bar(y: Array<out CharSequence>) {

@@ -367,7 +367,7 @@ object AbstractTypeChecker {
             assert(subType.isSingleClassifierType() || subType.typeConstructor().isIntersection() || state.isAllowedTypeVariable(subType)) {
                 "Not singleClassifierType and not intersection subType: $subType"
             }
-            assert(superType.isSingleClassifierType() || state .isAllowedTypeVariable(superType)) {
+            assert(superType.isSingleClassifierType() || state.isAllowedTypeVariable(superType)) {
                 "Not singleClassifierType superType: $superType"
             }
         }
@@ -587,7 +587,35 @@ object AbstractTypeChecker {
             }
         }
 
+        checkSubtypeForSelfType(state, subType, superType)?.let { return it }
+
         return null
+    }
+
+    /*
+     * To make overriding work:
+     * B <: A => Self(B) <: Self(A) | rightNullability
+     * To make `this` of class `B` having type Self(B):
+     * B <: A => Self(B) <: A | rightNullability
+     *
+     * rightNullability = sub.nonNullable || sup.nullable
+     */
+    private fun checkSubtypeForSelfType(
+        state: TypeCheckerState,
+        subType: SimpleTypeMarker,
+        superType: SimpleTypeMarker
+    ): Boolean? = with(state.typeSystemContext) {
+        fun rightNullability(sub: SimpleTypeMarker, sup: SimpleTypeMarker) =
+            !sub.isMarkedNullable() || sup.isMarkedNullable()
+        when {
+            subType.isSelfType() && superType.isSelfType() ->
+                rightNullability(subType, superType) && isSubtypeOf(state, subType.originIfSelfType(), superType.originIfSelfType())
+            subType.isSelfType() && !superType.isSelfType() -> {
+                val sub = subType.originIfSelfType()
+                rightNullability(sub, superType) && isSubtypeOf(state, sub, superType.withNullability(false))
+            }
+            else -> null
+        }
     }
 
     private fun TypeSystemContext.getTypeParameterForArgumentInBaseIfItEqualToTarget(

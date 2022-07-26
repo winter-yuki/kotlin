@@ -998,6 +998,16 @@ abstract class FirDataFlowAnalyzer<FLOW : Flow>(
     fun enterQualifiedAccessExpression() {}
 
     fun exitQualifiedAccessExpression(qualifiedAccessExpression: FirQualifiedAccessExpression) {
+        // TODO make it work
+        val receiverType = qualifiedAccessExpression.dispatchReceiver.resultType.coneTypeSafe() as? ConeClassLikeType
+        val declaration = qualifiedAccessExpression.toResolvedCallableSymbol()?.fir as? FirSimpleFunction
+        if (receiverType != null && declaration != null) {
+            val self = declaration.returnTypeRef.coneType
+            if (self is ConeSelfType) {
+                val smartcasted = self.copy(original = receiverType)
+                declaration.returnTypeRef.withReplacedConeType(smartcasted)
+            }
+        }
         graphBuilder.exitQualifiedAccessExpression(qualifiedAccessExpression).mergeIncomingFlow()
         processConditionalContract(qualifiedAccessExpression)
     }

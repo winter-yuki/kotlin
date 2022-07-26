@@ -1,0 +1,33 @@
+FILE: contravariant.kt
+    public abstract class A : R|kotlin/Any| {
+        public constructor(): R|A| {
+            super<R|kotlin/Any|>()
+        }
+
+        public final fun p(): R|SelfType(A)| {
+            ^p this@R|/A|
+        }
+
+        public final fun q(): R|SelfType(A)?| {
+            ^q Null(null)
+        }
+
+    }
+    public final class B : R|A| {
+        public constructor(): R|B| {
+            super<R|A|>()
+        }
+
+        public final fun a(): R|SelfType(B)| {
+            ^a this@R|/B|.R|/A.p|()
+        }
+
+        public final fun b(): R|SelfType(B)?| {
+            ^b this@R|/B|.R|/A.q|()
+        }
+
+        public final fun c(): R|SelfType(B)?| {
+            ^c this@R|/B|.R|/A.p|()
+        }
+
+    }

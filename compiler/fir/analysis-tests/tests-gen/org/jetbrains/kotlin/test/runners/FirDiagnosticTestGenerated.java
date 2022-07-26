@@ -3713,6 +3713,64 @@ public class FirDiagnosticTestGenerated extends AbstractFirDiagnosticTest {
         }
 
         @Nested
+        @TestMetadata("compiler/fir/analysis-tests/testData/resolve/self")
+        @TestDataPath("$PROJECT_ROOT")
+        public class Self {
+            @Test
+            public void testAllFilesPresentInSelf() throws Exception {
+                KtTestUtil.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/fir/analysis-tests/testData/resolve/self"), Pattern.compile("^([^.]+)\\.kt$"), null, true);
+            }
+
+            @Test
+            @TestMetadata("contravariant.kt")
+            public void testContravariant() throws Exception {
+                runTest("compiler/fir/analysis-tests/testData/resolve/self/contravariant.kt");
+            }
+
+            @Test
+            @TestMetadata("covariant.kt")
+            public void testCovariant() throws Exception {
+                runTest("compiler/fir/analysis-tests/testData/resolve/self/covariant.kt");
+            }
+
+            @Test
+            @TestMetadata("explicitReturn.kt")
+            public void testExplicitReturn() throws Exception {
+                runTest("compiler/fir/analysis-tests/testData/resolve/self/explicitReturn.kt");
+            }
+
+            @Test
+            @TestMetadata("noThis.kt")
+            public void testNoThis() throws Exception {
+                runTest("compiler/fir/analysis-tests/testData/resolve/self/noThis.kt");
+            }
+
+            @Test
+            @TestMetadata("qualifiedAccess.kt")
+            public void testQualifiedAccess() throws Exception {
+                runTest("compiler/fir/analysis-tests/testData/resolve/self/qualifiedAccess.kt");
+            }
+
+            @Test
+            @TestMetadata("returnOverride.kt")
+            public void testReturnOverride() throws Exception {
+                runTest("compiler/fir/analysis-tests/testData/resolve/self/returnOverride.kt");
+            }
+
+            @Test
+            @TestMetadata("selfAndClass.kt")
+            public void testSelfAndClass() throws Exception {
+                runTest("compiler/fir/analysis-tests/testData/resolve/self/selfAndClass.kt");
+            }
+
+            @Test
+            @TestMetadata("values.kt")
+            public void testValues() throws Exception {
+                runTest("compiler/fir/analysis-tests/testData/resolve/self/values.kt");
+            }
+        }
+
+        @Nested
         @TestMetadata("compiler/fir/analysis-tests/testData/resolve/smartcasts")
         @TestDataPath("$PROJECT_ROOT")
         public class Smartcasts {

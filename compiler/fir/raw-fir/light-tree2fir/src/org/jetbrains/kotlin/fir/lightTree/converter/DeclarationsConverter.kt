@@ -2086,11 +2086,17 @@ class DeclarationsConverter(
             }
         )
 
-        return buildUserTypeRef {
-            source = typeRefSource
-            isMarkedNullable = isNullable
-            qualifier.add(qualifierPart)
-            simpleFirUserType?.qualifier?.let { this.qualifier.addAll(0, it) }
+        return when {
+            identifier == ConeSelfType.SELF_NAME.identifier && firTypeArguments.isEmpty() -> {
+                val dispatchReceiver = context.dispatchReceiverTypesStack.lastOrNull()
+                createConeSelfType(dispatchReceiver, typeRefSource, isNullable)
+            }
+            else -> buildUserTypeRef {
+                source = typeRefSource
+                isMarkedNullable = isNullable
+                qualifier.add(qualifierPart)
+                simpleFirUserType?.qualifier?.let { this.qualifier.addAll(0, it) }
+            }
         }
     }
 

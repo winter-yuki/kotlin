@@ -204,6 +204,7 @@ fun <T : ConeKotlinType> T.withNullability(
         }
         is ConeIntegerLiteralConstantType -> ConeIntegerLiteralConstantTypeImpl(value, possibleTypes, isUnsigned, nullability)
         is ConeIntegerConstantOperatorType -> ConeIntegerConstantOperatorTypeImpl(isUnsigned, nullability)
+        is ConeSelfType -> ConeSelfType(original, nullability)
         else -> error("sealed: ${this::class}")
     } as T
 }
@@ -799,3 +800,18 @@ private fun ConeKotlinType.eraseAsUpperBound(
                 .makeConeTypeDefinitelyNotNullOrNotNull(session.typeContext)
         else -> error("unexpected Java type parameter upper bound kind: $this")
     }
+
+fun ConeKotlinType.asSelfTypeOrNull(typeContext: ConeTypeContext): ConeSelfType? =
+    (this as? ConeSimpleKotlinType)?.let {
+        ConeSelfType(
+            it.withNullability(ConeNullability.NOT_NULL, typeContext),
+            it.nullability
+        )
+    }
+
+fun FirTypeRef.asSelfTypeRefOrNull(typeContext: ConeTypeContext): FirResolvedTypeRef? =
+    (this as? FirResolvedTypeRef)?.let {
+        val newType = it.type.asSelfTypeOrNull(typeContext) ?: return@let null
+        it.withReplacedConeType(newType)
+    }
+

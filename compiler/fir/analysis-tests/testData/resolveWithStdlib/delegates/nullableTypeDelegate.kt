@@ -9,8 +9,8 @@ interface Delegate<R, T> : ReadWriteProperty<R, T>
 interface DatabaseEntity
 
 
-fun <Self : DatabaseEntity, Target : DatabaseEntity> Self.directed(clazz: Class<Target>):
-        Delegate<Self, Target?> = null!!
+fun <Self1 : DatabaseEntity, Target : DatabaseEntity> Self1.directed(clazz: Class<Target>):
+        Delegate<Self1, Target?> = null!!
 
 class MyClassSome : DatabaseEntity {
     var other by directed(MyClassSome::class.java)
