@@ -1,0 +1,53 @@
+FILE: methodExplicitReturn.kt
+    public abstract class A : R|kotlin/Any| {
+        public constructor(): R|A| {
+            super<R|kotlin/Any|>()
+        }
+
+        public final fun f(): R|Self: A| {
+            ^f Null(null)!!
+        }
+
+        public final fun g(): R|Self: A?| {
+            ^g Null(null)!!
+        }
+
+        public final fun h(): R|Self: A| {
+            ^h Null(null)!!
+        }
+
+        public final fun i(): R|Self: A?| {
+            ^i Null(null)
+        }
+
+        public open fun j(): R|Self: A| {
+            ^j Null(null)!!
+        }
+
+        public open fun k(): R|Self: A| {
+            ^k Null(null)!!
+        }
+
+    }
+    public final class B : R|A| {
+        public constructor(): R|B| {
+            super<R|A|>()
+        }
+
+        public final fun h2(): R|Self: B| {
+            ^h2 this@R|/B|.<CS errors: /A.h>#()
+        }
+
+        public final fun i2(): R|Self: B?| {
+            ^i2 this@R|/B|.<CS errors: /A.i>#()
+        }
+
+        public final override fun j(): R|Self: B| {
+            ^j Null(null)!!
+        }
+
+        public final override fun k(): R|Self: B| {
+            ^k Null(null)!!
+        }
+
+    }

@@ -33,6 +33,7 @@ import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.fir.types.builder.*
 import org.jetbrains.kotlin.fir.types.impl.ConeClassLikeTypeImpl
 import org.jetbrains.kotlin.fir.types.impl.FirQualifierPartImpl
+import org.jetbrains.kotlin.fir.types.impl.FirResolvedTypeRefImpl
 import org.jetbrains.kotlin.fir.types.impl.FirTypeArgumentListImpl
 import org.jetbrains.kotlin.lexer.KtTokens.*
 import org.jetbrains.kotlin.name.CallableId
@@ -1695,6 +1696,7 @@ open class RawFirBuilder(
             )
         }
 
+        @OptIn(org.jetbrains.kotlin.fir.FirImplementationDetail::class)
         override fun visitTypeReference(typeReference: KtTypeReference, data: Unit): FirElement {
             val typeElement = typeReference.typeElement
             val source = typeReference.toFirSourceElement()
@@ -1737,26 +1739,44 @@ open class RawFirBuilder(
                 is KtUserType -> {
                     var referenceExpression = unwrappedElement.referenceExpression
                     if (referenceExpression != null) {
-                        FirUserTypeRefBuilder().apply {
-                            this.source = source
-                            isMarkedNullable = isNullable
-                            var ktQualifier: KtUserType? = unwrappedElement
+                        if (referenceExpression.getReferencedNameAsName() == ConeSelfType.SELF_NAME) {
+                            val dispatchReceiver = context.dispatchReceiverTypesStack.lastOrNull()
+                            if (dispatchReceiver != null) {
+                                FirResolvedTypeRefBuilder().apply {
+                                    this.source = source
+                                    this.type = ConeSelfType(dispatchReceiver, ConeNullability.create(isNullable))
+                                }
+                            } else {
+                                FirErrorTypeRefBuilder().apply {
+                                    this.source = source
+                                    this.diagnostic = ConeSimpleDiagnostic(
+                                        "Self type is allowed only in method declaration",
+                                        DiagnosticKind.NoThis
+                                    )
+                                }
+                            }
+                        } else {
+                            FirUserTypeRefBuilder().apply {
+                                this.source = source
+                                isMarkedNullable = isNullable
+                                var ktQualifier: KtUserType? = unwrappedElement
 
-                            do {
-                                val firQualifier = FirQualifierPartImpl(
-                                    referenceExpression!!.toFirSourceElement(),
-                                    referenceExpression!!.getReferencedNameAsName(),
-                                    FirTypeArgumentListImpl(ktQualifier?.typeArgumentList?.toKtPsiSourceElement() ?: source).apply {
-                                        typeArguments.appendTypeArguments(ktQualifier!!.typeArguments)
-                                    }
-                                )
-                                qualifier.add(firQualifier)
+                                do {
+                                    val firQualifier = FirQualifierPartImpl(
+                                        referenceExpression!!.toFirSourceElement(),
+                                        referenceExpression!!.getReferencedNameAsName(),
+                                        FirTypeArgumentListImpl(ktQualifier?.typeArgumentList?.toKtPsiSourceElement() ?: source).apply {
+                                            typeArguments.appendTypeArguments(ktQualifier!!.typeArguments)
+                                        }
+                                    )
+                                    qualifier.add(firQualifier)
 
-                                ktQualifier = ktQualifier!!.qualifier
-                                referenceExpression = ktQualifier?.referenceExpression
-                            } while (referenceExpression != null)
+                                    ktQualifier = ktQualifier!!.qualifier
+                                    referenceExpression = ktQualifier?.referenceExpression
+                                } while (referenceExpression != null)
 
-                            qualifier.reverse()
+                                qualifier.reverse()
+                            }
                         }
                     } else {
                         FirErrorTypeRefBuilder().apply {

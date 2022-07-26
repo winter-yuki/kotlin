@@ -587,6 +587,12 @@ object AbstractTypeChecker {
             }
         }
 
+        if (superType.isSelfType()) {
+            val rightNullability = superType.isMarkedNullable() || !subType.isMarkedNullable()
+            val sub = if (subType.isSelfType()) subType.originIfSelfType() else subType
+            return rightNullability && isSubtypeOf(state, sub.withNullability(false), superType.originIfSelfType())
+        }
+
         return null
     }
 

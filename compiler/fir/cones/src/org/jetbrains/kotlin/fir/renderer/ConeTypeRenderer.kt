@@ -132,6 +132,11 @@ open class ConeTypeRenderer() {
             is ConeIntegerConstantOperatorType -> {
                 builder.append("IOT")
             }
+            is ConeSelfType -> {
+                builder.append("SelfType(")
+                type.original.render()
+                builder.append(")")
+            }
         }
         if (type !is ConeFlexibleType && type !is ConeErrorType) {
             builder.append(type.nullability.suffix)

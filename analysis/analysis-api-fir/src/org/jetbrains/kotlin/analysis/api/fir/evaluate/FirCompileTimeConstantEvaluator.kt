@@ -219,6 +219,7 @@ internal object FirCompileTimeConstantEvaluator {
             is ConeIntersectionType -> intersectedTypes.first().toConstantValueKind()
             is ConeStubType -> null
             is ConeIntegerLiteralType -> null
+            is ConeSelfType -> TODO()
         }
 
     private fun String.toConstantValueKind(): ConstantValueKind<*>? =

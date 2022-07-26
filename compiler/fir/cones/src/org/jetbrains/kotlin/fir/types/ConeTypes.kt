@@ -9,6 +9,7 @@ import org.jetbrains.kotlin.fir.diagnostics.ConeDiagnostic
 import org.jetbrains.kotlin.fir.symbols.ConeClassLikeLookupTag
 import org.jetbrains.kotlin.fir.symbols.ConeClassifierLookupTag
 import org.jetbrains.kotlin.name.ClassId
+import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.types.model.*
 import org.jetbrains.kotlin.utils.addToStdlib.foldMap
 
@@ -226,5 +227,40 @@ class ConeIntersectionType(
     override fun hashCode(): Int {
         if (hashCode != 0) return hashCode
         return intersectedTypes.hashCode().also { hashCode = it }
+    }
+}
+
+class ConeSelfType(
+    val original: ConeClassLikeType,
+    override val nullability: ConeNullability
+) : ConeSimpleKotlinType(), TypeConstructorMarker {
+
+    override val typeArguments: Array<out ConeTypeProjection>
+        get() = emptyArray()
+
+    override val attributes: ConeAttributes
+        get() = original.attributes
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as ConeSelfType
+
+        if (original != other.original) return false
+        if (nullability != other.nullability) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = 0
+        result = 31 * result + original.hashCode()
+        result = 31 * result + nullability.hashCode()
+        return result
+    }
+
+    companion object {
+        val SELF_NAME = Name.identifier("Self")
     }
 }

@@ -473,6 +473,10 @@ interface TypeSystemContext : TypeSystemOptimizationContext {
 
     fun TypeConstructorMarker.isCommonFinalClassConstructor(): Boolean
 
+    fun SimpleTypeMarker.isSelfType(): Boolean
+
+    fun SimpleTypeMarker.originIfSelfType(): SimpleTypeMarker
+
     fun captureFromArguments(
         type: SimpleTypeMarker,
         status: CaptureStatus

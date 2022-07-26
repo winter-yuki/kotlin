@@ -204,6 +204,7 @@ fun <T : ConeKotlinType> T.withNullability(
         }
         is ConeIntegerLiteralConstantType -> ConeIntegerLiteralConstantTypeImpl(value, possibleTypes, isUnsigned, nullability)
         is ConeIntegerConstantOperatorType -> ConeIntegerConstantOperatorTypeImpl(isUnsigned, nullability)
+        is ConeSelfType -> ConeSelfType(original, nullability)
         else -> error("sealed: ${this::class}")
     } as T
 }

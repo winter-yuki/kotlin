@@ -1,0 +1,73 @@
+FILE: returnOverride.kt
+    public abstract class A : R|kotlin/Any| {
+        public constructor(): R|A| {
+            super<R|kotlin/Any|>()
+        }
+
+        public abstract fun a(): R|SelfType(A)|
+
+        public abstract fun b(): R|SelfType(A)?|
+
+        public abstract fun c(): R|SelfType(A)?|
+
+    }
+    public abstract class B : R|A| {
+        public constructor(): R|B| {
+            super<R|A|>()
+        }
+
+        public abstract fun f(): R|SelfType(B)|
+
+        public abstract fun g(): R|SelfType(B)?|
+
+        public abstract fun h(): R|SelfType(B)?|
+
+        public abstract fun x(): R|SelfType(B)|
+
+        public abstract fun y(): R|SelfType(B)?|
+
+        public abstract fun z(): R|SelfType(B)?|
+
+    }
+    public final class C : R|B| {
+        public constructor(): R|C| {
+            super<R|B|>()
+        }
+
+        public final override fun a(): R|C| {
+            ^a Null(null)!!
+        }
+
+        public final override fun b(): R|C?| {
+            ^b Null(null)!!
+        }
+
+        public final override fun c(): R|C| {
+            ^c Null(null)!!
+        }
+
+        public final override fun f(): R|SelfType(C)| {
+            ^f Null(null)!!
+        }
+
+        public final override fun g(): R|SelfType(C)?| {
+            ^g Null(null)!!
+        }
+
+        public final override fun h(): R|SelfType(C)| {
+            ^h Null(null)!!
+        }
+
+        public final override fun x(): R|C| {
+            ^x Null(null)!!
+        }
+
+        public final override fun y(): R|C?| {
+            ^y Null(null)
+        }
+
+        public final override fun z(): R|C| {
+            ^z Null(null)!!
+        }
+
+    }

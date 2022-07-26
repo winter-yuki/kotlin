@@ -106,6 +106,7 @@ interface FirDeclarationPresenter {
             is ConeStubType -> {
                 append("ERROR")
             }
+            is ConeSelfType -> TODO()
         }
     }
 
