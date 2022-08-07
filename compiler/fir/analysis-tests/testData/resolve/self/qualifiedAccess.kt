@@ -1,12 +1,12 @@
 abstract class S {
-    fun p(): Self = this
+    fun p(): Self = null!!
     fun q(): Self? = null
 }
 
 class D : S() {
-    fun a(): Self = this
-    fun b(): Self? = this
-    fun c(): Self? = this
+    fun a(): Self = null!!
+    fun b(): Self? = null!!
+    fun c(): Self? = null!!
 }
 
 fun test() {
@@ -16,10 +16,6 @@ fun test() {
     val d3: D? = d.b()
     val d4: D? = d.q()
 
-//    val d5: D = d.p().a().q()
-
-//    b.a().b()
-//    b.b()?.c()
-//    b.a().p().q()?.a()
-//    b.q()?.a()
+    val d5: D? = d.p().a().q()
+    val d6: D? = d.a().q()?.c()
 }

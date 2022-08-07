@@ -15,15 +15,15 @@ abstract class B : A() {
 }
 
 class C : B() {
-    override fun a(): C = null!!
-    override fun b(): C? = null!!
-    override fun c(): C = null!!
+    override fun a(): <!RETURN_TYPE_MISMATCH_ON_OVERRIDE!>C<!> = null!!
+    override fun b(): <!RETURN_TYPE_MISMATCH_ON_OVERRIDE!>C?<!> = null!!
+    override fun c(): <!RETURN_TYPE_MISMATCH_ON_OVERRIDE!>C<!> = null!!
 
     override fun f(): Self = null!!
     override fun g(): Self? = null!!
     override fun h(): Self = null!!
 
-    override fun x(): C = null!!
-    override fun y(): C? = null
-    override fun z(): C = null!!
+    override fun x(): <!RETURN_TYPE_MISMATCH_ON_OVERRIDE!>C<!> = null!!
+    override fun y(): <!RETURN_TYPE_MISMATCH_ON_OVERRIDE!>C?<!> = null
+    override fun z(): <!RETURN_TYPE_MISMATCH_ON_OVERRIDE!>C<!> = null!!
 }

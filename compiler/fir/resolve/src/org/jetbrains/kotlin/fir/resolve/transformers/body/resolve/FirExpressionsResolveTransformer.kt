@@ -35,6 +35,7 @@ import org.jetbrains.kotlin.fir.resolve.transformers.StoreReceiver
 import org.jetbrains.kotlin.fir.scopes.impl.isWrappedIntegerOperator
 import org.jetbrains.kotlin.fir.scopes.impl.isWrappedIntegerOperatorForUnsignedType
 import org.jetbrains.kotlin.fir.symbols.impl.FirCallableSymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirRegularClassSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirVariableSymbol
 import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.fir.types.builder.buildErrorTypeRef
@@ -112,7 +113,11 @@ open class FirExpressionsResolveTransformer(transformer: FirBodyResolveTransform
                     }
                     implicitType != null -> buildResolvedTypeRef {
                         source = callee.source
-                        type = implicitType
+                        type = if (implicitReceiver.isCurrentClassDeclaration) {
+                            (implicitType as ConeSimpleKotlinType).asSelfType(session.typeContext)
+                        } else {
+                            implicitType
+                        }
                     }
                     labelName != null -> buildErrorTypeRef {
                         source = qualifiedAccessExpression.source
@@ -284,7 +289,12 @@ open class FirExpressionsResolveTransformer(transformer: FirBodyResolveTransform
                 superReference.replaceSuperTypeRef(resultType)
             }
         }
-        return superReferenceContainer
+        return superReferenceContainer.apply {
+            val resultTypeRef = resultType
+            if (resultTypeRef is FirResolvedTypeRef && implicitReceiver.isCurrentClassDeclaration) {
+                resultType = resultTypeRef.asSelfTypeRef(session.typeContext)
+            }
+        }
     }
 
     private fun markSuperReferenceError(
@@ -438,7 +448,8 @@ open class FirExpressionsResolveTransformer(transformer: FirBodyResolveTransform
             ConeNullability.NOT_NULL
         )
 
-        val approximationIsNeeded = resolutionMode !is ResolutionMode.ReceiverResolution && resolutionMode !is ResolutionMode.ContextDependent
+        val approximationIsNeeded =
+            resolutionMode !is ResolutionMode.ReceiverResolution && resolutionMode !is ResolutionMode.ContextDependent
 
         val integerOperatorCall = buildIntegerLiteralOperatorCall {
             source = originalCall.source
@@ -997,7 +1008,7 @@ open class FirExpressionsResolveTransformer(transformer: FirBodyResolveTransform
                     expectedTypeRef != null -> {
                         require(expressionType is ConeIntegerLiteralConstantTypeImpl)
                         val coneType = expectedTypeRef.coneTypeSafe<ConeKotlinType>()?.fullyExpandedType(session)
-                        val approximatedType= expressionType.getApproximatedType(coneType)
+                        val approximatedType = expressionType.getApproximatedType(coneType)
                         constExpression.replaceKind(approximatedType.toConstKind() as ConstantValueKind<T>)
                         approximatedType
                     }
@@ -1131,7 +1142,7 @@ open class FirExpressionsResolveTransformer(transformer: FirBodyResolveTransform
             ): FirFunctionCall = buildFunctionCall {
                 this.source = source
                 explicitReceiver = receiver
-                argumentList = when(arguments.size) {
+                argumentList = when (arguments.size) {
                     0 -> FirEmptyArgumentList
                     1 -> buildUnaryArgumentList(arguments.first())
                     else -> buildArgumentList {
@@ -1461,4 +1472,7 @@ open class FirExpressionsResolveTransformer(transformer: FirBodyResolveTransform
             )
         )
     }
+
+    private val ImplicitReceiverValue<*>?.isCurrentClassDeclaration: Boolean
+        get() = this?.boundSymbol is FirRegularClassSymbol
 }

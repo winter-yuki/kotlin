@@ -16,16 +16,4 @@ FILE: values.kt
             ^h Null(null)
         }
 
-        public final fun x(): R|SelfType(A)| {
-            ^x this@R|/A|.R|/A.f|()
-        }
-
-        public final fun y(): R|SelfType(A)?| {
-            ^y this@R|/A|.R|/A.f|()
-        }
-
-        public final fun z(): R|SelfType(A)?| {
-            ^z this@R|/A|.R|/A.g|()
-        }
-
     }

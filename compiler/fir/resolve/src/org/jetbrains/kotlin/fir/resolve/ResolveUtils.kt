@@ -252,16 +252,14 @@ fun <T : FirResolvable> BodyResolveComponents.typeFromCallee(access: T): FirReso
                 source = access.source?.fakeElement(KtFakeSourceElementKind.ErrorTypeRef)
                 diagnostic = ConeStubDiagnostic(newCallee.diagnostic)
             }
-        is FirNamedReferenceWithCandidate -> {
-            typeFromSymbol(newCallee.candidateSymbol, false)
-        }
+        is FirNamedReferenceWithCandidate ->
+            typeFromSymbol(newCallee.candidateSymbol, false, SelfTypeCastInfo.create(newCallee.candidate))
         is FirPropertyWithExplicitBackingFieldResolvedNamedReference -> {
             val symbol = newCallee.getNarrowedDownSymbol()
-            typeFromSymbol(symbol, false)
+            typeFromSymbol(symbol, false, SelfTypeCastInfo.create(access))
         }
-        is FirResolvedNamedReference -> {
-            typeFromSymbol(newCallee.resolvedSymbol, false)
-        }
+        is FirResolvedNamedReference ->
+            typeFromSymbol(newCallee.resolvedSymbol, false, SelfTypeCastInfo.create(access))
         is FirThisReference -> {
             val labelName = newCallee.labelName
             val implicitReceiver = implicitReceiverStack[labelName]
@@ -292,20 +290,48 @@ fun <T : FirResolvable> BodyResolveComponents.typeFromCallee(access: T): FirReso
     }
 }
 
-private fun BodyResolveComponents.typeFromSymbol(symbol: FirBasedSymbol<*>, makeNullable: Boolean): FirResolvedTypeRef {
+private class SelfTypeCastInfo private constructor(
+    val dispatchReceiverType: ConeKotlinType?,
+    val dispatchOnCurrentClassDeclaration: Boolean
+) {
+    companion object {
+        fun <T : FirResolvable> create(access: T): SelfTypeCastInfo {
+            val receiverExpression = (access as? FirQualifiedAccess)?.dispatchReceiver
+            val receiverType = receiverExpression?.typeRef?.coneTypeSafe<ConeKotlinType>()
+            val receiverBoundSymbol = (receiverExpression as? FirThisReceiverExpression)?.calleeReference?.boundSymbol
+            return SelfTypeCastInfo(receiverType, receiverBoundSymbol is FirRegularClassSymbol)
+        }
+
+        fun create(candidate: Candidate): SelfTypeCastInfo {
+            val value = candidate.dispatchReceiverValue
+            val expression = value?.receiverExpression as? FirThisReceiverExpression
+            val receiverOfClassDeclaration = expression?.calleeReference?.boundSymbol is FirRegularClassSymbol
+            return SelfTypeCastInfo(value?.type, receiverOfClassDeclaration)
+        }
+    }
+}
+
+private fun BodyResolveComponents.typeFromSymbol(
+    symbol: FirBasedSymbol<*>,
+    makeNullable: Boolean,
+    selfCastInfo: SelfTypeCastInfo
+): FirResolvedTypeRef {
     return when (symbol) {
         is FirCallableSymbol<*> -> {
-            val returnTypeRef = returnTypeCalculator.tryCalculateReturnType(symbol.fir)
+            val returnTypeRef = returnTypeCalculator
+                .tryCalculateReturnType(symbol.fir)
+                .tryApplySelfCast(selfCastInfo, session)
             if (makeNullable) {
                 returnTypeRef.withReplacedConeType(
                     returnTypeRef.type.withNullability(ConeNullability.NULLABLE, session.typeContext),
                     KtFakeSourceElementKind.ImplicitTypeRef
                 )
             } else {
+                val source = returnTypeRef.source?.fakeElement(KtFakeSourceElementKind.ImplicitTypeRef)
                 buildResolvedTypeRef {
-                    source = returnTypeRef.source?.fakeElement(KtFakeSourceElementKind.ImplicitTypeRef)
-                    type = returnTypeRef.type
-                    annotations += returnTypeRef.annotations
+                    this.source = source
+                    this.type = returnTypeRef.type
+                    this.annotations += returnTypeRef.annotations
                 }
             }
         }
@@ -318,6 +344,20 @@ private fun BodyResolveComponents.typeFromSymbol(symbol: FirBasedSymbol<*>, make
         }
         else -> error("WTF ! $symbol")
     }
+}
+
+private fun FirResolvedTypeRef.tryApplySelfCast(selfCastInfo: SelfTypeCastInfo, session: FirSession): FirResolvedTypeRef {
+    val returnType = type.takeIf { it is ConeSelfType } ?: return this
+    val receiverType = selfCastInfo.dispatchReceiverType
+    requireNotNull(receiverType) { "Got SelfType without dispatch receiver" }
+    val nullability = returnType.nullability
+    val newType = when {
+        receiverType is ConeSelfType -> receiverType.withNullability(nullability, session.typeContext)
+        selfCastInfo.dispatchOnCurrentClassDeclaration ->
+            (receiverType as ConeSimpleKotlinType).asSelfType(session.typeContext, nullability)
+        else -> receiverType.withNullability(nullability, session.typeContext)
+    }
+    return withReplacedConeType(newType)
 }
 
 fun BodyResolveComponents.transformQualifiedAccessUsingSmartcastInfo(
@@ -484,7 +524,7 @@ fun <T> BodyResolveComponents.initialTypeOfCandidate(
 }
 
 fun BodyResolveComponents.initialTypeOfCandidate(candidate: Candidate): ConeKotlinType {
-    val typeRef = typeFromSymbol(candidate.symbol, makeNullable = false)
+    val typeRef = typeFromSymbol(candidate.symbol, makeNullable = false, SelfTypeCastInfo.create(candidate))
     return initialTypeOfCandidate(candidate, typeRef)
 }
 

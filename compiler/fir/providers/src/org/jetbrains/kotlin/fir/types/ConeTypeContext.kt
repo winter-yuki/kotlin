@@ -297,7 +297,7 @@ interface ConeTypeContext : TypeSystemContext, TypeSystemOptimizationContext, Ty
             is ConeCapturedTypeConstructor -> supertypes.orEmpty()
             is ConeIntersectionType -> intersectedTypes
             is ConeIntegerLiteralType -> supertypes
-            is ConeSelfType -> emptyList()
+            is ConeSelfType -> listOf(correctOrigin(this@ConeTypeContext))
             else -> unknownConstructorError()
         }
     }

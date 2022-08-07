@@ -5,7 +5,7 @@ FILE: qualifiedAccess.kt
         }
 
         public final fun p(): R|SelfType(S)| {
-            ^p this@R|/S|
+            ^p Null(null)!!
         }
 
         public final fun q(): R|SelfType(S)?| {
@@ -19,15 +19,15 @@ FILE: qualifiedAccess.kt
         }
 
         public final fun a(): R|SelfType(D)| {
-            ^a this@R|/D|
+            ^a Null(null)!!
         }
 
         public final fun b(): R|SelfType(D)?| {
-            ^b this@R|/D|
+            ^b Null(null)!!
         }
 
         public final fun c(): R|SelfType(D)?| {
-            ^c this@R|/D|
+            ^c Null(null)!!
         }
 
     }
@@ -37,5 +37,6 @@ FILE: qualifiedAccess.kt
         lval d2: R|D| = R|<local>/d|.R|/S.p|()
         lval d3: R|D?| = R|<local>/d|.R|/D.b|()
         lval d4: R|D?| = R|<local>/d|.R|/S.q|()
-        lval d5: R|D| = R|<local>/d|.R|/S.p|().<Unresolved name: a>#().<Unresolved name: q>#()
+        lval d5: R|D?| = R|<local>/d|.R|/S.p|().R|/D.a|().R|/S.q|()
+        lval d6: R|D?| = R|<local>/d|.R|/D.a|().R|/S.q|()?.{ $subj$.R|/D.c|() }
     }

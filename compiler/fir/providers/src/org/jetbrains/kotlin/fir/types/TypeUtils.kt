@@ -801,17 +801,20 @@ private fun ConeKotlinType.eraseAsUpperBound(
         else -> error("unexpected Java type parameter upper bound kind: $this")
     }
 
-fun ConeKotlinType.asSelfTypeOrNull(typeContext: ConeTypeContext): ConeSelfType? =
-    (this as? ConeSimpleKotlinType)?.let {
-        ConeSelfType(
-            it.withNullability(ConeNullability.NOT_NULL, typeContext),
-            it.nullability
-        )
-    }
+fun ConeSimpleKotlinType.asSelfType(typeContext: ConeTypeContext, nullability: ConeNullability? = null): ConeSelfType =
+    ConeSelfType(
+        original = withNullability(ConeNullability.NOT_NULL, typeContext),
+        nullability = nullability ?: this.nullability
+    )
 
-fun FirTypeRef.asSelfTypeRefOrNull(typeContext: ConeTypeContext): FirResolvedTypeRef? =
-    (this as? FirResolvedTypeRef)?.let {
-        val newType = it.type.asSelfTypeOrNull(typeContext) ?: return@let null
-        it.withReplacedConeType(newType)
-    }
+fun FirResolvedTypeRef.asSelfTypeRefOrNull(typeContext: ConeTypeContext): FirResolvedTypeRef? =
+    type.let { if (it !is ConeSimpleKotlinType) null else withReplacedConeType(it.asSelfType(typeContext)) }
 
+fun FirResolvedTypeRef.asSelfTypeRef(typeContext: ConeTypeContext): FirResolvedTypeRef =
+    asSelfTypeRefOrNull(typeContext) ?: error("Only ${ConeSimpleKotlinType::class.simpleName} can be wraped as Self type")
+
+/**
+ * Get origin with correct nullability.
+ */
+fun ConeSelfType.correctOrigin(typeContext: ConeTypeContext): ConeSimpleKotlinType =
+    original.withNullability(nullability, typeContext)

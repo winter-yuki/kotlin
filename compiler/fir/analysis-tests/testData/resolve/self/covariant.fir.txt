@@ -5,15 +5,29 @@ FILE: covariant.kt
         }
 
         public final fun a(b: R|B|): R|SelfType(A)| {
-            ^a R|<local>/b|.R|/B.f|()
+            ^a R|<local>/b|.<CS errors: /B.f>#()
         }
 
         public final fun b(b: R|B|): R|SelfType(A)?| {
-            ^b R|<local>/b|.R|/B.g|()
+            ^b R|<local>/b|.<CS errors: /B.g>#()
         }
 
         public final fun c(b: R|B|): R|SelfType(A)?| {
-            ^c R|<local>/b|.R|/B.f|()
+            ^c R|<local>/b|.<CS errors: /B.f>#()
+        }
+
+        public final fun d(b: R|B|): R|SelfType(A)| {
+            ^d R|<local>/b|.<Inapplicable(INAPPLICABLE): kotlin/run>#<R|B|, R|SelfType(A)|>(<L> = run@fun R|B|.<anonymous>(): R|SelfType(A)| <inline=Inline, kind=EXACTLY_ONCE>  {
+                ^ this@R|special/anonymous|.R|/B.f|()
+            }
+            )
+        }
+
+        public final fun e(b: R|B?|): R|SelfType(A)| {
+            ^e R|<local>/b|.<Inapplicable(INAPPLICABLE): kotlin/run>#<R|B?|, R|SelfType(A)|>(<L> = run@fun R|B?|.<anonymous>(): R|SelfType(A)| <inline=Inline, kind=EXACTLY_ONCE>  {
+                ^ this@R|special/anonymous|?.{ $subj$.R|/B.f|() }
+            }
+            )
         }
 
     }
@@ -23,7 +37,7 @@ FILE: covariant.kt
         }
 
         public final fun f(): R|SelfType(B)| {
-            ^f this@R|/B|
+            ^f Null(null)!!
         }
 
         public final fun g(): R|SelfType(B)?| {

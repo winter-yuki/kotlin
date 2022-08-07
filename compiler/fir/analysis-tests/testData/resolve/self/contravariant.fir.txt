@@ -5,7 +5,7 @@ FILE: contravariant.kt
         }
 
         public final fun p(): R|SelfType(A)| {
-            ^p this@R|/A|
+            ^p Null(null)!!
         }
 
         public final fun q(): R|SelfType(A)?| {
@@ -19,15 +19,51 @@ FILE: contravariant.kt
         }
 
         public final fun a(): R|SelfType(B)| {
-            ^a this@R|/B|.R|/A.p|()
+            ^a this@R|/B|.R|/A.p|().R|/B.d|()
         }
 
         public final fun b(): R|SelfType(B)?| {
-            ^b this@R|/B|.R|/A.q|()
+            ^b this@R|/B|.R|/A.q|()?.{ $subj$.R|/B.d|() }
         }
 
         public final fun c(): R|SelfType(B)?| {
-            ^c this@R|/B|.R|/A.p|()
+            ^c this@R|/B|.R|/A.p|().R|/B.d|()
+        }
+
+        public final fun d(): R|SelfType(B)| {
+            ^d this@R|/B|.R|/A.p|().R|/B.a|()
+        }
+
+        public final fun e(): R|SelfType(B)?| {
+            ^e this@R|/B|.R|/A.q|()?.{ $subj$.R|/B.a|() }
+        }
+
+        public final fun f(): R|SelfType(B)?| {
+            ^f this@R|/B|.R|/A.p|().R|/B.a|()
+        }
+
+        public final fun g(): R|SelfType(B)| {
+            ^g this@R|/B|.super<R|A|>.R|/A.p|().<CS errors: /A.p>#()
+        }
+
+        public final fun h(): R|SelfType(B)?| {
+            ^h this@R|/B|.super<R|A|>.R|/A.q|()?.{ $subj$.<CS errors: /A.p>#() }
+        }
+
+        public final fun i(): R|SelfType(B)?| {
+            ^i this@R|/B|.super<R|A|>.R|/A.p|().<CS errors: /A.p>#()
+        }
+
+        public final fun j(b: R|kotlin/Boolean|): R|SelfType(B)| {
+            ^j when () {
+                R|<local>/b| ->  {
+                    this@R|/B|
+                }
+                else ->  {
+                    this@R|/B|.R|/A.p|()
+                }
+            }
+
         }
 
     }

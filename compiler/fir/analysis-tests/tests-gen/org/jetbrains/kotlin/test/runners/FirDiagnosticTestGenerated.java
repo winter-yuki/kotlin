@@ -3740,6 +3740,12 @@ public class FirDiagnosticTestGenerated extends AbstractFirDiagnosticTest {
             }
 
             @Test
+            @TestMetadata("implicidAccess.kt")
+            public void testImplicidAccess() throws Exception {
+                runTest("compiler/fir/analysis-tests/testData/resolve/self/implicidAccess.kt");
+            }
+
+            @Test
             @TestMetadata("noThis.kt")
             public void testNoThis() throws Exception {
                 runTest("compiler/fir/analysis-tests/testData/resolve/self/noThis.kt");

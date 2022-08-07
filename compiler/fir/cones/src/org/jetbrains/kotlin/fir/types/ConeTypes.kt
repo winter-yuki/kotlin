@@ -235,6 +235,10 @@ data class ConeSelfType(
     override val nullability: ConeNullability
 ) : ConeSimpleKotlinType(), TypeConstructorMarker {
 
+    init {
+        require(original.nullability == ConeNullability.NOT_NULL)
+    }
+
     override val typeArguments: Array<out ConeTypeProjection>
         get() = emptyArray()
 

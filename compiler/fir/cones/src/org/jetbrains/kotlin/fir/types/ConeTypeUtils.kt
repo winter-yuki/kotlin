@@ -30,6 +30,7 @@ fun ConeKotlinType.forEachType(action: (ConeKotlinType) -> Unit) {
         }
         is ConeDefinitelyNotNullType -> original.forEachType(action)
         is ConeIntersectionType -> intersectedTypes.forEach { it.forEachType(action) }
+        is ConeSelfType -> original.forEachType(action)
         else -> typeArguments.forEach { if (it is ConeKotlinTypeProjection) it.type.forEachType(action) }
     }
 }

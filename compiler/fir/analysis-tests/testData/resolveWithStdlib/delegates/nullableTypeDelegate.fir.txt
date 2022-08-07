@@ -9,7 +9,7 @@ FILE: nullableTypeDelegate.kt
     }
     public abstract interface DatabaseEntity : R|kotlin/Any| {
     }
-    public final fun <Self : R|DatabaseEntity|, Target : R|DatabaseEntity|> R|Self|.directed(clazz: R|java/lang/Class<Target>|): R|Delegate<Self, Target?>| {
+    public final fun <Self1 : R|DatabaseEntity|, Target : R|DatabaseEntity|> R|Self1|.directed(clazz: R|java/lang/Class<Target>|): R|Delegate<Self1, Target?>| {
         ^directed Null(null)!!
     }
     public final class MyClassSome : R|DatabaseEntity| {
