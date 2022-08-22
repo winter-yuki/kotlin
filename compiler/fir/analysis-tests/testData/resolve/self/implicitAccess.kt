@@ -1,4 +1,4 @@
-inline fun <T, R> T.run(block: T.() -> R) = block()
+// WITH_STDLIB
 
 abstract class S {
     fun p(): Self = null!!

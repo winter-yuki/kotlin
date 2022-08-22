@@ -1,0 +1,43 @@
+FILE: selfRefersGeneric.kt
+    public open class Lazy<out T> : R|kotlin/Any| {
+        public constructor<out T>(computation: R|() -> T|): R|Lazy<T>| {
+            super<R|kotlin/Any|>()
+        }
+
+        public final val computation: R|() -> T| = R|<local>/computation|
+            public get(): R|() -> T|
+
+        public final fun copy(): R|SelfType(Lazy<T>)| {
+            ^copy <CS errors: /Lazy.Lazy>#<R|ERROR CLASS: Cannot infer argument for type parameter T|>(<L> = Lazy@fun <anonymous>(): <ERROR TYPE REF: Cannot infer argument for type parameter T> <inline=NoInline>  {
+                ^ this@R|/Lazy|.R|/Lazy.computation|.R|SubstitutionOverride<kotlin/Function0.invoke: R|T|>|()
+            }
+            )
+        }
+
+    }
+    public open class LazyNumber<out T : R|kotlin/Number|> : R|Lazy<T>| {
+        public constructor<out T : R|kotlin/Number|>(computation: R|() -> T|): R|LazyNumber<T>| {
+            super<R|Lazy<T>|>(R|<local>/computation|)
+        }
+
+        public final fun shortify(): R|SelfType(LazyNumber<T>)| {
+            ^shortify <CS errors: /LazyNumber.LazyNumber>#<R|ERROR CLASS: Cannot infer argument for type parameter T|>(<L> = LazyNumber@fun <anonymous>(): <ERROR TYPE REF: Cannot infer argument for type parameter T> <inline=NoInline>  {
+                ^ this@R|/LazyNumber|.R|SubstitutionOverride</LazyNumber.computation: R|() -> T|>|.R|SubstitutionOverride<kotlin/Function0.invoke: R|T|>|().<Unresolved name: shortValue>#()
+            }
+            )
+        }
+
+    }
+    public final class LazyInt : R|LazyNumber<kotlin/Int>| {
+        public constructor(computation: R|() -> kotlin/Int|): R|LazyInt| {
+            super<R|LazyNumber<kotlin/Int>|>(R|<local>/computation|)
+        }
+
+        public final fun add(n: R|kotlin/Int|): R|SelfType(LazyInt)| {
+            ^add <CS errors: /LazyInt.LazyInt>#(<L> = LazyInt@fun <anonymous>(): R|kotlin/Int| <inline=NoInline>  {
+                ^ this@R|/LazyInt|.R|SubstitutionOverride</LazyInt.computation: R|() -> kotlin/Int|>|.R|SubstitutionOverride<kotlin/Function0.invoke: R|kotlin/Int|>|().R|kotlin/Int.plus|(R|<local>/n|)
+            }
+            )
+        }
+
+    }

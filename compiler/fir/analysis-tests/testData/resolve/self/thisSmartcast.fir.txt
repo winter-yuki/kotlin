@@ -1,0 +1,27 @@
+FILE: thisSmartcast.kt
+    public abstract class A : R|kotlin/Any| {
+        public constructor(): R|A| {
+            super<R|kotlin/Any|>()
+        }
+
+        public abstract fun f(): R|SelfType(A)|
+
+        public final fun g(): R|SelfType(A)| {
+            ^g this@R|/A|
+        }
+
+    }
+    public final class B : R|A| {
+        public constructor(): R|B| {
+            super<R|A|>()
+        }
+
+        public final override fun f(): R|SelfType(B)| {
+            ^f this@R|/B|
+        }
+
+    }
+    public final fun R|kotlin/Any|.test(): R|kotlin/Unit| {
+        R|kotlin/require|((this@R|/test| is R|B|))
+        lval b: R|B| = this@R|/test|.R|/B.f|().R|/A.g|().R|/B.f|()
+    }

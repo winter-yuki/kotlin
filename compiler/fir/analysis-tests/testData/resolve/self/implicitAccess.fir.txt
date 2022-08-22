@@ -1,7 +1,4 @@
-FILE: implicidAccess.kt
-    public final inline fun <T, R> R|T|.run(block: R|T.() -> R|): R|R| {
-        ^run R|<local>/block|.R|SubstitutionOverride<kotlin/Function1.invoke: R|R|>|(this@R|/run|)
-    }
+FILE: implicitAccess.kt
     public abstract class S : R|kotlin/Any| {
         public constructor(): R|S| {
             super<R|kotlin/Any|>()
@@ -36,15 +33,15 @@ FILE: implicidAccess.kt
     }
     public final fun test(): R|kotlin/Unit| {
         lval d: R|D| = R|/D.D|()
-        lval d1: R|D| = R|<local>/d|.R|/run|<R|D|, R|D|>(<L> = run@fun R|D|.<anonymous>(): R|D| <inline=Inline, kind=UNKNOWN>  {
+        lval d1: R|D| = R|<local>/d|.R|kotlin/run|<R|D|, R|D|>(<L> = run@fun R|D|.<anonymous>(): R|D| <inline=Inline, kind=EXACTLY_ONCE>  {
             ^ this@R|special/anonymous|.R|/D.a|().R|/S.p|()
         }
         )
-        lval d2: R|D| = R|<local>/d|.R|/run|<R|D|, R|D|>(<L> = run@fun R|D|.<anonymous>(): R|D| <inline=Inline, kind=UNKNOWN>  {
+        lval d2: R|D| = R|<local>/d|.R|kotlin/run|<R|D|, R|D|>(<L> = run@fun R|D|.<anonymous>(): R|D| <inline=Inline, kind=EXACTLY_ONCE>  {
             ^ this@R|special/anonymous|.R|/S.p|().R|/D.a|()
         }
         )
-        lval d3: R|D?| = R|<local>/d|.R|/run|<R|D|, R|D?|>(<L> = run@fun R|D|.<anonymous>(): R|D?| <inline=Inline, kind=UNKNOWN>  {
+        lval d3: R|D?| = R|<local>/d|.R|kotlin/run|<R|D|, R|D?|>(<L> = run@fun R|D|.<anonymous>(): R|D?| <inline=Inline, kind=EXACTLY_ONCE>  {
             ^ this@R|special/anonymous|.R|/S.q|()?.{ $subj$.R|/S.p|() }
         }
         )

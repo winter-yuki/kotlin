@@ -4,7 +4,9 @@ abstract class A {
     fun c(b: B): Self? = <!RETURN_TYPE_MISMATCH!>b.f()<!>
 
     fun d(b: B): Self = b.run { <!ARGUMENT_TYPE_MISMATCH!>this.f()<!> }
-    fun e(b: B?): Self = b.run { <!ARGUMENT_TYPE_MISMATCH!>this?.f()<!> }
+    fun e(b: B?): Self? = b.run { <!ARGUMENT_TYPE_MISMATCH!>this?.f()<!> }
+    fun h(b: B): Self = <!RETURN_TYPE_MISMATCH!>b.f()<!>
+    fun i(b: B?): Self? = <!RETURN_TYPE_MISMATCH!>b?.f()<!>
 }
 
 class B : A() {

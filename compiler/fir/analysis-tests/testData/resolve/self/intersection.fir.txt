@@ -1,0 +1,52 @@
+FILE: intersection.kt
+    public abstract interface A : R|kotlin/Any| {
+        public abstract fun f(): R|SelfType(A)|
+
+    }
+    public abstract interface B : R|A| {
+        public abstract fun g(): R|SelfType(B)|
+
+    }
+    public abstract interface C : R|A| {
+        public abstract fun h(): R|SelfType(C)|
+
+    }
+    public abstract interface D : R|B|, R|C| {
+    }
+    public abstract interface E : R|B|, R|C| {
+    }
+    public final fun test(d: R|D|, e: R|E|): R|kotlin/Unit| {
+        lval bc: R|it(B & C)| = when () {
+            Boolean(true) ->  {
+                R|<local>/d|
+            }
+            else ->  {
+                R|<local>/e|
+            }
+        }
+
+        lval b1: R|B| = R|<local>/bc|.R|/A.f|().R|/C.h|()
+        lval c2: R|C| = R|<local>/bc|.R|/A.f|().R|/B.g|()
+        lval Sbc: R|it(B & C)| = when () {
+            Boolean(true) ->  {
+                R|<local>/d|.R|/A.f|()
+            }
+            else ->  {
+                R|<local>/e|
+            }
+        }
+
+        lval b2: R|B| = R|<local>/Sbc|.R|/C.h|()
+        lval c2: R|C| = R|<local>/Sbc|.R|/B.g|()
+        lval SbSc: R|it(B & C)| = when () {
+            Boolean(true) ->  {
+                R|<local>/d|.R|/A.f|()
+            }
+            else ->  {
+                R|<local>/e|.R|/A.f|()
+            }
+        }
+
+        lval b3: R|B| = R|<local>/SbSc|.R|/C.h|()
+        lval c3: R|C| = R|<local>/SbSc|.R|/B.g|()
+    }

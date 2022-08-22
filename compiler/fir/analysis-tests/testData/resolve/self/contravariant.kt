@@ -17,4 +17,7 @@ class B : A() {
     fun i(): Self? = <!RETURN_TYPE_MISMATCH!>super.p().p()<!>
 
     fun j(b: Boolean): Self = if (b) this else p()
+
+    // Otherwise b.k(a) will cast A to B implicitly
+    fun k(a: A): Self = <!RETURN_TYPE_MISMATCH!>a.p()<!>
 }

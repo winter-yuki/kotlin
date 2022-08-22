@@ -1,0 +1,21 @@
+FILE: nonDispatchThis.kt
+    public final class A : R|kotlin/Any| {
+        public constructor(): R|A| {
+            super<R|kotlin/Any|>()
+        }
+
+        public final fun f(): R|SelfType(A)| {
+            ^f this@R|/A|.<CS errors: kotlin/apply>#<R|A|>(<L> = apply@fun R|A|.<anonymous>(): R|kotlin/Unit| <inline=Inline, kind=EXACTLY_ONCE>  {
+                ^@apply Unit
+            }
+            )
+        }
+
+        public final fun g(): R|SelfType(A)| {
+            ^g this@R|/A|.<Inapplicable(INAPPLICABLE): kotlin/run>#<R|A|, R|SelfType(A)|>(<L> = run@fun R|A|.<anonymous>(): R|SelfType(A)| <inline=Inline, kind=EXACTLY_ONCE>  {
+                ^ <Unresolved name: p>#()
+            }
+            )
+        }
+
+    }

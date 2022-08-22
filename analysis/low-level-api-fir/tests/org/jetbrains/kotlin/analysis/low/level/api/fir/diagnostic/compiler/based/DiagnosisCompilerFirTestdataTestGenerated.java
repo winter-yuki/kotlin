@@ -3734,21 +3734,45 @@ public class DiagnosisCompilerFirTestdataTestGenerated extends AbstractDiagnosis
             }
 
             @Test
+            @TestMetadata("createSubtype.kt")
+            public void testCreateSubtype() throws Exception {
+                runTest("compiler/fir/analysis-tests/testData/resolve/self/createSubtype.kt");
+            }
+
+            @Test
             @TestMetadata("explicitReturn.kt")
             public void testExplicitReturn() throws Exception {
                 runTest("compiler/fir/analysis-tests/testData/resolve/self/explicitReturn.kt");
             }
 
             @Test
-            @TestMetadata("implicidAccess.kt")
-            public void testImplicidAccess() throws Exception {
-                runTest("compiler/fir/analysis-tests/testData/resolve/self/implicidAccess.kt");
+            @TestMetadata("implicitAccess.kt")
+            public void testImplicitAccess() throws Exception {
+                runTest("compiler/fir/analysis-tests/testData/resolve/self/implicitAccess.kt");
+            }
+
+            @Test
+            @TestMetadata("intersection.kt")
+            public void testIntersection() throws Exception {
+                runTest("compiler/fir/analysis-tests/testData/resolve/self/intersection.kt");
+            }
+
+            @Test
+            @TestMetadata("methodReferenceType.kt")
+            public void testMethodReferenceType() throws Exception {
+                runTest("compiler/fir/analysis-tests/testData/resolve/self/methodReferenceType.kt");
             }
 
             @Test
             @TestMetadata("noThis.kt")
             public void testNoThis() throws Exception {
                 runTest("compiler/fir/analysis-tests/testData/resolve/self/noThis.kt");
+            }
+
+            @Test
+            @TestMetadata("nonDispatchThis.kt")
+            public void testNonDispatchThis() throws Exception {
+                runTest("compiler/fir/analysis-tests/testData/resolve/self/nonDispatchThis.kt");
             }
 
             @Test
@@ -3767,6 +3791,24 @@ public class DiagnosisCompilerFirTestdataTestGenerated extends AbstractDiagnosis
             @TestMetadata("selfAndClass.kt")
             public void testSelfAndClass() throws Exception {
                 runTest("compiler/fir/analysis-tests/testData/resolve/self/selfAndClass.kt");
+            }
+
+            @Test
+            @TestMetadata("selfRefersGeneric.kt")
+            public void testSelfRefersGeneric() throws Exception {
+                runTest("compiler/fir/analysis-tests/testData/resolve/self/selfRefersGeneric.kt");
+            }
+
+            @Test
+            @TestMetadata("thisSmartcast.kt")
+            public void testThisSmartcast() throws Exception {
+                runTest("compiler/fir/analysis-tests/testData/resolve/self/thisSmartcast.kt");
+            }
+
+            @Test
+            @TestMetadata("typeArg.kt")
+            public void testTypeArg() throws Exception {
+                runTest("compiler/fir/analysis-tests/testData/resolve/self/typeArg.kt");
             }
 
             @Test

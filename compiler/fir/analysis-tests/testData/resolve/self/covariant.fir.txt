@@ -23,11 +23,19 @@ FILE: covariant.kt
             )
         }
 
-        public final fun e(b: R|B?|): R|SelfType(A)| {
-            ^e R|<local>/b|.<Inapplicable(INAPPLICABLE): kotlin/run>#<R|B?|, R|SelfType(A)|>(<L> = run@fun R|B?|.<anonymous>(): R|SelfType(A)| <inline=Inline, kind=EXACTLY_ONCE>  {
+        public final fun e(b: R|B?|): R|SelfType(A)?| {
+            ^e R|<local>/b|.<Inapplicable(INAPPLICABLE): kotlin/run>#<R|B?|, R|SelfType(A)?|>(<L> = run@fun R|B?|.<anonymous>(): R|SelfType(A)?| <inline=Inline, kind=EXACTLY_ONCE>  {
                 ^ this@R|special/anonymous|?.{ $subj$.R|/B.f|() }
             }
             )
+        }
+
+        public final fun h(b: R|B|): R|SelfType(A)| {
+            ^h R|<local>/b|.<CS errors: /B.f>#()
+        }
+
+        public final fun i(b: R|B?|): R|SelfType(A)?| {
+            ^i R|<local>/b|?.{ $subj$.<CS errors: /B.f>#() }
         }
 
     }

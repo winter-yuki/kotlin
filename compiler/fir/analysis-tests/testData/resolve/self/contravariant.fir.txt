@@ -66,4 +66,8 @@ FILE: contravariant.kt
 
         }
 
+        public final fun k(a: R|A|): R|SelfType(B)| {
+            ^k R|<local>/a|.<CS errors: /A.p>#()
+        }
+
     }

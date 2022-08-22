@@ -3300,19 +3300,39 @@ public class LazyBodyIsNotTouchedTilContractsPhaseTestGenerated extends Abstract
             runTest("compiler/fir/analysis-tests/testData/resolve/self/covariant.kt");
         }
 
+        @TestMetadata("createSubtype.kt")
+        public void testCreateSubtype() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/self/createSubtype.kt");
+        }
+
         @TestMetadata("explicitReturn.kt")
         public void testExplicitReturn() throws Exception {
             runTest("compiler/fir/analysis-tests/testData/resolve/self/explicitReturn.kt");
         }
 
-        @TestMetadata("implicidAccess.kt")
-        public void testImplicidAccess() throws Exception {
-            runTest("compiler/fir/analysis-tests/testData/resolve/self/implicidAccess.kt");
+        @TestMetadata("implicitAccess.kt")
+        public void testImplicitAccess() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/self/implicitAccess.kt");
+        }
+
+        @TestMetadata("intersection.kt")
+        public void testIntersection() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/self/intersection.kt");
+        }
+
+        @TestMetadata("methodReferenceType.kt")
+        public void testMethodReferenceType() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/self/methodReferenceType.kt");
         }
 
         @TestMetadata("noThis.kt")
         public void testNoThis() throws Exception {
             runTest("compiler/fir/analysis-tests/testData/resolve/self/noThis.kt");
+        }
+
+        @TestMetadata("nonDispatchThis.kt")
+        public void testNonDispatchThis() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/self/nonDispatchThis.kt");
         }
 
         @TestMetadata("qualifiedAccess.kt")
@@ -3328,6 +3348,21 @@ public class LazyBodyIsNotTouchedTilContractsPhaseTestGenerated extends Abstract
         @TestMetadata("selfAndClass.kt")
         public void testSelfAndClass() throws Exception {
             runTest("compiler/fir/analysis-tests/testData/resolve/self/selfAndClass.kt");
+        }
+
+        @TestMetadata("selfRefersGeneric.kt")
+        public void testSelfRefersGeneric() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/self/selfRefersGeneric.kt");
+        }
+
+        @TestMetadata("thisSmartcast.kt")
+        public void testThisSmartcast() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/self/thisSmartcast.kt");
+        }
+
+        @TestMetadata("typeArg.kt")
+        public void testTypeArg() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/self/typeArg.kt");
         }
 
         @TestMetadata("values.kt")

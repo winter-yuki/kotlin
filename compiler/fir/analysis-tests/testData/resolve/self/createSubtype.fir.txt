@@ -1,0 +1,59 @@
+FILE: createSubtype.kt
+    public sealed class Data : R|kotlin/Any| {
+        protected constructor(): R|Data| {
+            super<R|kotlin/Any|>()
+        }
+
+        public final data class One : R|Data| {
+            public constructor(a: R|kotlin/Int|): R|Data.One| {
+                super<R|Data|>()
+            }
+
+            public final var a: R|kotlin/Int| = R|<local>/a|
+                public get(): R|kotlin/Int|
+                public set(value: R|kotlin/Int|): R|kotlin/Unit|
+
+            public final operator fun component1(): R|kotlin/Int|
+
+            public final fun copy(a: R|kotlin/Int| = this@R|/Data.One|.R|/Data.One.a|): R|Data.One|
+
+        }
+
+        public final data class Two : R|Data| {
+            public constructor(a: R|kotlin/Int|, b: R|kotlin/Int|): R|Data.Two| {
+                super<R|Data|>()
+            }
+
+            public final var a: R|kotlin/Int| = R|<local>/a|
+                public get(): R|kotlin/Int|
+                public set(value: R|kotlin/Int|): R|kotlin/Unit|
+
+            public final var b: R|kotlin/Int| = R|<local>/b|
+                public get(): R|kotlin/Int|
+                public set(value: R|kotlin/Int|): R|kotlin/Unit|
+
+            public final operator fun component1(): R|kotlin/Int|
+
+            public final operator fun component2(): R|kotlin/Int|
+
+            public final fun copy(a: R|kotlin/Int| = this@R|/Data.Two|.R|/Data.Two.a|, b: R|kotlin/Int| = this@R|/Data.Two|.R|/Data.Two.b|): R|Data.Two|
+
+        }
+
+        public final fun copy(): R|SelfType(Data)| {
+            ^copy when (this@R|/Data|) {
+                ($subj$ is R|Data.One|) ->  {
+                    R|/Data.One.One|(this@R|/Data|.R|/Data.One.a|)
+                }
+                ($subj$ is R|Data.Two|) ->  {
+                    R|/Data.Two.Two|(this@R|/Data|.R|/Data.Two.a|, this@R|/Data|.R|/Data.Two.b|)
+                }
+            }
+
+        }
+
+    }
+    public final fun test(): R|kotlin/Unit| {
+        lval a: <ERROR TYPE REF: Unresolved name: One> = <Unresolved name: One>#(Int(1))
+        lval b: <ERROR TYPE REF: Unresolved name: copy> = R|<local>/a|.<Unresolved name: copy>#()
+    }
