@@ -19,6 +19,7 @@ import org.gradle.deployment.internal.DeploymentHandle
 import org.gradle.deployment.internal.DeploymentRegistry
 import org.gradle.process.internal.ExecHandle
 import org.gradle.process.internal.ExecHandleFactory
+import org.gradle.work.NormalizeLineEndings
 import org.jetbrains.kotlin.build.report.metrics.BuildMetricsReporter
 import org.jetbrains.kotlin.build.report.metrics.BuildMetricsReporterImpl
 import org.jetbrains.kotlin.build.report.metrics.BuildPerformanceMetric
@@ -27,7 +28,7 @@ import org.jetbrains.kotlin.gradle.plugin.PropertiesProvider
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinJsCompilation
 import org.jetbrains.kotlin.gradle.plugin.mpp.pm20.util.archivesName
 import org.jetbrains.kotlin.gradle.plugin.mpp.pm20.util.distsDirectory
-import org.jetbrains.kotlin.gradle.report.BuildMetricsReporterService
+import org.jetbrains.kotlin.gradle.report.BuildMetricsService
 import org.jetbrains.kotlin.gradle.targets.js.RequiredKotlinJsDependency
 import org.jetbrains.kotlin.gradle.targets.js.dsl.KotlinWebpackRulesContainer
 import org.jetbrains.kotlin.gradle.targets.js.dsl.WebpackRulesDsl
@@ -73,7 +74,7 @@ constructor(
         get() = injected
 
     @get:Internal
-    internal abstract val buildMetricsReporterService: Property<BuildMetricsReporterService?>
+    internal abstract val buildMetricsService: Property<BuildMetricsService?>
 
     @get:Internal
     val metrics: Property<BuildMetricsReporter> = project.objects
@@ -100,7 +101,12 @@ constructor(
 
     @get:PathSensitive(PathSensitivity.ABSOLUTE)
     @get:InputFile
-    val entryProperty: RegularFileProperty = objects.fileProperty().fileProvider(compilation.compileKotlinTask.outputFileProperty)
+    @get:NormalizeLineEndings
+    val entryProperty: RegularFileProperty = objects
+        .fileProperty()
+        .fileProvider(
+            compilation.compileTaskProvider.flatMap { it.outputFileProperty }
+        )
 
     init {
         onlyIf {
@@ -115,6 +121,7 @@ constructor(
     @get:PathSensitive(PathSensitivity.ABSOLUTE)
     @get:IgnoreEmptyDirectories
     @get:InputFiles
+    @get:NormalizeLineEndings
     val runtimeClasspath: FileCollection by lazy {
         compilation.compileDependencyFiles
     }
@@ -171,6 +178,7 @@ constructor(
     @get:PathSensitive(PathSensitivity.ABSOLUTE)
     @get:Optional
     @get:IgnoreEmptyDirectories
+    @get:NormalizeLineEndings
     @get:InputDirectory
     open val configDirectory: File?
         get() = projectDir.resolve("webpack.config.d").takeIf { it.isDirectory }
@@ -297,7 +305,7 @@ constructor(
 
     @TaskAction
     fun doExecute() {
-        resolutionManager.checkRequiredDependencies(task = this, services = services, logger = logger, projectPath = projectPath)
+        resolutionManager.checkRequiredDependencies(task = this)
 
         val runner = createRunner()
 
@@ -330,7 +338,7 @@ constructor(
                     buildMetrics.addMetric(BuildPerformanceMetric.BUNDLE_SIZE, it)
                 }
 
-            buildMetricsReporterService.orNull?.also { it.addTask(path, this.javaClass, buildMetrics) }
+            buildMetricsService.orNull?.also { it.addTask(path, this.javaClass, buildMetrics) }
         }
     }
 

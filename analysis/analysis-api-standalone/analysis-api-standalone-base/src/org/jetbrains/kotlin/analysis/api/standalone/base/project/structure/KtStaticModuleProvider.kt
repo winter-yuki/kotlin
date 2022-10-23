@@ -7,20 +7,23 @@ package org.jetbrains.kotlin.analysis.api.standalone.base.project.structure
 
 import com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.analysis.project.structure.*
-import org.jetbrains.kotlin.platform.TargetPlatform
 import org.jetbrains.kotlin.psi.psiUtil.contains
+import org.jetbrains.kotlin.serialization.deserialization.builtins.BuiltInSerializerProtocol
 
 class KtStaticModuleProvider(
-    private val projectStructure: KtModuleProjectStructure,
+    private val builtinsModule: KtBuiltinsModule,
+    val projectStructure: KtModuleProjectStructure,
 ) : ProjectStructureProvider() {
     override fun getKtModuleForKtElement(element: PsiElement): KtModule {
+        val containingFileAsPsiFile = element.containingFile
+        val containingFileAsVirtualFile = containingFileAsPsiFile.virtualFile
+        if (containingFileAsVirtualFile.extension == BuiltInSerializerProtocol.BUILTINS_FILE_EXTENSION) {
+            return builtinsModule
+        }
+
         return projectStructure.mainModules
             .first { module ->
-                module.ktModule.contentScope.contains(element)
+                element in module.ktModule.contentScope
             }.ktModule
-    }
-
-    override fun getKtBinaryModules(): Collection<KtBinaryModule> {
-        return projectStructure.allKtModules().filterIsInstance<KtBinaryModule>()
     }
 }

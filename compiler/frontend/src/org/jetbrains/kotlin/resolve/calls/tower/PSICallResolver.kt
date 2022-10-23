@@ -5,6 +5,7 @@
 
 package org.jetbrains.kotlin.resolve.calls.tower
 
+import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.config.LanguageVersionSettings
 import org.jetbrains.kotlin.contracts.EffectSystem
@@ -143,39 +144,8 @@ class PSICallResolver(
         }
     }
 
-    fun <D : CallableDescriptor> runResolutionAndInferenceForGivenDescriptors(
-        context: BasicCallResolutionContext,
-        descriptors: Collection<CallableDescriptor>,
-        tracingStrategy: TracingStrategy,
-        kind: KotlinCallKind,
-        substitutor: TypeSubstitutor? = null,
-        dispatchReceiver: ReceiverValueWithSmartCastInfo? = null
-    ): OverloadResolutionResults<D> {
-        val isSpecialFunction = descriptors.any { it.name in SPECIAL_FUNCTION_NAMES }
-        val kotlinCall = toKotlinCall(
-            context, kind, context.call, givenCandidatesName, tracingStrategy, isSpecialFunction, dispatchReceiver?.receiverValue
-        )
-        val scopeTower = ASTScopeTower(context)
-        val resolutionCallbacks = createResolutionCallbacks(context)
-        val givenCandidates = descriptors.map {
-            GivenCandidate(
-                it,
-                dispatchReceiver = dispatchReceiver,
-                knownTypeParametersResultingSubstitutor = substitutor
-            )
-        }
-
-        val result = kotlinCallResolver.resolveAndCompleteGivenCandidates(
-            scopeTower, resolutionCallbacks, kotlinCall, calculateExpectedType(context), givenCandidates, context.collectAllCandidates
-        )
-
-        return convertToOverloadResolutionResults<D>(context, result, tracingStrategy).also {
-            clearCacheForApproximationResults()
-        }
-    }
-
     // actually, `D` is at least FunctionDescriptor, but right now because of CallResolver it isn't possible change upper bound for `D`
-    fun <D : CallableDescriptor> runResolutionAndInferenceForGivenOldCandidates(
+    fun <D : CallableDescriptor> runResolutionAndInferenceForGivenCandidates(
         context: BasicCallResolutionContext,
         resolutionCandidates: Collection<OldResolutionCandidate<D>>,
         tracingStrategy: TracingStrategy
@@ -293,10 +263,6 @@ class PSICallResolver(
         return SingleOverloadResolutionResult(resolvedCall)
     }
 
-    private fun needToReportUnresolvedReferenceForNoneCandidates(call: Call): Boolean =
-        // Don't report unresolved reference on constructor calls since they are processed separately, and aother error is reported
-        call.callElement !is KtConstructorDelegationCall
-
     private fun <D : CallableDescriptor> handleErrorResolutionResult(
         context: BasicCallResolutionContext,
         trace: BindingTrace,
@@ -308,9 +274,7 @@ class PSICallResolver(
         diagnostics.firstIsInstanceOrNull<NoneCandidatesCallDiagnostic>()?.let {
             kotlinToResolvedCallTransformer.transformAndReport<D>(result, context, tracingStrategy)
 
-            if (needToReportUnresolvedReferenceForNoneCandidates(context.call)) {
-                tracingStrategy.unresolvedReference(trace)
-            }
+            tracingStrategy.unresolvedReference(trace)
             return OverloadResolutionResultsImpl.nameNotFound()
         }
 
@@ -506,7 +470,7 @@ class PSICallResolver(
             dispatchReceiver: ReceiverValueWithSmartCastInfo?,
             extensionReceiver: ReceiverValueWithSmartCastInfo?
         ): Collection<VariableDescriptor> {
-            return candidateInterceptor.interceptVariableCandidates(
+            val result = candidateInterceptor.interceptVariableCandidates(
                 initialResults,
                 this,
                 context,
@@ -517,6 +481,14 @@ class PSICallResolver(
                 dispatchReceiver,
                 extensionReceiver
             )
+            if (name != StandardNames.ENUM_ENTRIES || languageVersionSettings.supportsFeature(LanguageFeature.EnumEntries)) {
+                return result
+            }
+            return result.filterNot {
+                it is PropertyDescriptor && it.isSynthesized &&
+                        it.dispatchReceiverParameter == null && it.extensionReceiverParameter == null &&
+                        (it.containingDeclaration as? ClassDescriptor)?.kind == ClassKind.ENUM_CLASS
+            }
         }
     }
 

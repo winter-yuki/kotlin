@@ -921,8 +921,6 @@ public final class BooleanArray {
 @kotlin.annotation.Retention(value = AnnotationRetention.BINARY)
 @kotlin.SinceKotlin(version = "1.3")
 @kotlin.experimental.ExperimentalTypeInference
-@kotlin.Deprecated(message = "BuilderInference annotation may not be used anymore. The builder inference is enabled automatically for builder calls if needed")
-@kotlin.DeprecatedSinceKotlin(errorSince = "1.9", hiddenSince = "1.10", warningSince = "1.7")
 public final annotation class BuilderInference : kotlin.Annotation {
     public constructor BuilderInference()
 }
@@ -991,6 +989,22 @@ public final class Byte : kotlin.Number, kotlin.Comparable<kotlin.Byte> {
     public final operator fun rangeTo(other: kotlin.Long): kotlin.ranges.LongRange
 
     public final operator fun rangeTo(other: kotlin.Short): kotlin.ranges.IntRange
+
+    @kotlin.SinceKotlin(version = "1.7")
+    @kotlin.ExperimentalStdlibApi
+    public final operator fun rangeUntil(other: kotlin.Byte): kotlin.ranges.IntRange
+
+    @kotlin.SinceKotlin(version = "1.7")
+    @kotlin.ExperimentalStdlibApi
+    public final operator fun rangeUntil(other: kotlin.Int): kotlin.ranges.IntRange
+
+    @kotlin.SinceKotlin(version = "1.7")
+    @kotlin.ExperimentalStdlibApi
+    public final operator fun rangeUntil(other: kotlin.Long): kotlin.ranges.LongRange
+
+    @kotlin.SinceKotlin(version = "1.7")
+    @kotlin.ExperimentalStdlibApi
+    public final operator fun rangeUntil(other: kotlin.Short): kotlin.ranges.IntRange
 
     @kotlin.SinceKotlin(version = "1.1")
     public final operator fun rem(other: kotlin.Byte): kotlin.Int
@@ -1093,6 +1107,10 @@ public final class Char : kotlin.Comparable<kotlin.Char> {
     public final operator fun plus(other: kotlin.Int): kotlin.Char
 
     public final operator fun rangeTo(other: kotlin.Char): kotlin.ranges.CharRange
+
+    @kotlin.SinceKotlin(version = "1.7")
+    @kotlin.ExperimentalStdlibApi
+    public final operator fun rangeUntil(other: kotlin.Char): kotlin.ranges.CharRange
 
     @kotlin.Deprecated(message = "Conversion of Char to Number is deprecated. Use Char.code property instead.", replaceWith = kotlin.ReplaceWith(expression = "this.code.toByte()", imports = {}))
     @kotlin.DeprecatedSinceKotlin(warningSince = "1.5")
@@ -1451,23 +1469,6 @@ public open class Exception : kotlin.Throwable {
     public constructor Exception(cause: kotlin.Throwable?)
 }
 
-@kotlin.annotation.Target(allowedTargets = {AnnotationTarget.ANNOTATION_CLASS})
-@kotlin.annotation.Retention(value = AnnotationRetention.BINARY)
-@kotlin.SinceKotlin(version = "1.2")
-@kotlin.DeprecatedSinceKotlin(errorSince = "1.6", warningSince = "1.4")
-@kotlin.Deprecated(message = "Please use RequiresOptIn instead.")
-public final annotation class Experimental : kotlin.Annotation {
-    public constructor Experimental(level: kotlin.Experimental.Level = ...)
-
-    public final val level: kotlin.Experimental.Level { get; }
-
-    public final enum class Level : kotlin.Enum<kotlin.Experimental.Level> {
-        enum entry WARNING
-
-        enum entry ERROR
-    }
-}
-
 @kotlin.RequiresOptIn
 @kotlin.annotation.MustBeDocumented
 @kotlin.annotation.Target(allowedTargets = {AnnotationTarget.CLASS, AnnotationTarget.ANNOTATION_CLASS, AnnotationTarget.PROPERTY, AnnotationTarget.FIELD, AnnotationTarget.LOCAL_VARIABLE, AnnotationTarget.VALUE_PARAMETER, AnnotationTarget.CONSTRUCTOR, AnnotationTarget.FUNCTION, AnnotationTarget.PROPERTY_GETTER, AnnotationTarget.PROPERTY_SETTER, AnnotationTarget.TYPEALIAS})
@@ -1483,6 +1484,13 @@ public final annotation class ExperimentalMultiplatform : kotlin.Annotation {
 @kotlin.SinceKotlin(version = "1.3")
 public final annotation class ExperimentalStdlibApi : kotlin.Annotation {
     public constructor ExperimentalStdlibApi()
+}
+
+@kotlin.annotation.Target(allowedTargets = {AnnotationTarget.CLASS})
+@kotlin.annotation.Retention(value = AnnotationRetention.BINARY)
+@kotlin.SinceKotlin(version = "1.8")
+public final annotation class ExperimentalSubclassOptIn : kotlin.Annotation {
+    public constructor ExperimentalSubclassOptIn()
 }
 
 @kotlin.RequiresOptIn(level = Level.WARNING)
@@ -1745,6 +1753,22 @@ public final class Int : kotlin.Number, kotlin.Comparable<kotlin.Int> {
 
     public final operator fun rangeTo(other: kotlin.Short): kotlin.ranges.IntRange
 
+    @kotlin.SinceKotlin(version = "1.7")
+    @kotlin.ExperimentalStdlibApi
+    public final operator fun rangeUntil(other: kotlin.Byte): kotlin.ranges.IntRange
+
+    @kotlin.SinceKotlin(version = "1.7")
+    @kotlin.ExperimentalStdlibApi
+    public final operator fun rangeUntil(other: kotlin.Int): kotlin.ranges.IntRange
+
+    @kotlin.SinceKotlin(version = "1.7")
+    @kotlin.ExperimentalStdlibApi
+    public final operator fun rangeUntil(other: kotlin.Long): kotlin.ranges.LongRange
+
+    @kotlin.SinceKotlin(version = "1.7")
+    @kotlin.ExperimentalStdlibApi
+    public final operator fun rangeUntil(other: kotlin.Short): kotlin.ranges.IntRange
+
     @kotlin.SinceKotlin(version = "1.1")
     public final operator fun rem(other: kotlin.Byte): kotlin.Int
 
@@ -1945,6 +1969,22 @@ public final class Long : kotlin.Number, kotlin.Comparable<kotlin.Long> {
     public final operator fun rangeTo(other: kotlin.Long): kotlin.ranges.LongRange
 
     public final operator fun rangeTo(other: kotlin.Short): kotlin.ranges.LongRange
+
+    @kotlin.SinceKotlin(version = "1.7")
+    @kotlin.ExperimentalStdlibApi
+    public final operator fun rangeUntil(other: kotlin.Byte): kotlin.ranges.LongRange
+
+    @kotlin.SinceKotlin(version = "1.7")
+    @kotlin.ExperimentalStdlibApi
+    public final operator fun rangeUntil(other: kotlin.Int): kotlin.ranges.LongRange
+
+    @kotlin.SinceKotlin(version = "1.7")
+    @kotlin.ExperimentalStdlibApi
+    public final operator fun rangeUntil(other: kotlin.Long): kotlin.ranges.LongRange
+
+    @kotlin.SinceKotlin(version = "1.7")
+    @kotlin.ExperimentalStdlibApi
+    public final operator fun rangeUntil(other: kotlin.Short): kotlin.ranges.LongRange
 
     @kotlin.SinceKotlin(version = "1.1")
 /*∆*/     public final inline operator fun rem(other: kotlin.Byte): kotlin.Long
@@ -2279,6 +2319,22 @@ public final class Short : kotlin.Number, kotlin.Comparable<kotlin.Short> {
 
     public final operator fun rangeTo(other: kotlin.Short): kotlin.ranges.IntRange
 
+    @kotlin.SinceKotlin(version = "1.7")
+    @kotlin.ExperimentalStdlibApi
+    public final operator fun rangeUntil(other: kotlin.Byte): kotlin.ranges.IntRange
+
+    @kotlin.SinceKotlin(version = "1.7")
+    @kotlin.ExperimentalStdlibApi
+    public final operator fun rangeUntil(other: kotlin.Int): kotlin.ranges.IntRange
+
+    @kotlin.SinceKotlin(version = "1.7")
+    @kotlin.ExperimentalStdlibApi
+    public final operator fun rangeUntil(other: kotlin.Long): kotlin.ranges.LongRange
+
+    @kotlin.SinceKotlin(version = "1.7")
+    @kotlin.ExperimentalStdlibApi
+    public final operator fun rangeUntil(other: kotlin.Short): kotlin.ranges.IntRange
+
     @kotlin.SinceKotlin(version = "1.1")
     public final operator fun rem(other: kotlin.Byte): kotlin.Int
 
@@ -2387,6 +2443,16 @@ public final class String : kotlin.Comparable<kotlin.String>, kotlin.CharSequenc
 
     public companion object of String {
     }
+}
+
+@kotlin.annotation.Target(allowedTargets = {AnnotationTarget.CLASS})
+@kotlin.annotation.Retention(value = AnnotationRetention.BINARY)
+@kotlin.SinceKotlin(version = "1.8")
+@kotlin.ExperimentalSubclassOptIn
+public final annotation class SubclassOptInRequired : kotlin.Annotation {
+    public constructor SubclassOptInRequired(markerClass: kotlin.reflect.KClass<out kotlin.Annotation>)
+
+    public final val markerClass: kotlin.reflect.KClass<out kotlin.Annotation> { get; }
 }
 
 @kotlin.annotation.Target(allowedTargets = {AnnotationTarget.CLASS, AnnotationTarget.ANNOTATION_CLASS, AnnotationTarget.TYPE_PARAMETER, AnnotationTarget.PROPERTY, AnnotationTarget.FIELD, AnnotationTarget.LOCAL_VARIABLE, AnnotationTarget.VALUE_PARAMETER, AnnotationTarget.CONSTRUCTOR, AnnotationTarget.FUNCTION, AnnotationTarget.PROPERTY_GETTER, AnnotationTarget.PROPERTY_SETTER, AnnotationTarget.TYPE, AnnotationTarget.EXPRESSION, AnnotationTarget.FILE, AnnotationTarget.TYPEALIAS})
@@ -2535,6 +2601,11 @@ public final inline class UByte : kotlin.Comparable<kotlin.UByte> {
 
     @kotlin.internal.InlineOnly
     public final inline operator fun rangeTo(other: kotlin.UByte): kotlin.ranges.UIntRange
+
+    @kotlin.SinceKotlin(version = "1.7")
+    @kotlin.ExperimentalStdlibApi
+    @kotlin.internal.InlineOnly
+    public final inline operator fun rangeUntil(other: kotlin.UByte): kotlin.ranges.UIntRange
 
     @kotlin.internal.InlineOnly
     public final inline operator fun rem(other: kotlin.UByte): kotlin.UInt
@@ -2730,6 +2801,11 @@ public final inline class UInt : kotlin.Comparable<kotlin.UInt> {
 
     @kotlin.internal.InlineOnly
     public final inline operator fun rangeTo(other: kotlin.UInt): kotlin.ranges.UIntRange
+
+    @kotlin.SinceKotlin(version = "1.7")
+    @kotlin.ExperimentalStdlibApi
+    @kotlin.internal.InlineOnly
+    public final inline operator fun rangeUntil(other: kotlin.UInt): kotlin.ranges.UIntRange
 
     @kotlin.internal.InlineOnly
     public final inline operator fun rem(other: kotlin.UByte): kotlin.UInt
@@ -2932,6 +3008,11 @@ public final inline class ULong : kotlin.Comparable<kotlin.ULong> {
     @kotlin.internal.InlineOnly
     public final inline operator fun rangeTo(other: kotlin.ULong): kotlin.ranges.ULongRange
 
+    @kotlin.SinceKotlin(version = "1.7")
+    @kotlin.ExperimentalStdlibApi
+    @kotlin.internal.InlineOnly
+    public final inline operator fun rangeUntil(other: kotlin.ULong): kotlin.ranges.ULongRange
+
     @kotlin.internal.InlineOnly
     public final inline operator fun rem(other: kotlin.UByte): kotlin.ULong
 
@@ -3133,6 +3214,11 @@ public final inline class UShort : kotlin.Comparable<kotlin.UShort> {
     @kotlin.internal.InlineOnly
     public final inline operator fun rangeTo(other: kotlin.UShort): kotlin.ranges.UIntRange
 
+    @kotlin.SinceKotlin(version = "1.7")
+    @kotlin.ExperimentalStdlibApi
+    @kotlin.internal.InlineOnly
+    public final inline operator fun rangeUntil(other: kotlin.UShort): kotlin.ranges.UIntRange
+
     @kotlin.internal.InlineOnly
     public final inline operator fun rem(other: kotlin.UByte): kotlin.UInt
 
@@ -3259,15 +3345,4 @@ public open class UnsupportedOperationException : kotlin.RuntimeException {
     public constructor UnsupportedOperationException(message: kotlin.String?, cause: kotlin.Throwable?)
 
     public constructor UnsupportedOperationException(cause: kotlin.Throwable?)
-}
-
-@kotlin.annotation.Target(allowedTargets = {AnnotationTarget.CLASS, AnnotationTarget.PROPERTY, AnnotationTarget.LOCAL_VARIABLE, AnnotationTarget.VALUE_PARAMETER, AnnotationTarget.CONSTRUCTOR, AnnotationTarget.FUNCTION, AnnotationTarget.PROPERTY_GETTER, AnnotationTarget.PROPERTY_SETTER, AnnotationTarget.EXPRESSION, AnnotationTarget.FILE, AnnotationTarget.TYPEALIAS})
-@kotlin.annotation.Retention(value = AnnotationRetention.SOURCE)
-@kotlin.SinceKotlin(version = "1.2")
-@kotlin.DeprecatedSinceKotlin(errorSince = "1.6", warningSince = "1.4")
-@kotlin.Deprecated(message = "Please use OptIn instead.", replaceWith = kotlin.ReplaceWith(expression = "OptIn(*markerClass)", imports = {"kotlin.OptIn"}))
-public final annotation class UseExperimental : kotlin.Annotation {
-    public constructor UseExperimental(vararg markerClass: kotlin.reflect.KClass<out kotlin.Annotation>)
-
-    public final val markerClass: kotlin.Array<out kotlin.reflect.KClass<out kotlin.Annotation>> { get; }
 }

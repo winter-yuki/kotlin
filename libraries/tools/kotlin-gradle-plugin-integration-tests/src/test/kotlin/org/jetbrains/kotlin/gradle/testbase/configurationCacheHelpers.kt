@@ -5,10 +5,12 @@
 
 package org.jetbrains.kotlin.gradle.testbase
 
+import org.gradle.testkit.runner.BuildResult
 import org.jetbrains.kotlin.gradle.BaseGradleIT
 import java.net.URI
 import java.nio.file.Path
 import kotlin.io.path.ExperimentalPathApi
+import kotlin.io.path.exists
 import kotlin.io.path.name
 import kotlin.test.fail
 
@@ -20,6 +22,7 @@ fun TestProject.assertSimpleConfigurationCacheScenarioWorks(
     buildOptions: BuildOptions,
     executedTaskNames: List<String>? = null,
     checkUpToDateOnRebuild: Boolean = true,
+    checkConfigurationCacheFileReport: Boolean = true,
 ) {
     // First, run a build that serializes the tasks state for configuration cache in further builds
 
@@ -30,7 +33,9 @@ fun TestProject.assertSimpleConfigurationCacheScenarioWorks(
         assertOutputContains(
             "Calculating task graph as no configuration cache is available for tasks: ${buildArguments.joinToString(separator = " ")}"
         )
-        assertConfigurationCacheSucceeded()
+
+        assertOutputContains("Configuration cache entry stored.")
+        if (checkConfigurationCacheFileReport) assertConfigurationCacheReportNotCreated()
     }
 
     build("clean", buildOptions = buildOptions)
@@ -38,7 +43,7 @@ fun TestProject.assertSimpleConfigurationCacheScenarioWorks(
     // Then run a build where tasks states are deserialized to check that they work correctly in this mode
     build(*buildArguments, buildOptions = buildOptions) {
         assertTasksExecuted(*executedTask.toTypedArray())
-        assertOutputContains("Reusing configuration cache.")
+        assertConfigurationCacheReused()
     }
 
     if (checkUpToDateOnRebuild) {
@@ -67,16 +72,21 @@ private fun copyReportToTempDir(htmlReportFile: Path): Path =
 private val GradleProject.configurationCacheReportFile
     get() = projectPath
         .resolve("build")
-        .findInPath("configuration-cache-report.html")
+        .takeIf { it.exists() }
+        ?.findInPath("configuration-cache-report.html")
         ?.let { copyReportToTempDir(it) }
 
 private val Path.asClickableFileUrl
     get() = URI("file", "", toUri().path, null, null).toString()
 
-private fun GradleProject.assertConfigurationCacheSucceeded() {
+private fun GradleProject.assertConfigurationCacheReportNotCreated() {
     configurationCacheReportFile?.let { htmlReportFile ->
         fail("Configuration cache problems were found, check ${htmlReportFile.asClickableFileUrl} for details.")
     }
+}
+
+fun BuildResult.assertConfigurationCacheReused() {
+    assertOutputContains("Reusing configuration cache.")
 }
 
 val BuildOptions.withConfigurationCache: BuildOptions

@@ -12,13 +12,13 @@ import kotlinx.collections.immutable.persistentListOf
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.fir.FirElement
 import org.jetbrains.kotlin.fir.FirSession
+import org.jetbrains.kotlin.fir.caches.firCachesFactory
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.declarations.FirResolvePhase.COMPILER_REQUIRED_ANNOTATIONS
 import org.jetbrains.kotlin.fir.expressions.FirAnnotation
 import org.jetbrains.kotlin.fir.expressions.FirAnnotationCall
 import org.jetbrains.kotlin.fir.expressions.FirStatement
 import org.jetbrains.kotlin.fir.extensions.*
-import org.jetbrains.kotlin.fir.languageVersionSettings
 import org.jetbrains.kotlin.fir.resolve.ResolutionMode
 import org.jetbrains.kotlin.fir.resolve.ScopeSession
 import org.jetbrains.kotlin.fir.resolve.fqName
@@ -32,8 +32,10 @@ import org.jetbrains.kotlin.fir.visitors.transformSingle
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
+import org.jetbrains.kotlin.name.StandardClassIds
 import org.jetbrains.kotlin.name.StandardClassIds.Annotations.Deprecated
 import org.jetbrains.kotlin.name.StandardClassIds.Annotations.DeprecatedSinceKotlin
+import org.jetbrains.kotlin.name.StandardClassIds.Annotations.JvmRecord
 import org.jetbrains.kotlin.name.StandardClassIds.Annotations.WasExperimental
 
 class FirCompilerRequiredAnnotationsResolveProcessor(
@@ -154,7 +156,7 @@ private class FirAnnotationResolveTransformer(
 ) {
     companion object {
         private val REQUIRED_ANNOTATIONS: Set<ClassId> = setOf(
-            Deprecated, DeprecatedSinceKotlin, WasExperimental
+            Deprecated, DeprecatedSinceKotlin, WasExperimental, JvmRecord
         )
 
         private val REQUIRED_ANNOTATION_NAMES: Set<Name> = REQUIRED_ANNOTATIONS.mapTo(mutableSetOf()) { it.shortClassName }
@@ -253,8 +255,8 @@ private class FirAnnotationResolveTransformer(
     }
 
     private fun calculateDeprecations(classLikeDeclaration: FirClassLikeDeclaration) {
-        if (classLikeDeclaration.deprecation == null) {
-            classLikeDeclaration.replaceDeprecation(classLikeDeclaration.getDeprecationInfos(session.languageVersionSettings.apiVersion))
+        if (classLikeDeclaration.deprecationsProvider == UnresolvedDeprecationProvider) {
+            classLikeDeclaration.replaceDeprecationsProvider(classLikeDeclaration.getDeprecationsProvider(session.firCachesFactory))
         }
     }
 }

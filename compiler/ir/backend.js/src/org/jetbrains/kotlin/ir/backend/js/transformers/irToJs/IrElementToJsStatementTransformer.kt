@@ -17,7 +17,6 @@ import org.jetbrains.kotlin.ir.expressions.*
 import org.jetbrains.kotlin.ir.symbols.IrFunctionSymbol
 import org.jetbrains.kotlin.ir.symbols.IrReturnableBlockSymbol
 import org.jetbrains.kotlin.ir.types.classifierOrNull
-import org.jetbrains.kotlin.ir.types.classOrNull
 import org.jetbrains.kotlin.ir.types.isAny
 import org.jetbrains.kotlin.ir.util.constructedClassType
 import org.jetbrains.kotlin.ir.util.file
@@ -28,14 +27,12 @@ import org.jetbrains.kotlin.js.backend.ast.*
 @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
 class IrElementToJsStatementTransformer : BaseIrElementToJsNodeTransformer<JsStatement, JsGenerationContext> {
 
-    override fun visitFunction(declaration: IrFunction, data: JsGenerationContext) = JsEmpty.also {
-        assert(declaration.origin == JsIrBackendContext.callableClosureOrigin) {
-            "The only possible Function Declaration is one composed in Callable Reference Lowering"
-        }
+    override fun visitFunction(declaration: IrFunction, data: JsGenerationContext): JsStatement {
+        error("All functions must be already lowered")
     }
 
     override fun visitBlockBody(body: IrBlockBody, context: JsGenerationContext): JsStatement {
-        return JsBlock(body.statements.map { it.accept(this, context) })
+        return JsBlock(body.statements.map { it.accept(this, context) }).withSource(body, context, container = context.currentFunction)
     }
 
     override fun visitBlock(expression: IrBlock, context: JsGenerationContext): JsStatement {
@@ -56,7 +53,7 @@ class IrElementToJsStatementTransformer : BaseIrElementToJsNodeTransformer<JsSta
             }
         } else {
             JsBlock(statements)
-        }
+        }.withSource(expression, context)
     }
 
     private fun List<JsStatement>.wrapInCommentsInlineFunctionCall(expression: IrReturnableBlock): List<JsStatement> {
@@ -68,7 +65,7 @@ class IrElementToJsStatementTransformer : BaseIrElementToJsNodeTransformer<JsSta
     }
 
     override fun visitComposite(expression: IrComposite, context: JsGenerationContext): JsStatement {
-        return JsBlock(expression.statements.map { it.accept(this, context) })
+        return JsBlock(expression.statements.map { it.accept(this, context) }).withSource(expression, context)
     }
 
     override fun visitExpression(expression: IrExpression, context: JsGenerationContext): JsStatement {
@@ -104,7 +101,7 @@ class IrElementToJsStatementTransformer : BaseIrElementToJsNodeTransformer<JsSta
     override fun visitSetField(expression: IrSetField, context: JsGenerationContext): JsStatement {
         val fieldName = context.getNameForField(expression.symbol.owner)
         val expressionTransformer = IrElementToJsExpressionTransformer()
-        val dest = JsNameRef(fieldName, expression.receiver?.accept(expressionTransformer, context))
+        val dest = jsElementAccess(fieldName, expression.receiver?.accept(expressionTransformer, context))
         return expression.value.maybeOptimizeIntoSwitch(context) { jsAssignment(dest, it).withSource(expression, context).makeStmt() }
     }
 
@@ -165,7 +162,7 @@ class IrElementToJsStatementTransformer : BaseIrElementToJsNodeTransformer<JsSta
         if (expression.symbol.isUnitInstanceFunction(data)) {
             return JsEmpty
         }
-        if (data.checkIfJsCode(expression.symbol) || data.checkIfAnnotatedWithJsFunc(expression.symbol)) {
+        if (data.checkIfJsCode(expression.symbol) || data.checkIfHasAssociatedJsCode(expression.symbol)) {
             return JsCallTransformer(expression, data).generateStatement()
         }
         return translateCall(expression, data, IrElementToJsExpressionTransformer()).withSource(expression, data).makeStmt()
@@ -189,12 +186,12 @@ class IrElementToJsStatementTransformer : BaseIrElementToJsNodeTransformer<JsSta
         val jsCatch = aTry.catches.singleOrNull()?.let {
             val name = context.getNameForValueDeclaration(it.catchParameter)
             val jsCatchBlock = it.result.accept(this, context)
-            JsCatch(emptyScope, name.ident, jsCatchBlock)
+            JsCatch(emptyScope, name.ident, jsCatchBlock).withSource(it, context)
         }
 
         val jsFinallyBlock = aTry.finallyExpression?.accept(this, context)?.asBlock()
 
-        return JsTry(jsTryBlock, jsCatch, jsFinallyBlock)
+        return JsTry(jsTryBlock, jsCatch, jsFinallyBlock).withSource(aTry, context)
     }
 
     override fun visitWhen(expression: IrWhen, context: JsGenerationContext): JsStatement {

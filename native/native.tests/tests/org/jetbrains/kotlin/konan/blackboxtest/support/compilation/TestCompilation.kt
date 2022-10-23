@@ -119,6 +119,7 @@ internal abstract class SourceBasedCompilation<A : TestCompilationArtifact>(
     optimizationMode: OptimizationMode,
     private val memoryModel: MemoryModel,
     private val threadStateChecker: ThreadStateChecker,
+    private val sanitizer: Sanitizer,
     private val gcType: GCType,
     private val gcScheduler: GCScheduler,
     freeCompilerArgs: TestCompilerArgs,
@@ -138,6 +139,7 @@ internal abstract class SourceBasedCompilation<A : TestCompilationArtifact>(
         add("-repo", home.librariesDir.path)
         memoryModel.compilerFlags?.let { compilerFlags -> add(compilerFlags) }
         threadStateChecker.compilerFlag?.let { compilerFlag -> add(compilerFlag) }
+        sanitizer.compilerFlag?.let { compilerFlag -> add(compilerFlag) }
         gcType.compilerFlag?.let { compilerFlag -> add(compilerFlag) }
         gcScheduler.compilerFlag?.let { compilerFlag -> add(compilerFlag) }
     }
@@ -164,6 +166,7 @@ internal class LibraryCompilation(
     optimizationMode = settings.get(),
     memoryModel = settings.get(),
     threadStateChecker = settings.get(),
+    sanitizer = settings.get(),
     gcType = settings.get(),
     gcScheduler = settings.get(),
     freeCompilerArgs = freeCompilerArgs,
@@ -196,6 +199,7 @@ internal class ExecutableCompilation(
     optimizationMode = settings.get(),
     memoryModel = settings.get(),
     threadStateChecker = settings.get(),
+    sanitizer = settings.get(),
     gcType = settings.get(),
     gcScheduler = settings.get(),
     freeCompilerArgs = freeCompilerArgs,
@@ -292,6 +296,8 @@ internal class StaticCacheCompilation(
         cacheMode.staticCacheRootDir ?: fail { "No cache root directory found for cache mode $cacheMode" }
     }
 
+    private val makePerFileCache: Boolean = settings.get<CacheMode>().makePerFileCaches
+
     override fun applySpecificArgs(argsBuilder: ArgsBuilder): Unit = with(argsBuilder) {
         add("-produce", "static_cache")
 
@@ -310,9 +316,14 @@ internal class StaticCacheCompilation(
             "-Xcache-directory=${expectedArtifact.cacheDir.path}",
             "-Xcache-directory=$cacheRootDir"
         )
+        if (makePerFileCache)
+            add("-Xmake-per-file-cache")
     }
 
     override fun applyDependencies(argsBuilder: ArgsBuilder): Unit = with(argsBuilder) {
+        dependencies.friends.takeIf(Collection<*>::isNotEmpty)?.let { friends ->
+            add("-friend-modules", friends.joinToString(File.pathSeparator) { friend -> friend.path })
+        }
         addFlattened(dependencies.cachedLibraries) { (_, library) -> listOf("-l", library.path) }
         add(dependencies.uniqueCacheDirs) { libraryCacheDir -> "-Xcache-directory=${libraryCacheDir.path}" }
     }
@@ -341,8 +352,12 @@ internal class CategorizedDependencies(uncategorizedDependencies: Iterable<TestC
     val cachedLibraries: List<KLIBStaticCache> by lazy { uncategorizedDependencies.collectArtifacts<KLIBStaticCache, LibraryStaticCache>() }
 
     val libraryToCache: KLIB by lazy {
-        val libraries = uncategorizedDependencies.collectArtifacts<KLIB, TestCompilationDependencyType<KLIB>>()
-        libraries.singleOrNull<KLIB>()
+        val libraries: List<KLIB> = buildList {
+            this += libraries
+            this += includedLibraries
+            if (isEmpty()) this += friends // Friends should be ignored if they come with the main library.
+        }
+        libraries.singleOrNull()
             ?: fail { "Only one library is expected as input for ${StaticCacheCompilation::class.java}, found: $libraries" }
     }
 
@@ -351,14 +366,7 @@ internal class CategorizedDependencies(uncategorizedDependencies: Iterable<TestC
     }
 
     private inline fun <reified A : TestCompilationArtifact, reified T : TestCompilationDependencyType<A>> Iterable<TestCompilationDependency<*>>.collectArtifacts(): List<A> {
-        val concreteDependencyType = T::class.objectInstance
-        val dependencyTypeMatcher: (TestCompilationDependencyType<*>) -> Boolean = if (concreteDependencyType != null) {
-            { it == concreteDependencyType }
-        } else {
-            { it.canYield(A::class.java) }
-        }
-
-        return mapNotNull { dependency -> if (dependencyTypeMatcher(dependency.type)) dependency.artifact as A else null }
+        return mapNotNull { dependency -> if (dependency.type is T) dependency.artifact as A else null }
     }
 }
 

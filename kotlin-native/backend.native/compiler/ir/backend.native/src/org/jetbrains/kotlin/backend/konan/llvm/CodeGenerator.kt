@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the LICENSE file.
+ * Copyright 2010-2022 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.backend.konan.llvm
@@ -54,7 +54,8 @@ internal class CodeGenerator(override val context: Context) : ContextUtils {
     fun llvmFunctionOrNull(function: IrFunction): LlvmCallable? =
             function.llvmFunctionOrNull
 
-    val intPtrType = LLVMIntPtrTypeInContext(llvmContext, llvmTargetData)!!
+    val llvmDeclarations = context.generationState.llvmDeclarations
+    val intPtrType = LLVMIntPtrTypeInContext(llvm.llvmContext, llvmTargetData)!!
     internal val immOneIntPtrType = LLVMConstInt(intPtrType, 1, 1)!!
     internal val immThreeIntPtrType = LLVMConstInt(intPtrType, 3, 1)!!
     // Keep in sync with OBJECT_TAG_MASK in C++.
@@ -72,7 +73,6 @@ internal class CodeGenerator(override val context: Context) : ContextUtils {
     private fun countParams(fn: IrFunction) = LLVMCountParams(fn.llvmFunction.llvmValue)
 
     fun functionEntryPointAddress(function: IrFunction) = function.entryPointAddress.llvm
-    fun functionHash(function: IrFunction): LLVMValueRef = function.computeFunctionName().localHash.llvm
 
     fun typeInfoForAllocation(constructedClass: IrClass): LLVMValueRef {
         assert(!constructedClass.isObjCClass())
@@ -80,10 +80,10 @@ internal class CodeGenerator(override val context: Context) : ContextUtils {
     }
 
     fun generateLocationInfo(locationInfo: LocationInfo): DILocationRef? = if (locationInfo.inlinedAt != null)
-        LLVMCreateLocationInlinedAt(LLVMGetModuleContext(context.llvmModule), locationInfo.line, locationInfo.column,
+        LLVMCreateLocationInlinedAt(LLVMGetModuleContext(llvm.module), locationInfo.line, locationInfo.column,
                 locationInfo.scope, generateLocationInfo(locationInfo.inlinedAt))
     else
-        LLVMCreateLocation(LLVMGetModuleContext(context.llvmModule), locationInfo.line, locationInfo.column, locationInfo.scope)
+        LLVMCreateLocation(LLVMGetModuleContext(llvm.module), locationInfo.line, locationInfo.column, locationInfo.scope)
 
     val objCDataGenerator = when {
         context.config.target.family.isAppleFamily -> ObjCDataGenerator(this)
@@ -104,7 +104,7 @@ internal sealed class ExceptionHandler {
             kotlinException: LLVMValueRef
     ): Unit = with(functionGenerationContext) {
         call(
-                context.llvm.throwExceptionFunction,
+                llvm.throwExceptionFunction,
                 listOf(kotlinException),
                 Lifetime.IRRELEVANT,
                 this@ExceptionHandler
@@ -201,7 +201,7 @@ internal inline fun generateFunction(
 ): LLVMValueRef {
     val function = addLlvmFunctionWithDefaultAttributes(
             codegen.context,
-            codegen.context.llvmModule!!,
+            codegen.llvm.module,
             name,
             functionType
     )
@@ -236,7 +236,7 @@ internal inline fun generateFunctionNoRuntime(
 ): LLVMValueRef {
     val function = addLlvmFunctionWithDefaultAttributes(
             codegen.context,
-            codegen.context.llvmModule!!,
+            codegen.llvm.module,
             name,
             functionType
     )
@@ -284,11 +284,11 @@ internal class StackLocalsManagerImpl(
             if (context.memoryModel == MemoryModel.EXPERIMENTAL) alloca(kObjHeaderPtr) else null
 
     override fun alloc(irClass: IrClass, cleanFieldsExplicitly: Boolean): LLVMValueRef = with(functionGenerationContext) {
-        val type = context.llvmDeclarations.forClass(irClass).bodyType
+        val type = llvmDeclarations.forClass(irClass).bodyType
         val stackLocal = appendingTo(bbInitStackLocals) {
             val stackSlot = LLVMBuildAlloca(builder, type, "")!!
 
-            memset(bitcast(kInt8Ptr, stackSlot), 0, LLVMSizeOfTypeInBits(codegen.llvmTargetData, type).toInt() / 8)
+            memset(bitcast(llvm.int8PtrType, stackSlot), 0, LLVMSizeOfTypeInBits(codegen.llvmTargetData, type).toInt() / 8)
 
             val objectHeader = structGep(stackSlot, 0, "objHeader")
             val typeInfo = codegen.typeInfoForAllocation(irClass)
@@ -313,24 +313,27 @@ internal class StackLocalsManagerImpl(
         // Create new type or get already created.
         context.declaredLocalArrays.getOrPut(name) {
             val fieldTypes = listOf(kArrayHeader, LLVMArrayType(arrayToElementType[irClass.symbol]!!, count))
-            val classType = LLVMStructCreateNamed(LLVMGetModuleContext(context.llvmModule), name)!!
+            val classType = LLVMStructCreateNamed(LLVMGetModuleContext(llvm.module), name)!!
             LLVMStructSetBody(classType, fieldTypes.toCValues(), fieldTypes.size, 1)
             classType
         }
     }
 
     private val symbols = functionGenerationContext.context.ir.symbols
+    private val llvm = functionGenerationContext.llvm
+
     // TODO: find better place?
     private val arrayToElementType = mapOf(
-            symbols.array              to functionGenerationContext.kObjHeaderPtr,
-            symbols.byteArray          to int8Type,
-            symbols.charArray          to int16Type,
-            symbols.shortArray         to int16Type,
-            symbols.intArray           to int32Type,
-            symbols.longArray          to int64Type,
-            symbols.floatArray         to floatType,
-            symbols.doubleArray        to doubleType,
-            symbols.booleanArray       to int8Type
+            symbols.array to functionGenerationContext.kObjHeaderPtr,
+            symbols.byteArray to llvm.int8Type,
+            symbols.charArray to llvm.int16Type,
+            symbols.string to llvm.int16Type,
+            symbols.shortArray to llvm.int16Type,
+            symbols.intArray to llvm.int32Type,
+            symbols.longArray to llvm.int64Type,
+            symbols.floatArray to llvm.floatType,
+            symbols.doubleArray to llvm.doubleType,
+            symbols.booleanArray to llvm.int8Type
     )
 
     override fun allocArray(irClass: IrClass, count: LLVMValueRef) = with(functionGenerationContext) {
@@ -345,7 +348,7 @@ internal class StackLocalsManagerImpl(
             val sizeField = structGep(arrayHeaderSlot, 1, "count_")
             store(count, sizeField)
 
-            memset(bitcast(kInt8Ptr, structGep(arraySlot, 1, "arrayBody")),
+            memset(bitcast(llvm.int8PtrType, structGep(arraySlot, 1, "arrayBody")),
                     0,
                     constCount * LLVMSizeOfTypeInBits(codegen.llvmTargetData, arrayToElementType[irClass.symbol]).toInt() / 8
             )
@@ -366,9 +369,9 @@ internal class StackLocalsManagerImpl(
     private fun clean(stackLocal: StackLocal, refsOnly: Boolean) = with(functionGenerationContext) {
         if (stackLocal.isArray) {
             if (stackLocal.irClass.symbol == context.ir.symbols.array)
-                call(context.llvm.zeroArrayRefsFunction, listOf(stackLocal.objHeaderPtr))
+                call(llvm.zeroArrayRefsFunction, listOf(stackLocal.objHeaderPtr))
         } else {
-            val type = context.llvmDeclarations.forClass(stackLocal.irClass).bodyType
+            val type = llvmDeclarations.forClass(stackLocal.irClass).bodyType
             for (field in context.getLayoutBuilder(stackLocal.irClass).fields) {
                 val fieldIndex = field.index
                 val fieldType = LLVMStructGetTypeAtIndex(type, fieldIndex)!!
@@ -378,7 +381,7 @@ internal class StackLocalsManagerImpl(
                     if (refsOnly)
                         storeHeapRef(kNullObjHeaderPtr, fieldPtr)
                     else
-                        call(context.llvm.zeroHeapRefFunction, listOf(fieldPtr))
+                        call(llvm.zeroHeapRefFunction, listOf(fieldPtr))
                 }
             }
 
@@ -387,7 +390,7 @@ internal class StackLocalsManagerImpl(
                 val bodySize = LLVMSizeOfTypeInBits(codegen.llvmTargetData, type).toInt() / 8
                 val serviceInfoSize = runtime.pointerSize
                 val serviceInfoSizeLlvm = LLVMConstInt(codegen.intPtrType, serviceInfoSize.toLong(), 1)!!
-                val bodyWithSkippedServiceInfoPtr = intToPtr(add(bodyPtr, serviceInfoSizeLlvm), kInt8Ptr)
+                val bodyWithSkippedServiceInfoPtr = intToPtr(add(bodyPtr, serviceInfoSizeLlvm), llvm.int8PtrType)
                 memset(bodyWithSkippedServiceInfoPtr, 0, bodySize - serviceInfoSize)
             }
         }
@@ -413,7 +416,7 @@ internal abstract class FunctionGenerationContextBuilder<T : FunctionGenerationC
             this(
                     addLlvmFunctionWithDefaultAttributes(
                             codegen.context,
-                            codegen.context.llvmModule!!,
+                            codegen.llvm.module,
                             functionName,
                             functionType
                     ),
@@ -447,6 +450,7 @@ internal abstract class FunctionGenerationContext(
     )
 
     override val context = codegen.context
+    val llvmDeclarations = codegen.llvmDeclarations
     val vars = VariableManager(this)
     private val basicBlockToLastLocation = mutableMapOf<LLVMBasicBlockRef, LocationInfoRange>()
 
@@ -514,8 +518,8 @@ internal abstract class FunctionGenerationContext(
     init {
         irFunction?.let {
             if (!irFunction.isExported()) {
-                LLVMSetLinkage(function, LLVMLinkage.LLVMInternalLinkage)
-                // (Cannot do this before the function body is created).
+                if (!context.config.producePerFileCache || irFunction !in context.generationState.calledFromExportedInlineFunctions)
+                    LLVMSetLinkage(function, LLVMLinkage.LLVMInternalLinkage) // (Cannot do this before the function body is created)
             }
         }
     }
@@ -525,13 +529,13 @@ internal abstract class FunctionGenerationContext(
     }
 
     protected fun basicBlockInFunction(name: String, locationInfo: LocationInfo?): LLVMBasicBlockRef {
-        val bb = LLVMAppendBasicBlockInContext(llvmContext, function, name)!!
+        val bb = LLVMAppendBasicBlockInContext(llvm.llvmContext, function, name)!!
         update(bb, locationInfo)
         return bb
     }
 
     fun basicBlock(name: String = "label_", startLocationInfo: LocationInfo?, endLocationInfo: LocationInfo? = startLocationInfo): LLVMBasicBlockRef {
-        val result = LLVMInsertBasicBlockInContext(llvmContext, this.currentBlock, name)!!
+        val result = LLVMInsertBasicBlockInContext(llvm.llvmContext, this.currentBlock, name)!!
         update(result, startLocationInfo, endLocationInfo)
         LLVMMoveBasicBlockAfter(result, this.currentBlock)
         return result
@@ -549,7 +553,7 @@ internal abstract class FunctionGenerationContext(
     fun alloca(type: LLVMTypeRef?, name: String = "", variableLocation: VariableDebugLocation? = null): LLVMValueRef {
         if (isObjectType(type!!)) {
             appendingTo(localsInitBb) {
-                val slotAddress = gep(slotsPhi!!, Int32(slotCount).llvm, name)
+                val slotAddress = gep(slotsPhi!!, llvm.int32(slotCount), name)
                 variableLocation?.let {
                     slotToVariableLocation[slotCount] = it
                 }
@@ -562,7 +566,7 @@ internal abstract class FunctionGenerationContext(
             val slotAddress = LLVMBuildAlloca(builder, type, name)!!
             variableLocation?.let {
                 DIInsertDeclaration(
-                        builder = codegen.context.debugInfo.builder,
+                        builder = codegen.context.generationState.debugInfo.builder,
                         value = slotAddress,
                         localVariable = it.localVariable,
                         location = it.location,
@@ -579,15 +583,21 @@ internal abstract class FunctionGenerationContext(
 
     fun param(index: Int): LLVMValueRef = LLVMGetParam(this.function, index)!!
 
-    fun load(value: LLVMValueRef, name: String = ""): LLVMValueRef {
-        val result = LLVMBuildLoad(builder, value, name)!!
+    fun load(address: LLVMValueRef, name: String = "", memoryOrder: LLVMAtomicOrdering? = null): LLVMValueRef {
+        val value = LLVMBuildLoad(builder, address, name)!!
+        if (memoryOrder != null) {
+            LLVMSetOrdering(value, memoryOrder)
+        }
         // Use loadSlot() API for that.
         assert(!isObjectRef(value))
-        return result
+        return value
     }
 
-    fun loadSlot(address: LLVMValueRef, isVar: Boolean, resultSlot: LLVMValueRef? = null, name: String = ""): LLVMValueRef {
+    fun loadSlot(address: LLVMValueRef, isVar: Boolean, resultSlot: LLVMValueRef? = null, name: String = "", memoryOrder: LLVMAtomicOrdering? = null): LLVMValueRef {
         val value = LLVMBuildLoad(builder, address, name)!!
+        if (memoryOrder != null) {
+            LLVMSetOrdering(value, memoryOrder)
+        }
         if (isObjectRef(value) && isVar) {
             val slot = resultSlot ?: alloca(LLVMTypeOf(value), variableLocation = null)
             storeStackRef(value, slot)
@@ -616,19 +626,19 @@ internal abstract class FunctionGenerationContext(
 
     fun freeze(value: LLVMValueRef, exceptionHandler: ExceptionHandler) {
         if (isObjectRef(value))
-            call(context.llvm.freezeSubgraph, listOf(value), Lifetime.IRRELEVANT, exceptionHandler)
+            call(llvm.freezeSubgraph, listOf(value), Lifetime.IRRELEVANT, exceptionHandler)
     }
 
     fun checkGlobalsAccessible(exceptionHandler: ExceptionHandler) {
         if (context.memoryModel == MemoryModel.STRICT)
-            call(context.llvm.checkGlobalsAccessible, emptyList(), Lifetime.IRRELEVANT, exceptionHandler)
+            call(llvm.checkGlobalsAccessible, emptyList(), Lifetime.IRRELEVANT, exceptionHandler)
     }
 
     private fun updateReturnRef(value: LLVMValueRef, address: LLVMValueRef) {
         if (context.memoryModel == MemoryModel.STRICT)
             store(value, address)
         else
-            call(context.llvm.updateReturnRefFunction, listOf(address, value))
+            call(llvm.updateReturnRefFunction, listOf(address, value))
     }
 
     private fun updateRef(value: LLVMValueRef, address: LLVMValueRef, onStack: Boolean) {
@@ -636,9 +646,9 @@ internal abstract class FunctionGenerationContext(
             if (context.memoryModel == MemoryModel.STRICT)
                 store(value, address)
             else
-                call(context.llvm.updateStackRefFunction, listOf(address, value))
+                call(llvm.updateStackRefFunction, listOf(address, value))
         } else {
-            call(context.llvm.updateHeapRefFunction, listOf(address, value))
+            call(llvm.updateHeapRefFunction, listOf(address, value))
         }
     }
 
@@ -652,8 +662,8 @@ internal abstract class FunctionGenerationContext(
             "Attempt to switch the thread state when runtime is forbidden"
         }
         when (state) {
-            Native -> call(context.llvm.Kotlin_mm_switchThreadStateNative, emptyList())
-            Runnable -> call(context.llvm.Kotlin_mm_switchThreadStateRunnable, emptyList())
+            Native -> call(llvm.Kotlin_mm_switchThreadStateNative, emptyList())
+            Runnable -> call(llvm.Kotlin_mm_switchThreadStateRunnable, emptyList())
         }.let {} // Force exhaustive.
     }
 
@@ -664,11 +674,11 @@ internal abstract class FunctionGenerationContext(
     }
 
     fun memset(pointer: LLVMValueRef, value: Byte, size: Int, isVolatile: Boolean = false) =
-            call(context.llvm.memsetFunction,
+            call(llvm.memsetFunction,
                     listOf(pointer,
-                            Int8(value).llvm,
-                            Int32(size).llvm,
-                            Int1(isVolatile).llvm))
+                            llvm.int8(value),
+                            llvm.int32(size),
+                            llvm.int1(isVolatile)))
 
     fun call(llvmCallable: LlvmCallable, args: List<LLVMValueRef>,
              resultLifetime: Lifetime = Lifetime.IRRELEVANT,
@@ -777,7 +787,7 @@ internal abstract class FunctionGenerationContext(
     }
 
     fun allocInstance(typeInfo: LLVMValueRef, lifetime: Lifetime, resultSlot: LLVMValueRef?): LLVMValueRef =
-            call(context.llvm.allocInstanceFunction, listOf(typeInfo), lifetime, resultSlot = resultSlot)
+            call(llvm.allocInstanceFunction, listOf(typeInfo), lifetime, resultSlot = resultSlot)
 
     fun allocInstance(irClass: IrClass, lifetime: Lifetime, stackLocalsManager: StackLocalsManager, resultSlot: LLVMValueRef?) =
             if (lifetime == Lifetime.STACK)
@@ -799,13 +809,13 @@ internal abstract class FunctionGenerationContext(
         return if (lifetime == Lifetime.STACK) {
             stackLocalsManager.allocArray(irClass, count)
         } else {
-            call(context.llvm.allocArrayFunction, listOf(typeInfo, count), lifetime, exceptionHandler, resultSlot = resultSlot)
+            call(llvm.allocArrayFunction, listOf(typeInfo, count), lifetime, exceptionHandler, resultSlot = resultSlot)
         }
     }
 
     fun unreachable(): LLVMValueRef? {
         if (context.config.debug) {
-            call(context.llvm.llvmTrap, emptyList())
+            call(llvm.llvmTrap, emptyList())
         }
         val res = LLVMBuildUnreachable(builder)
         currentPositionHolder.setAfterTerminator()
@@ -906,17 +916,17 @@ internal abstract class FunctionGenerationContext(
             LLVMBuildExtractValue(builder, aggregate, index, name)!!
 
     fun gxxLandingpad(numClauses: Int, name: String = "", switchThreadState: Boolean = false): LLVMValueRef {
-        val personalityFunction = context.llvm.gxxPersonalityFunction.llvmValue
+        val personalityFunction = llvm.gxxPersonalityFunction.llvmValue
 
         // Type of `landingpad` instruction result (depends on personality function):
-        val landingpadType = structType(int8TypePtr, int32Type)
+        val landingpadType = llvm.structType(llvm.int8PtrType, llvm.int32Type)
 
         val landingpad = LLVMBuildLandingPad(builder, landingpadType, personalityFunction, numClauses, name)!!
 
         if (switchThreadState) {
             switchThreadState(Runnable)
         }
-        call(context.llvm.setCurrentFrameFunction, listOf(slotsPhi!!))
+        call(llvm.setCurrentFrameFunction, listOf(slotsPhi!!))
         setCurrentFrameIsCalled = true
 
         return landingpad
@@ -942,7 +952,7 @@ internal abstract class FunctionGenerationContext(
             if (wrapExceptionMode) {
                 LLVMAddClause(landingpad, objcNSExceptionRtti.llvm)
             }
-            LLVMAddClause(landingpad, LLVMConstNull(kInt8Ptr))
+            LLVMAddClause(landingpad, LLVMConstNull(llvm.int8PtrType))
 
             val fatalForeignExceptionBlock = basicBlock("fatalForeignException", position()?.start)
             val forwardKotlinExceptionBlock = basicBlock("forwardKotlinException", position()?.start)
@@ -950,7 +960,7 @@ internal abstract class FunctionGenerationContext(
             val typeId = extractValue(landingpad, 1)
             val isKotlinException = icmpEq(
                     typeId,
-                    call(context.llvm.llvmEhTypeidFor, listOf(kotlinExceptionRtti.llvm))
+                    call(llvm.llvmEhTypeidFor, listOf(kotlinExceptionRtti.llvm))
             )
 
             if (wrapExceptionMode) {
@@ -961,7 +971,7 @@ internal abstract class FunctionGenerationContext(
                 appendingTo(foreignExceptionBlock) {
                     val isObjCException = icmpEq(
                             typeId,
-                            call(context.llvm.llvmEhTypeidFor, listOf(objcNSExceptionRtti.llvm))
+                            call(llvm.llvmEhTypeidFor, listOf(objcNSExceptionRtti.llvm))
                     )
                     condBr(isObjCException, forwardNativeExceptionBlock, fatalForeignExceptionBlock)
 
@@ -994,12 +1004,12 @@ internal abstract class FunctionGenerationContext(
     fun terminateWithCurrentException(landingpad: LLVMValueRef) {
         val exceptionRecord = extractValue(landingpad, 0)
         // So `std::terminate` is called from C++ catch block:
-        call(context.llvm.cxaBeginCatchFunction, listOf(exceptionRecord))
+        call(llvm.cxaBeginCatchFunction, listOf(exceptionRecord))
         terminate()
     }
 
     fun terminate() {
-        call(context.llvm.cxxStdTerminate, emptyList())
+        call(llvm.cxxStdTerminate, emptyList())
 
         // Note: unreachable instruction to be generated here, but debug information is improper in this case.
         val loopBlock = basicBlock("loop", position()?.start)
@@ -1025,7 +1035,7 @@ internal abstract class FunctionGenerationContext(
     fun catchKotlinException(): LLVMValueRef {
         val landingpadResult = gxxLandingpad(numClauses = 1, name = "lp")
 
-        LLVMAddClause(landingpadResult, LLVMConstNull(kInt8Ptr))
+        LLVMAddClause(landingpadResult, LLVMConstNull(llvm.int8PtrType))
 
         // TODO: properly handle C++ exceptions: currently C++ exception can be thrown out from try-finally
         // bypassing the finally block.
@@ -1037,14 +1047,14 @@ internal abstract class FunctionGenerationContext(
         val exceptionRecord = extractValue(landingpadResult, 0, "er")
 
         // __cxa_begin_catch returns pointer to C++ exception object.
-        val beginCatch = context.llvm.cxaBeginCatchFunction
+        val beginCatch = llvm.cxaBeginCatchFunction
         val exceptionRawPtr = call(beginCatch, listOf(exceptionRecord))
 
         // Pointer to Kotlin exception object:
-        val exceptionPtr = call(context.llvm.Kotlin_getExceptionObject, listOf(exceptionRawPtr), Lifetime.GLOBAL)
+        val exceptionPtr = call(llvm.Kotlin_getExceptionObject, listOf(exceptionRawPtr), Lifetime.GLOBAL)
 
         // __cxa_end_catch performs some C++ cleanup, including calling `ExceptionObjHolder` class destructor.
-        val endCatch = context.llvm.cxaEndCatchFunction
+        val endCatch = llvm.cxaEndCatchFunction
         call(endCatch, listOf())
 
         return exceptionPtr
@@ -1054,20 +1064,20 @@ internal abstract class FunctionGenerationContext(
         val exceptionRecord = extractValue(landingpadResult, 0, "er")
 
         // __cxa_begin_catch returns pointer to C++ exception object.
-        val exceptionRawPtr = call(context.llvm.cxaBeginCatchFunction, listOf(exceptionRecord))
+        val exceptionRawPtr = call(llvm.cxaBeginCatchFunction, listOf(exceptionRecord))
 
         // This will take care of ARC - need to be done in the catching scope, i.e. before __cxa_end_catch
         val exception = call(context.ir.symbols.createForeignException.owner.llvmFunction,
                 listOf(exceptionRawPtr),
                 Lifetime.GLOBAL, exceptionHandler)
 
-        call(context.llvm.cxaEndCatchFunction, listOf())
+        call(llvm.cxaEndCatchFunction, listOf())
         return exception
     }
 
     fun generateFrameCheck() {
         if (!context.shouldOptimize())
-            call(context.llvm.checkCurrentFrameFunction, listOf(slotsPhi!!))
+            call(llvm.checkCurrentFrameFunction, listOf(slotsPhi!!))
     }
 
     inline fun ifThenElse(
@@ -1138,13 +1148,24 @@ internal abstract class FunctionGenerationContext(
 
     fun loadTypeInfo(objPtr: LLVMValueRef): LLVMValueRef {
         val typeInfoOrMetaPtr = structGep(objPtr, 0  /* typeInfoOrMeta_ */)
-        val typeInfoOrMetaWithFlags = load(typeInfoOrMetaPtr)
+
+        val memoryOrder = if (context.config.targetHasAddressDependency) {
+            /**
+             * Formally, this ordering is too weak, and doesn't prevent data race with installing extra object.
+             * Check comment in ObjHeader::type_info for details.
+             */
+            LLVMAtomicOrdering.LLVMAtomicOrderingMonotonic
+        } else {
+            LLVMAtomicOrdering.LLVMAtomicOrderingAcquire
+        }
+
+        val typeInfoOrMetaWithFlags = load(typeInfoOrMetaPtr, memoryOrder = memoryOrder)
         // Clear two lower bits.
         val typeInfoOrMetaWithFlagsRaw = ptrToInt(typeInfoOrMetaWithFlags, codegen.intPtrType)
         val typeInfoOrMetaRaw = and(typeInfoOrMetaWithFlagsRaw, codegen.immTypeInfoMask)
         val typeInfoOrMeta = intToPtr(typeInfoOrMetaRaw, kTypeInfoPtr)
         val typeInfoPtrPtr = structGep(typeInfoOrMeta, 0 /* typeInfo */)
-        return load(typeInfoPtrPtr)
+        return load(typeInfoPtrPtr, memoryOrder = LLVMAtomicOrdering.LLVMAtomicOrderingMonotonic)
     }
 
     fun lookupInterfaceTableRecord(typeInfo: LLVMValueRef, interfaceId: Int): LLVMValueRef {
@@ -1153,7 +1174,7 @@ internal abstract class FunctionGenerationContext(
 
         fun fastPath(): LLVMValueRef {
             // The fastest optimistic version.
-            val interfaceTableIndex = and(interfaceTableSize, Int32(interfaceId).llvm)
+            val interfaceTableIndex = and(interfaceTableSize, llvm.int32(interfaceId))
             return gep(interfaceTable, interfaceTableIndex)
         }
 
@@ -1168,7 +1189,7 @@ internal abstract class FunctionGenerationContext(
             val fastPathBB = basicBlock("fast_path", startLocationInfo)
             val slowPathBB = basicBlock("slow_path", startLocationInfo)
             val takeResBB = basicBlock("take_res", startLocationInfo)
-            condBr(icmpGe(interfaceTableSize, kImmInt32Zero), fastPathBB, slowPathBB)
+            condBr(icmpGe(interfaceTableSize, llvm.kImmInt32Zero), fastPathBB, slowPathBB)
             positionAtEnd(takeResBB)
             val resultPhi = phi(pointerType(runtime.interfaceTableRecordType))
             appendingTo(fastPathBB) {
@@ -1177,9 +1198,9 @@ internal abstract class FunctionGenerationContext(
                 addPhiIncoming(resultPhi, currentBlock to fastValue)
             }
             appendingTo(slowPathBB) {
-                val actualInterfaceTableSize = sub(kImmInt32Zero, interfaceTableSize) // -interfaceTableSize
-                val slowValue = call(context.llvm.lookupInterfaceTableRecord,
-                        listOf(interfaceTable, actualInterfaceTableSize, Int32(interfaceId).llvm))
+                val actualInterfaceTableSize = sub(llvm.kImmInt32Zero, interfaceTableSize) // -interfaceTableSize
+                val slowValue = call(llvm.lookupInterfaceTableRecord,
+                        listOf(interfaceTable, actualInterfaceTableSize, llvm.int32(interfaceId)))
                 br(takeResBB)
                 addPhiIncoming(resultPhi, currentBlock to slowValue)
             }
@@ -1191,7 +1212,7 @@ internal abstract class FunctionGenerationContext(
         assert(LLVMTypeOf(receiver) == codegen.kObjHeaderPtr)
 
         val typeInfoPtr: LLVMValueRef = if (irFunction.getObjCMethodInfo() != null)
-            call(context.llvm.getObjCKotlinTypeInfo, listOf(receiver))
+            call(llvm.getObjCKotlinTypeInfo, listOf(receiver))
         else
             loadTypeInfo(receiver)
 
@@ -1209,9 +1230,9 @@ internal abstract class FunctionGenerationContext(
             !owner.isInterface -> {
                 // If this is a virtual method of the class - we can call via vtable.
                 val index = context.getLayoutBuilder(owner).vtableIndex(anyMethod ?: irFunction)
-                val vtablePlace = gep(typeInfoPtr, Int32(1).llvm) // typeInfoPtr + 1
-                val vtable = bitcast(kInt8PtrPtr, vtablePlace)
-                val slot = gep(vtable, Int32(index).llvm)
+                val vtablePlace = gep(typeInfoPtr, llvm.int32(1)) // typeInfoPtr + 1
+                val vtable = bitcast(llvm.int8PtrPtrType, vtablePlace)
+                val slot = gep(vtable, llvm.int32(index))
                 load(slot)
             }
 
@@ -1219,7 +1240,7 @@ internal abstract class FunctionGenerationContext(
                 // Essentially: typeInfo.itable[place(interfaceId)].vtable[method]
                 val itablePlace = context.getLayoutBuilder(owner).itablePlace(irFunction)
                 val interfaceTableRecord = lookupInterfaceTableRecord(typeInfoPtr, itablePlace.interfaceId)
-                load(gep(load(structGep(interfaceTableRecord, 2 /* vtable */)), Int32(itablePlace.methodIndex).llvm))
+                load(gep(load(structGep(interfaceTableRecord, 2 /* vtable */)), llvm.int32(itablePlace.methodIndex)))
             }
         }
         val functionPtrType = pointerType(codegen.getLlvmFunctionType(irFunction))
@@ -1268,10 +1289,10 @@ internal abstract class FunctionGenerationContext(
                 // If thread local object is imported - access it via getter function.
                 ObjectStorageKind.THREAD_LOCAL -> {
                     val valueGetterName = irClass.threadLocalObjectStorageGetterSymbolName
-                    val valueGetterFunction = LLVMGetNamedFunction(context.llvmModule, valueGetterName)
+                    val valueGetterFunction = LLVMGetNamedFunction(llvm.module, valueGetterName)
                             ?: addLlvmFunctionWithDefaultAttributes(
                                     context,
-                                    context.llvmModule!!,
+                                    llvm.module,
                                     valueGetterName,
                                     functionType(kObjHeaderPtrPtr, false)
                             )
@@ -1283,7 +1304,7 @@ internal abstract class FunctionGenerationContext(
 
                 // If global object is imported - import it's storage directly.
                 ObjectStorageKind.PERMANENT, ObjectStorageKind.SHARED -> {
-                    val llvmType = getLLVMType(irClass.defaultType)
+                    val llvmType = irClass.defaultType.toLLVMType(llvm)
                     importGlobal(
                             irClass.globalObjectStorageSymbolName,
                             llvmType,
@@ -1293,7 +1314,7 @@ internal abstract class FunctionGenerationContext(
             }
         } else {
             // Local globals and thread locals storage info is stored in our map.
-            val singleton = context.llvmDeclarations.forSingleton(irClass)
+            val singleton = llvmDeclarations.forSingleton(irClass)
             val instanceAddress = singleton.instanceStorage
             instanceAddress.getAddress(this)
         }
@@ -1301,14 +1322,14 @@ internal abstract class FunctionGenerationContext(
         when (storageKind) {
             ObjectStorageKind.SHARED ->
                 // If current file used a shared object, make file's (de)initializer function deinit it.
-                context.llvm.globalSharedObjects += objectPtr
+                llvm.globalSharedObjects += objectPtr
             ObjectStorageKind.THREAD_LOCAL ->
                 // If current file used locally defined TLS objects, make file's (de)initializer function
                 // init and deinit TLS.
                 // Note: for exported TLS objects a getter is generated in a file they're defined in. Which
                 // adds TLS init and deinit to that file's (de)initializer function.
                 if (!isExternal(irClass))
-                    context.llvm.fileUsesThreadLocalObjects = true
+                    llvm.fileUsesThreadLocalObjects = true
             ObjectStorageKind.PERMANENT -> { /* Do nothing, no need to free such an instance. */ }
         }
 
@@ -1317,7 +1338,7 @@ internal abstract class FunctionGenerationContext(
         }
         val bbInit = basicBlock("label_init", startLocationInfo, endLocationInfo)
         val bbExit = basicBlock("label_continue", startLocationInfo, endLocationInfo)
-        val objectVal = loadSlot(objectPtr, false)
+        val objectVal = loadSlot(objectPtr, false, memoryOrder = LLVMAtomicOrdering.LLVMAtomicOrderingAcquire)
         val objectInitialized = icmpUGt(ptrToInt(objectVal, codegen.intPtrType), codegen.immOneIntPtrType)
         val bbCurrent = currentBlock
         condBr(objectInitialized, bbExit, bbInit)
@@ -1328,9 +1349,9 @@ internal abstract class FunctionGenerationContext(
         val ctor = codegen.llvmFunction(defaultConstructor).llvmValue
         val initFunction =
                 if (storageKind == ObjectStorageKind.SHARED && context.config.threadsAreAllowed) {
-                    context.llvm.initSingletonFunction
+                    llvm.initSingletonFunction
                 } else {
-                    context.llvm.initThreadLocalSingleton
+                    llvm.initThreadLocalSingleton
                 }
         val args = listOf(objectPtr, typeInfo, ctor)
         val newValue = call(initFunction, args, Lifetime.GLOBAL, exceptionHandler, resultSlot = resultSlot)
@@ -1338,7 +1359,7 @@ internal abstract class FunctionGenerationContext(
         br(bbExit)
 
         positionAtEnd(bbExit)
-        val valuePhi = phi(codegen.getLLVMType(irClass.defaultType))
+        val valuePhi = phi(irClass.defaultType.toLLVMType(llvm))
         addPhiIncoming(valuePhi, bbCurrent to objectVal, bbInitResult to newValue)
 
         return valuePhi
@@ -1349,19 +1370,10 @@ internal abstract class FunctionGenerationContext(
      */
     fun getEnumEntry(enumEntry: IrEnumEntry, exceptionHandler: ExceptionHandler): LLVMValueRef {
         val enumClass = enumEntry.parentAsClass
-        val loweredEnum = context.specialDeclarationsFactory.getLoweredEnum(enumClass)
-
-        val getterId = loweredEnum.entriesMap[enumEntry.name]!!.getterId
-        val values = call(
-                loweredEnum.valuesGetter.llvmFunction.llvmValue,
-                emptyList(),
-                Lifetime.ARGUMENT,
-                exceptionHandler
-        )
-
+        val getterId = context.enumsSupport.enumEntriesMap(enumClass)[enumEntry.name]!!.getterId
         return call(
-                loweredEnum.itemGetterSymbol.owner.llvmFunction.llvmValue,
-                listOf(values, Int32(getterId).llvm),
+                context.enumsSupport.getValueGetter(enumClass).llvmFunction.llvmValue,
+                listOf(llvm.int32(getterId)),
                 Lifetime.GLOBAL,
                 exceptionHandler
         )
@@ -1378,10 +1390,10 @@ internal abstract class FunctionGenerationContext(
                 val name = irClass.descriptor.getExternalObjCMetaClassBinaryName()
                 val objCClass = getObjCClass(name, llvmSymbolOrigin)
 
-                val getClass = context.llvm.externalFunction(LlvmFunctionProto(
+                val getClass = llvm.externalFunction(LlvmFunctionProto(
                         "object_getClass",
-                        LlvmRetType(int8TypePtr),
-                        listOf(LlvmParamType(int8TypePtr)),
+                        LlvmRetType(llvm.int8PtrType),
+                        listOf(LlvmParamType(llvm.int8PtrType)),
                         origin = context.standardLlvmSymbolsOrigin
                 ))
                 call(getClass, listOf(objCClass), exceptionHandler = exceptionHandler)
@@ -1398,11 +1410,11 @@ internal abstract class FunctionGenerationContext(
 
             val storedClass = this.load(classPointerGlobal)
 
-            val storedClassIsNotNull = this.icmpNe(storedClass, kNullInt8Ptr)
+            val storedClassIsNotNull = this.icmpNe(storedClass, llvm.kNullInt8Ptr)
 
             return this.ifThenElse(storedClassIsNotNull, storedClass) {
                 call(
-                        context.llvm.createKotlinObjCClass,
+                        llvm.createKotlinObjCClass,
                         listOf(classInfo),
                         exceptionHandler = exceptionHandler
                 )
@@ -1411,7 +1423,7 @@ internal abstract class FunctionGenerationContext(
     }
 
     fun getObjCClass(binaryName: String, llvmSymbolOrigin: CompiledKlibModuleOrigin): LLVMValueRef {
-        context.llvm.imports.add(llvmSymbolOrigin)
+        llvm.imports.add(llvmSymbolOrigin)
         return load(codegen.objCDataGenerator!!.genClassRef(binaryName).llvm)
     }
 
@@ -1446,13 +1458,13 @@ internal abstract class FunctionGenerationContext(
 
         appendingTo(prologueBb) {
             val slots = if (needSlotsPhi || needCleanupLandingpadAndLeaveFrame)
-                LLVMBuildArrayAlloca(builder, kObjHeaderPtr, Int32(slotCount).llvm, "")!!
+                LLVMBuildArrayAlloca(builder, kObjHeaderPtr, llvm.int32(slotCount), "")!!
             else
                 kNullObjHeaderPtrPtr
             if (needSlots || needCleanupLandingpadAndLeaveFrame) {
                 check(!forbidRuntime) { "Attempt to start a frame where runtime usage is forbidden" }
                 // Zero-init slots.
-                val slotsMem = bitcast(kInt8Ptr, slots)
+                val slotsMem = bitcast(llvm.int8PtrType, slots)
                 memset(slotsMem, 0, slotCount * codegen.runtime.pointerSize)
             }
             addPhiIncoming(slotsPhi!!, prologueBb to slots)
@@ -1461,7 +1473,7 @@ internal abstract class FunctionGenerationContext(
                     val expr = longArrayOf(DwarfOp.DW_OP_plus_uconst.value,
                             runtime.pointerSize * slot.toLong()).toCValues()
                     DIInsertDeclaration(
-                            builder       = codegen.context.debugInfo.builder,
+                            builder       = codegen.context.generationState.debugInfo.builder,
                             value         = slots,
                             localVariable = variable.localVariable,
                             location      = variable.location,
@@ -1497,18 +1509,18 @@ internal abstract class FunctionGenerationContext(
             startLocation?.let { debugLocation(it, it) }
             if (needsRuntimeInit || switchToRunnable) {
                 check(!forbidRuntime) { "Attempt to init runtime where runtime usage is forbidden" }
-                call(context.llvm.initRuntimeIfNeeded, emptyList())
+                call(llvm.initRuntimeIfNeeded, emptyList())
             }
             if (switchToRunnable) {
                 switchThreadState(Runnable)
             }
             if (needSlots || needCleanupLandingpadAndLeaveFrame) {
-                call(context.llvm.enterFrameFunction, listOf(slotsPhi!!, Int32(vars.skipSlots).llvm, Int32(slotCount).llvm))
+                call(llvm.enterFrameFunction, listOf(slotsPhi!!, llvm.int32(vars.skipSlots), llvm.int32(slotCount)))
             } else {
                 check(!setCurrentFrameIsCalled)
             }
             if (context.memoryModel == MemoryModel.EXPERIMENTAL && !forbidRuntime) {
-                call(context.llvm.Kotlin_mm_safePointFunctionPrologue, emptyList())
+                call(llvm.Kotlin_mm_safePointFunctionPrologue, emptyList())
             }
             resetDebugLocation()
             br(entryBb)
@@ -1576,16 +1588,16 @@ internal abstract class FunctionGenerationContext(
     private val kotlinExceptionRtti: ConstPointer
         get() = constPointer(importGlobal(
                 "_ZTI18ExceptionObjHolder", // typeinfo for ObjHolder
-                int8TypePtr,
+                llvm.int8PtrType,
                 origin = context.stdlibModule.llvmSymbolOrigin
-        )).bitcast(int8TypePtr)
+        )).bitcast(llvm.int8PtrType)
 
     private val objcNSExceptionRtti: ConstPointer by lazy {
         constPointer(importGlobal(
                 "OBJC_EHTYPE_\$_NSException", // typeinfo for NSException*
-                int8TypePtr,
+                llvm.int8PtrType,
                 origin = context.stdlibModule.llvmSymbolOrigin
-        )).bitcast(int8TypePtr)
+        )).bitcast(llvm.int8PtrType)
     }
 
     //-------------------------------------------------------------------------//
@@ -1596,7 +1608,7 @@ internal abstract class FunctionGenerationContext(
      * This class is introduced to workaround unreachable code handling.
      */
     inner class PositionHolder {
-        private val builder: LLVMBuilderRef = LLVMCreateBuilderInContext(llvmContext)!!
+        private val builder: LLVMBuilderRef = LLVMCreateBuilderInContext(llvm.llvmContext)!!
 
 
         fun getBuilder(): LLVMBuilderRef {
@@ -1702,8 +1714,8 @@ internal abstract class FunctionGenerationContext(
     private fun releaseVars() {
         if (needCleanupLandingpadAndLeaveFrame || needSlots) {
             check(!forbidRuntime) { "Attempt to leave a frame where runtime usage is forbidden" }
-            call(context.llvm.leaveFrameFunction,
-                    listOf(slotsPhi!!, Int32(vars.skipSlots).llvm, Int32(slotCount).llvm))
+            call(llvm.leaveFrameFunction,
+                    listOf(slotsPhi!!, llvm.int32(vars.skipSlots), llvm.int32(slotCount)))
         }
         if (!stackLocalsManager.isEmpty() && context.memoryModel != MemoryModel.EXPERIMENTAL) {
             stackLocalsManager.clean(refsOnly = true) // Only bother about not leaving any dangling references.
@@ -1751,7 +1763,7 @@ internal class DefaultFunctionGenerationContext(
     override fun processReturns() {
         appendingTo(epilogueBb) {
             when {
-                returnType == voidType -> {
+                returnType == llvm.voidType -> {
                     retVoid()
                 }
                 returns.isNotEmpty() -> {

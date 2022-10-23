@@ -58,9 +58,6 @@ public class JVMConfigurationKeys {
     public static final CompilerConfigurationKey<Boolean> USE_TYPE_TABLE =
             CompilerConfigurationKey.create("use type table in serializer");
 
-    public static final CompilerConfigurationKey<Boolean> USE_SINGLE_MODULE =
-            CompilerConfigurationKey.create("combine modules for source files and binary dependencies into a single module");
-
     public static final CompilerConfigurationKey<JvmTarget> JVM_TARGET =
             CompilerConfigurationKey.create("JVM bytecode target version");
 
@@ -136,6 +133,9 @@ public class JVMConfigurationKeys {
     public static final CompilerConfigurationKey<Boolean> NO_UNIFIED_NULL_CHECKS =
             CompilerConfigurationKey.create("Use pre-1.4 exception types in null checks instead of java.lang.NPE");
 
+    public static final CompilerConfigurationKey<Boolean> NO_SOURCE_DEBUG_EXTENSION =
+            CompilerConfigurationKey.create("Do not generate @kotlin.jvm.internal.SourceDebugExtension annotation on a class with the copy of SMAP");
+
     public static final CompilerConfigurationKey<Boolean> USE_OLD_INLINE_CLASSES_MANGLING_SCHEME =
             CompilerConfigurationKey.create("Use old, 1.4 version of inline classes mangling scheme");
 
@@ -159,4 +159,13 @@ public class JVMConfigurationKeys {
 
     public static final CompilerConfigurationKey<Boolean> ENABLE_DEBUG_MODE =
             CompilerConfigurationKey.create("Enable debug mode");
+
+    public static final CompilerConfigurationKey<Boolean> IGNORE_CONST_OPTIMIZATION_ERRORS =
+            CompilerConfigurationKey.create("Ignore errors from IrConstTransformer");
+
+    public static final CompilerConfigurationKey<Boolean> NO_NEW_JAVA_ANNOTATION_TARGETS =
+            CompilerConfigurationKey.create("Do not generate Java 1.8+ targets for Kotlin annotation classes");
+
+    public static final CompilerConfigurationKey<Boolean> OLD_INNER_CLASSES_LOGIC =
+            CompilerConfigurationKey.create("Use old logic for generation of InnerClasses attributes");
 }

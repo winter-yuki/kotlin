@@ -12,12 +12,14 @@ import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.*
+import org.gradle.work.NormalizeLineEndings
 import org.jetbrains.kotlin.gradle.utils.contentEquals
 import java.io.File
 import javax.inject.Inject
 
 abstract class YarnLockCopyTask : DefaultTask() {
 
+    @get:NormalizeLineEndings
     @get:InputFile
     @get:PathSensitive(PathSensitivity.RELATIVE)
     abstract val inputFile: RegularFileProperty
@@ -50,13 +52,11 @@ abstract class YarnLockCopyTask : DefaultTask() {
         val STORE_YARN_LOCK_NAME = "kotlinStoreYarnLock"
         val RESTORE_YARN_LOCK_NAME = "kotlinRestoreYarnLock"
         val UPGRADE_YARN_LOCK = "kotlinUpgradeYarnLock"
+        val YARN_LOCK_MISMATCH_MESSAGE = "yarn.lock was changed. Run the `${YarnLockCopyTask.UPGRADE_YARN_LOCK}` task to actualize yarn.lock file"
     }
 }
 
 abstract class YarnLockStoreTask : YarnLockCopyTask() {
-    @get:Internal
-    abstract val yarnLockMismatchReportService: Property<YarnLockMismatchReportService>
-
     @Input
     lateinit var yarnLockMismatchReport: Provider<YarnLockMismatchReport>
 
@@ -86,9 +86,6 @@ abstract class YarnLockStoreTask : YarnLockCopyTask() {
                     logger.warn(YARN_LOCK_MISMATCH_MESSAGE)
                 }
                 YarnLockMismatchReport.FAIL -> throw GradleException(YARN_LOCK_MISMATCH_MESSAGE)
-                YarnLockMismatchReport.FAIL_AFTER_BUILD -> {
-                    yarnLockMismatchReportService.get().failOnClose()
-                }
                 else -> error("Unknown yarn.lock mismatch report kind")
             }
         }
@@ -99,5 +96,4 @@ enum class YarnLockMismatchReport {
     NONE,
     WARNING,
     FAIL,
-    FAIL_AFTER_BUILD,
 }

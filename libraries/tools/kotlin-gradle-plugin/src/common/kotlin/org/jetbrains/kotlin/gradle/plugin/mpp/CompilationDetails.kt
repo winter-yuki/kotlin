@@ -5,6 +5,7 @@
 
 package org.jetbrains.kotlin.gradle.plugin.mpp
 
+import com.android.build.gradle.api.BaseVariant
 import org.gradle.api.Action
 import org.gradle.api.Project
 import org.gradle.api.UnknownTaskException
@@ -15,25 +16,16 @@ import org.gradle.api.tasks.SourceSet
 import org.gradle.api.tasks.TaskProvider
 import org.gradle.api.tasks.bundling.AbstractArchiveTask
 import org.jetbrains.kotlin.gradle.dsl.*
-import org.jetbrains.kotlin.gradle.dsl.KotlinJvmOptionsImpl
 import org.jetbrains.kotlin.gradle.plugin.*
 import org.jetbrains.kotlin.gradle.plugin.mpp.internal.KotlinCompilationsModuleGroups
 import org.jetbrains.kotlin.gradle.plugin.mpp.pm20.*
 import org.jetbrains.kotlin.gradle.plugin.mpp.pm20.util.*
-import org.jetbrains.kotlin.gradle.plugin.mpp.pm20.util.newDependencyFilesHolder
-import org.jetbrains.kotlin.gradle.plugin.mpp.pm20.util.ofVariantCompileDependencies
-import org.jetbrains.kotlin.gradle.plugin.mpp.pm20.util.unambiguousNameInProject
-import org.jetbrains.kotlin.gradle.plugin.sources.defaultSourceSetLanguageSettingsChecker
-import org.jetbrains.kotlin.gradle.plugin.sources.getVisibleSourceSetsFromAssociateCompilations
+import org.jetbrains.kotlin.gradle.plugin.sources.*
 import org.jetbrains.kotlin.gradle.plugin.sources.kpm.FragmentMappedKotlinSourceSet
-import org.jetbrains.kotlin.gradle.plugin.sources.dependsOnClosure
-import org.jetbrains.kotlin.gradle.plugin.sources.withDependsOnClosure
 import org.jetbrains.kotlin.gradle.targets.js.KotlinJsTarget
-import org.jetbrains.kotlin.gradle.targets.js.ir.KotlinJsIrCompilation
 import org.jetbrains.kotlin.gradle.targets.js.ir.KotlinJsIrTarget
 import org.jetbrains.kotlin.gradle.targets.metadata.getMetadataCompilationForSourceSet
 import org.jetbrains.kotlin.gradle.utils.*
-import org.jetbrains.kotlin.gradle.utils.lowerCamelCaseName
 import org.jetbrains.kotlin.project.model.LanguageSettings
 import org.jetbrains.kotlin.tooling.core.closure
 import java.util.*
@@ -54,15 +46,18 @@ interface CompilationDetails<T : KotlinCommonOptions> {
 
     fun source(sourceSet: KotlinSourceSet)
 
-    val directlyIncludedKotlinSourceSets: Set<KotlinSourceSet>
-    val defaultSourceSetName: String
+    val directlyIncludedKotlinSourceSets: ObservableSet<KotlinSourceSet>
+
+    val allKotlinSourceSets: ObservableSet<KotlinSourceSet>
+
+    val defaultSourceSet: KotlinSourceSet
+
+    @Deprecated("Use defaultSourceSet.name instead", ReplaceWith("defaultSourceSet.name"), level = DeprecationLevel.WARNING)
+    val defaultSourceSetName: String get() = defaultSourceSet.name
 
     @Suppress("UNCHECKED_CAST")
     val compilation: KotlinCompilation<T>
         get() = target.compilations.getByName(compilationData.compilationPurpose) as KotlinCompilation<T>
-
-    val defaultSourceSet: KotlinSourceSet
-        get() = target.project.kotlinExtension.sourceSets.getByName(defaultSourceSetName)
 }
 
 interface CompilationDetailsWithRuntime<T : KotlinCommonOptions> : CompilationDetails<T> {
@@ -72,12 +67,17 @@ interface CompilationDetailsWithRuntime<T : KotlinCommonOptions> : CompilationDe
 internal val CompilationDetails<*>.associateCompilationsClosure: Iterable<CompilationDetails<*>>
     get() = closure { it.associateCompilations }
 
-open class DefaultCompilationDetails<T : KotlinCommonOptions>(
+open class DefaultCompilationDetails<T : KotlinCommonOptions, CO : KotlinCommonCompilerOptions>(
     final override val target: KotlinTarget,
     final override val compilationPurpose: String,
-    createKotlinOptions: DefaultCompilationDetails<*>.() -> T
-) : CompilationDetails<T>, KotlinCompilationData<T> {
+    defaultSourceSet: KotlinSourceSet,
+    createCompilerOptions: DefaultCompilationDetails<T, CO>.() -> HasCompilerOptions<CO>,
+    createKotlinOptions: DefaultCompilationDetails<T, CO>.() -> T
+) : AbstractCompilationDetails<T>(defaultSourceSet), KotlinCompilationData<T> {
 
+    override val compilerOptions: HasCompilerOptions<CO> by lazy { createCompilerOptions() }
+
+    @Deprecated("Replaced with compilerOptions.options", replaceWith = ReplaceWith("compilerOptions.options"))
     override val kotlinOptions: T by lazy { createKotlinOptions() }
 
     final override val project: Project
@@ -96,6 +96,7 @@ open class DefaultCompilationDetails<T : KotlinCommonOptions>(
             lowerCamelCaseName(
                 target.disambiguationClassifier,
                 compilationPurpose.takeIf { it != KotlinCompilation.MAIN_COMPILATION_NAME },
+                "compilation",
             )
         )
 
@@ -106,18 +107,6 @@ open class DefaultCompilationDetails<T : KotlinCommonOptions>(
             "compileClasspath"
         )
     )
-
-    override val directlyIncludedKotlinSourceSets: MutableSet<KotlinSourceSet> = mutableSetOf()
-
-    override val defaultSourceSetName: String
-        get() = lowerCamelCaseName(
-            target.disambiguationClassifier.takeIf { target !is KotlinMetadataTarget },
-            when {
-                isMainCompilationData() && target is KotlinMetadataTarget ->
-                    KotlinSourceSet.COMMON_MAIN_SOURCE_SET_NAME // corner case: main compilation of the metadata target compiles commonMain
-                else -> compilationPurpose
-            }
-        )
 
     override val compilationClassifier: String?
         get() = target.disambiguationClassifier
@@ -145,7 +134,7 @@ open class DefaultCompilationDetails<T : KotlinCommonOptions>(
     )
 
     override val languageSettings: LanguageSettings
-        get() = project.kotlinExtension.sourceSets.getByName(defaultSourceSetName).languageSettings
+        get() = defaultSourceSet.languageSettings
 
     override val platformType: KotlinPlatformType
         get() = target.platformType
@@ -250,7 +239,7 @@ open class DefaultCompilationDetails<T : KotlinCommonOptions>(
      * Adds `allDependencies` of configurations mentioned in `configurationNames` to configuration named [this] in
      * a lazy manner
      */
-    private fun String.addAllDependenciesFromOtherConfigurations(project: Project, vararg configurationNames: String) {
+    protected fun String.addAllDependenciesFromOtherConfigurations(project: Project, vararg configurationNames: String) {
         project.configurations.named(this).configure { receiverConfiguration ->
             receiverConfiguration.dependencies.addAllLater(
                 project.objects.listProperty(Dependency::class.java).apply {
@@ -266,12 +255,9 @@ open class DefaultCompilationDetails<T : KotlinCommonOptions>(
         }
     }
 
-
-    override fun source(sourceSet: KotlinSourceSet) {
-        if (directlyIncludedKotlinSourceSets.add(sourceSet)) {
-            target.project.whenEvaluated {
-                addExactSourceSetsEagerly(sourceSet.withDependsOnClosure)
-            }
+    override fun whenSourceSetAdded(sourceSet: KotlinSourceSet) {
+        sourceSet.internal.withDependsOnClosure.forAll { inWithDependsOnClosure ->
+            addExactSourceSetEagerly(inWithDependsOnClosure)
         }
     }
 
@@ -283,52 +269,61 @@ open class DefaultCompilationDetails<T : KotlinCommonOptions>(
             addAsCommonSources
         ) { sourceSet.kotlin }
 
-    internal fun addExactSourceSetsEagerly(sourceSets: Set<KotlinSourceSet>) {
+
+    private val sourceSetsAddedEagerly = hashSetOf<KotlinSourceSet>()
+
+    internal fun addExactSourceSetEagerly(sourceSet: KotlinSourceSet) {
+        if (!sourceSetsAddedEagerly.add(sourceSet)) return
+
         with(target.project) {
             //TODO possibly issue with forced instantiation
-            sourceSets.forEach { sourceSet ->
-                addSourcesToCompileTask(
-                    sourceSet,
-                    addAsCommonSources = lazy {
-                        CompilationSourceSetUtil.sourceSetsInMultipleCompilations(project).contains(sourceSet.name)
+            addSourcesToCompileTask(
+                sourceSet,
+                addAsCommonSources = lazy {
+                    target.project.kotlinExtension.sourceSets.any { otherSourceSet ->
+                        sourceSet in otherSourceSet.dependsOn
                     }
-                )
-
-                // Use `forced = false` since `api`, `implementation`, and `compileOnly` may be missing in some cases like
-                // old Java & Android projects:
-                addExtendsFromRelation(compilation.apiConfigurationName, sourceSet.apiConfigurationName, forced = false)
-                addExtendsFromRelation(
-                    compilation.implementationConfigurationName,
-                    sourceSet.implementationConfigurationName,
-                    forced = false
-                )
-                addExtendsFromRelation(compilation.compileOnlyConfigurationName, sourceSet.compileOnlyConfigurationName, forced = false)
-
-                if (compilation is KotlinCompilationToRunnableFiles<*>) {
-                    addExtendsFromRelation(compilation.runtimeOnlyConfigurationName, sourceSet.runtimeOnlyConfigurationName, forced = false)
                 }
+            )
 
-                if (sourceSet.name != defaultSourceSetName) {
-                    kotlinExtension.sourceSets.findByName(defaultSourceSetName)?.let { defaultSourceSet ->
-                        // Temporary solution for checking consistency across source sets participating in a compilation that may
-                        // not be interconnected with the dependsOn relation: check the settings as if the default source set of
-                        // the compilation depends on the one added to the compilation:
-                        defaultSourceSetLanguageSettingsChecker.runAllChecks(
-                            defaultSourceSet,
-                            sourceSet
-                        )
-                    }
+            // Use `forced = false` since `api`, `implementation`, and `compileOnly` may be missing in some cases like
+            // old Java & Android projects:
+            addExtendsFromRelation(compilation.apiConfigurationName, sourceSet.apiConfigurationName, forced = false)
+            addExtendsFromRelation(
+                compilation.implementationConfigurationName,
+                sourceSet.implementationConfigurationName,
+                forced = false
+            )
+            addExtendsFromRelation(compilation.compileOnlyConfigurationName, sourceSet.compileOnlyConfigurationName, forced = false)
+
+            if (compilation is KotlinCompilationToRunnableFiles<*>) {
+                addExtendsFromRelation(compilation.runtimeOnlyConfigurationName, sourceSet.runtimeOnlyConfigurationName, forced = false)
+            }
+
+            if (sourceSet.name != defaultSourceSetName) {
+                kotlinExtension.sourceSets.findByName(defaultSourceSetName)?.let { defaultSourceSet ->
+                    // Temporary solution for checking consistency across source sets participating in a compilation that may
+                    // not be interconnected with the dependsOn relation: check the settings as if the default source set of
+                    // the compilation depends on the one added to the compilation:
+                    defaultSourceSetLanguageSettingsChecker.runAllChecks(
+                        defaultSourceSet,
+                        sourceSet
+                    )
                 }
             }
         }
     }
 }
 
-open class DefaultCompilationDetailsWithRuntime<T : KotlinCommonOptions>(
+open class DefaultCompilationDetailsWithRuntime<T : KotlinCommonOptions, CO : KotlinCommonCompilerOptions>(
     target: KotlinTarget,
     compilationPurpose: String,
-    createKotlinOptions: DefaultCompilationDetails<*>.() -> T
-) : DefaultCompilationDetails<T>(target, compilationPurpose, createKotlinOptions), CompilationDetailsWithRuntime<T> {
+    defaultSourceSet: KotlinSourceSet,
+    createCompilerOptions: DefaultCompilationDetails<T, CO>.() -> HasCompilerOptions<CO>,
+    createKotlinOptions: DefaultCompilationDetails<T, CO>.() -> T
+) : DefaultCompilationDetails<T, CO>(
+    target, compilationPurpose, defaultSourceSet, createCompilerOptions, createKotlinOptions
+), CompilationDetailsWithRuntime<T> {
     override val runtimeDependencyFilesHolder: GradleKpmDependencyFilesHolder = project.newDependencyFilesHolder(
         lowerCamelCaseName(
             target.disambiguationClassifier,
@@ -341,10 +336,16 @@ open class DefaultCompilationDetailsWithRuntime<T : KotlinCommonOptions>(
 open class NativeCompilationDetails(
     target: KotlinTarget,
     compilationPurpose: String,
-    createKotlinOptions: DefaultCompilationDetails<*>.() -> KotlinCommonOptions
-) : DefaultCompilationDetails<KotlinCommonOptions>(
+    defaultSourceSet: KotlinSourceSet,
+    @Suppress("DEPRECATION")
+    createCompilerOptions: DefaultCompilationDetails<KotlinCommonOptions, KotlinCommonCompilerOptions>.() -> HasCompilerOptions<KotlinCommonCompilerOptions>,
+    @Suppress("DEPRECATION")
+    createKotlinOptions: DefaultCompilationDetails<KotlinCommonOptions, KotlinCommonCompilerOptions>.() -> KotlinCommonOptions
+) : DefaultCompilationDetails<KotlinCommonOptions, KotlinCommonCompilerOptions>(
     target,
     compilationPurpose,
+    defaultSourceSet,
+    createCompilerOptions,
     createKotlinOptions
 ) {
     override val compileDependencyFilesHolder: GradleKpmDependencyFilesHolder = project.newDependencyFilesHolder(
@@ -375,21 +376,26 @@ open class NativeCompilationDetails(
 internal open class SharedNativeCompilationDetails(
     target: KotlinTarget,
     compilationPurpose: String,
-    createKotlinOptions: DefaultCompilationDetails<*>.() -> KotlinCommonOptions
-) :
-    DefaultCompilationDetails<KotlinCommonOptions>(
-        target,
-        compilationPurpose,
-        createKotlinOptions
-    ) {
+    defaultSourceSet: KotlinSourceSet,
+    @Suppress("DEPRECATION")
+    createCompilerOptions: DefaultCompilationDetails<KotlinCommonOptions, KotlinCommonCompilerOptions>.() -> HasCompilerOptions<KotlinCommonCompilerOptions>,
+    @Suppress("DEPRECATION")
+    createKotlinOptions: DefaultCompilationDetails<KotlinCommonOptions, KotlinCommonCompilerOptions>.() -> KotlinCommonOptions
+) : DefaultCompilationDetails<KotlinCommonOptions, KotlinCommonCompilerOptions>(
+    target,
+    compilationPurpose,
+    defaultSourceSet,
+    createCompilerOptions,
+    createKotlinOptions
+) {
 
     override val friendArtifacts: FileCollection
         get() = super.friendArtifacts.plus(run {
             val project = target.project
-            val friendSourceSets = getVisibleSourceSetsFromAssociateCompilations(project, defaultSourceSet).toMutableSet().apply {
+            val friendSourceSets = getVisibleSourceSetsFromAssociateCompilations(defaultSourceSet).toMutableSet().apply {
                 // TODO: implement proper dependsOn/refines compiler args for Kotlin/Native and pass the dependsOn klibs separately;
                 //       But for now, those dependencies don't have any special semantics, so passing all them as friends works, too
-                addAll(defaultSourceSet.dependsOnClosure)
+                addAll(defaultSourceSet.internal.dependsOnClosure)
             }
             project.files(friendSourceSets.mapNotNull { project.getMetadataCompilationForSourceSet(it)?.output?.classesDirs })
         })
@@ -401,8 +407,14 @@ internal open class SharedNativeCompilationDetails(
 
 internal open class MetadataMappedCompilationDetails<T : KotlinCommonOptions>(
     override val target: KotlinMetadataTarget,
+    defaultSourceSet: KotlinSourceSet,
     final override val compilationData: AbstractKotlinFragmentMetadataCompilationData<T>
-) : CompilationDetails<T> {
+) : AbstractCompilationDetails<T>(defaultSourceSet) {
+
+    @Suppress("UNCHECKED_CAST")
+    override val compilation: KotlinCompilation<T>
+        get() = target.compilations.getByName(defaultSourceSet.name) as KotlinCompilation<T>
+
     override val compileDependencyFilesHolder: GradleKpmDependencyFilesHolder =
         GradleKpmDependencyFilesHolder.ofMetadataCompilationDependencies(compilationData)
 
@@ -416,35 +428,23 @@ internal open class MetadataMappedCompilationDetails<T : KotlinCommonOptions>(
     override val associateCompilations: Set<CompilationDetails<*>>
         get() = emptySet()
 
-    override fun source(sourceSet: KotlinSourceSet) {
-        throw UnsupportedOperationException("metadata compilations have predefined sources")
+    override fun whenSourceSetAdded(sourceSet: KotlinSourceSet) {
+        if (sourceSet != defaultSourceSet)
+            throw UnsupportedOperationException("metadata compilations have predefined sources")
     }
-
-    private val underlyingSourceSet: FragmentMappedKotlinSourceSet
-        get() = target.project.kotlinExtension.sourceSets.withType<FragmentMappedKotlinSourceSet>().single {
-            it.underlyingFragment == compilationData.fragment
-        }
-
-    override val directlyIncludedKotlinSourceSets: MutableSet<KotlinSourceSet>
-        get() = Collections.unmodifiableSet(hashSetOf(underlyingSourceSet))
-
-    override val defaultSourceSetName: String
-        get() = underlyingSourceSet.name
 }
 
 internal open class VariantMappedCompilationDetails<T : KotlinCommonOptions>(
     open val variant: GradleKpmVariantInternal,
-    override val target: KotlinTarget
-) : CompilationDetails<T> {
+    override val target: KotlinTarget,
+    defaultSourceSet: FragmentMappedKotlinSourceSet,
+) : AbstractCompilationDetails<T>(defaultSourceSet) {
 
     @Suppress("UNCHECKED_CAST")
     override val compilationData: KotlinCompilationData<T>
         get() = variant.compilationData as KotlinCompilationData<T>
 
-    override val defaultSourceSetName: String
-        get() = variant.unambiguousNameInProject
-
-    override fun source(sourceSet: KotlinSourceSet) {
+    override fun whenSourceSetAdded(sourceSet: KotlinSourceSet) {
         compilation.defaultSourceSet.dependsOn(sourceSet)
     }
 
@@ -465,26 +465,28 @@ internal open class VariantMappedCompilationDetails<T : KotlinCommonOptions>(
     override val kotlinDependenciesHolder: HasKotlinDependencies
         get() = variant
 
-    override val directlyIncludedKotlinSourceSets: Set<KotlinSourceSet>
-        get() = compilation.defaultSourceSet.dependsOn
 }
 
 internal open class VariantMappedCompilationDetailsWithRuntime<T : KotlinCommonOptions>(
     override val variant: GradleKpmVariantWithRuntimeInternal,
-    target: KotlinTarget
-) : VariantMappedCompilationDetails<T>(variant, target),
+    target: KotlinTarget,
+    defaultSourceSet: FragmentMappedKotlinSourceSet
+) : VariantMappedCompilationDetails<T>(variant, target, defaultSourceSet),
     CompilationDetailsWithRuntime<T> {
     override val runtimeDependencyFilesHolder: GradleKpmDependencyFilesHolder
         get() = GradleKpmDependencyFilesHolder.ofVariantRuntimeDependencies(variant)
 }
 
-internal class WithJavaCompilationDetails<T : KotlinCommonOptions>(
+internal class WithJavaCompilationDetails<T : KotlinCommonOptions, CO : KotlinCommonCompilerOptions>(
     target: KotlinTarget,
     compilationPurpose: String,
-    createKotlinOptions: DefaultCompilationDetails<*>.() -> T
-) : DefaultCompilationDetailsWithRuntime<T>(target, compilationPurpose, createKotlinOptions) {
-    override val compilation: KotlinWithJavaCompilation<T>
-        get() = super.compilation as KotlinWithJavaCompilation<T>
+    defaultSourceSet: KotlinSourceSet,
+    createCompilerOptions: DefaultCompilationDetails<T, CO>.() -> HasCompilerOptions<CO>,
+    createKotlinOptions: DefaultCompilationDetails<T, CO>.() -> T
+) : DefaultCompilationDetailsWithRuntime<T, CO>(target, compilationPurpose, defaultSourceSet, createCompilerOptions, createKotlinOptions) {
+    @Suppress("UNCHECKED_CAST")
+    override val compilation: KotlinWithJavaCompilation<T, CO>
+        get() = super.compilation as KotlinWithJavaCompilation<T, CO>
 
     val javaSourceSet: SourceSet
         get() = compilation.javaSourceSet
@@ -513,24 +515,48 @@ internal class WithJavaCompilationDetails<T : KotlinCommonOptions>(
 class AndroidCompilationDetails(
     target: KotlinTarget,
     compilationPurpose: String,
+    defaultSourceSet: KotlinSourceSet,
+    val androidVariant: BaseVariant,
     /** Workaround mutual creation order: a compilation is not added to the target's compilations collection until some point, pass it here */
     private val getCompilationInstance: () -> KotlinJvmAndroidCompilation
-) : DefaultCompilationDetailsWithRuntime<KotlinJvmOptions>(
+) : DefaultCompilationDetailsWithRuntime<KotlinJvmOptions, KotlinJvmCompilerOptions>(
     target,
     compilationPurpose,
-    { KotlinJvmOptionsImpl() }
+    defaultSourceSet,
+    {
+        object : HasCompilerOptions<KotlinJvmCompilerOptions> {
+            override val options: KotlinJvmCompilerOptions =
+                target.project.objects.newInstance(KotlinJvmCompilerOptionsDefault::class.java)
+        }
+    },
+    {
+        object : KotlinJvmOptions {
+            override val options: KotlinJvmCompilerOptions
+                get() = compilerOptions.options
+        }
+    }
 ) {
     override val compilation: KotlinJvmAndroidCompilation get() = getCompilationInstance()
-
-    val androidVariant get() = compilation.androidVariant
 
     override val friendArtifacts: FileCollection
         get() = target.project.files(super.friendArtifacts, compilation.testedVariantArtifacts)
 
+    /*
+    * Example of how multiplatform dependencies from common would get to Android test classpath:
+    * commonMainImplementation -> androidDebugImplementation -> debugImplementation -> debugAndroidTestCompileClasspath
+    * After the fix for KT-35916 MPP compilation configurations receive a 'compilation' postfix for disambiguation.
+    * androidDebugImplementation remains a source set configuration, but no longer contains compilation dependencies.
+    * Therefore, it doesn't get dependencies from common source sets.
+    * We now explicitly add associate compilation dependencies to the Kotlin test compilation configurations (test classpaths).
+    * This helps, because the Android test classpath configurations extend from the Kotlin test compilations' directly.
+    */
     override fun addAssociateCompilationDependencies(other: KotlinCompilation<*>) {
-        if ((other as? KotlinJvmAndroidCompilation)?.androidVariant != getTestedVariantData(androidVariant)) {
-            super.addAssociateCompilationDependencies(other)
-        } // otherwise, do nothing: the Android Gradle plugin adds these dependencies for us, we don't need to add them to the classpath
+        compilation.compileDependencyConfigurationName.addAllDependenciesFromOtherConfigurations(
+            project,
+            other.apiConfigurationName,
+            other.implementationConfigurationName,
+            other.compileOnlyConfigurationName
+        )
     }
 
     override val kotlinDependenciesHolder: HasKotlinDependencies
@@ -545,17 +571,32 @@ class AndroidCompilationDetails(
         }
 }
 
-internal class MetadataCompilationDetails(target: KotlinTarget, name: String) :
-    DefaultCompilationDetails<KotlinMultiplatformCommonOptions>(
-        target,
-        name,
-        { KotlinMultiplatformCommonOptionsImpl() }
-    ) {
+internal class MetadataCompilationDetails(
+    target: KotlinTarget,
+    name: String,
+    defaultSourceSet: KotlinSourceSet,
+) : DefaultCompilationDetails<KotlinMultiplatformCommonOptions, KotlinMultiplatformCommonCompilerOptions>(
+    target,
+    name,
+    defaultSourceSet,
+    {
+        object : HasCompilerOptions<KotlinMultiplatformCommonCompilerOptions> {
+            override val options: KotlinMultiplatformCommonCompilerOptions =
+                target.project.objects.newInstance(KotlinMultiplatformCommonCompilerOptionsDefault::class.java)
+        }
+    },
+    {
+        object : KotlinMultiplatformCommonOptions {
+            override val options: KotlinMultiplatformCommonCompilerOptions
+                get() = compilerOptions.options
+        }
+    }
+) {
 
     override val friendArtifacts: FileCollection
         get() = super.friendArtifacts.plus(run {
             val project = target.project
-            val friendSourceSets = getVisibleSourceSetsFromAssociateCompilations(target.project, defaultSourceSet)
+            val friendSourceSets = getVisibleSourceSetsFromAssociateCompilations(defaultSourceSet)
             project.files(friendSourceSets.mapNotNull { target.compilations.findByName(it.name)?.output?.classesDirs })
         })
 }
@@ -563,7 +604,24 @@ internal class MetadataCompilationDetails(target: KotlinTarget, name: String) :
 internal open class JsCompilationDetails(
     target: KotlinTarget,
     compilationPurpose: String,
-) : DefaultCompilationDetailsWithRuntime<KotlinJsOptions>(target, compilationPurpose, { KotlinJsOptionsImpl() }) {
+    defaultSourceSet: KotlinSourceSet,
+) : DefaultCompilationDetailsWithRuntime<KotlinJsOptions, KotlinJsCompilerOptions>(
+    target,
+    compilationPurpose,
+    defaultSourceSet,
+    {
+        object : HasCompilerOptions<KotlinJsCompilerOptions> {
+            override val options: KotlinJsCompilerOptions =
+                target.project.objects.newInstance(KotlinJsCompilerOptionsDefault::class.java)
+        }
+    },
+    {
+        object : KotlinJsOptions {
+            override val options: KotlinJsCompilerOptions
+                get() = compilerOptions.options
+        }
+    }
+) {
 
     internal abstract class JsCompilationDependenciesHolder @Inject constructor(
         val target: KotlinTarget,
@@ -592,6 +650,7 @@ internal open class JsCompilationDetails(
             return lowerCamelCaseName(
                 disambiguationClassifierInPlatform,
                 compilationPurpose.takeIf { it != KotlinCompilation.MAIN_COMPILATION_NAME },
+                "compilation",
                 simpleName
             )
         }
@@ -606,38 +665,11 @@ internal open class JsCompilationDetails(
     override val kotlinDependenciesHolder: HasKotlinDependencies
         get() = target.project.objects.newInstance(JsCompilationDependenciesHolder::class.java, target, compilationPurpose)
 
-    override val defaultSourceSetName: String
-        get() {
-            val classifier = if (target is KotlinJsTarget && target.irTarget != null)
-                target.disambiguationClassifierInPlatform
-            else target.disambiguationClassifier
-
-            return lowerCamelCaseName(
-                classifier,
-                compilationPurpose
-            )
-        }
 }
 
-internal class JsIrCompilationDetails(target: KotlinTarget, compilationPurpose: String) :
-    JsCompilationDetails(target, compilationPurpose) {
-
-    override fun addSourcesToCompileTask(sourceSet: KotlinSourceSet, addAsCommonSources: Lazy<Boolean>) {
-        super.addSourcesToCompileTask(sourceSet, addAsCommonSources)
-        (compilation as KotlinJsIrCompilation).allSources.add(sourceSet.kotlin)
-    }
-
-    override val defaultSourceSetName: String
-        get() {
-            val target = target as KotlinJsIrTarget
-            return lowerCamelCaseName(
-                if (target.mixedMode)
-                    target.disambiguationClassifierInPlatform
-                else
-                    target.disambiguationClassifier,
-                compilationPurpose
-            )
-        }
+internal class JsIrCompilationDetails(
+    target: KotlinTarget, compilationPurpose: String, defaultSourceSet: KotlinSourceSet
+) : JsCompilationDetails(target, compilationPurpose, defaultSourceSet) {
 
     internal abstract class JsIrCompilationDependencyHolder @Inject constructor(target: KotlinTarget, compilationPurpose: String) :
         JsCompilationDependenciesHolder(target, compilationPurpose) {

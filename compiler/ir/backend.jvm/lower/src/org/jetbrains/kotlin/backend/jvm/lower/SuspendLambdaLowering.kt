@@ -177,7 +177,7 @@ private class SuspendLambdaLowering(context: JvmBackendContext) : SuspendLowerin
 
             val parametersFields = function.explicitParameters.map {
                 val field = if (it in usedParams) addField {
-                    val normalizedType = context.typeMapper.mapType(it.type).normalize()
+                    val normalizedType = context.defaultTypeMapper.mapType(it.type).normalize()
                     val index = varsCountByType[normalizedType]?.plus(1) ?: 0
                     varsCountByType[normalizedType] = index
                     // Rename `$this` to avoid being caught by inlineCodegenUtils.isCapturedFieldName()
@@ -254,6 +254,8 @@ private class SuspendLambdaLowering(context: JvmBackendContext) : SuspendLowerin
                 }, null)
                 context.irFactory.createBlockBody(UNDEFINED_OFFSET, UNDEFINED_OFFSET, localVals.filterNotNull() + body.statements)
             }
+
+            copyAnnotationsFrom(irFunction)
         }
     }
 

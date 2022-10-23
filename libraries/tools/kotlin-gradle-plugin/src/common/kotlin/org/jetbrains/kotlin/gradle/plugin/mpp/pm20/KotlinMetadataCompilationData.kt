@@ -11,13 +11,13 @@ import org.gradle.api.file.FileCollection
 import org.gradle.api.file.SourceDirectorySet
 import org.gradle.api.tasks.TaskProvider
 import org.jetbrains.kotlin.gradle.dsl.*
-import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformCommonOptionsImpl
 import org.jetbrains.kotlin.gradle.plugin.*
 import org.jetbrains.kotlin.gradle.plugin.mpp.*
 import org.jetbrains.kotlin.gradle.plugin.mpp.pm20.util.archivesName
 import org.jetbrains.kotlin.gradle.plugin.mpp.pm20.util.disambiguateName
 import org.jetbrains.kotlin.gradle.targets.metadata.ResolvedMetadataFilesProvider
 import org.jetbrains.kotlin.gradle.targets.metadata.createMetadataDependencyTransformationClasspath
+import org.jetbrains.kotlin.gradle.targets.native.NativeCompilerOptions
 import org.jetbrains.kotlin.gradle.utils.getValue
 import org.jetbrains.kotlin.gradle.utils.lowerCamelCaseName
 import org.jetbrains.kotlin.gradle.utils.newProperty
@@ -78,7 +78,7 @@ internal abstract class AbstractKotlinFragmentMetadataCompilationData<T : Kotlin
         project.provider { project.buildDir.resolve("processedResources/${fragment.disambiguateName("metadata")}") }
     )
 
-    override val languageSettings: LanguageSettingsBuilder = fragment.languageSettings
+    final override val languageSettings: LanguageSettingsBuilder = fragment.languageSettings
 
     override val platformType: KotlinPlatformType
         get() = KotlinPlatformType.common
@@ -118,7 +118,8 @@ internal open class KotlinCommonFragmentMetadataCompilationDataImpl(
     module,
     compileAllTask,
     metadataCompilationRegistry,
-    resolvedMetadataFiles), KotlinCommonFragmentMetadataCompilationData {
+    resolvedMetadataFiles
+), KotlinCommonFragmentMetadataCompilationData {
 
     override val isActive: Boolean
         get() = !fragment.isNativeShared() &&
@@ -127,7 +128,19 @@ internal open class KotlinCommonFragmentMetadataCompilationDataImpl(
                             mapTo(hashSetOf()) { it.platformType }.size > 1
                 }
 
-    override val kotlinOptions: KotlinMultiplatformCommonOptions = KotlinMultiplatformCommonOptionsImpl()
+    override val compilerOptions: HasCompilerOptions<KotlinMultiplatformCommonCompilerOptions> =
+        object : HasCompilerOptions<KotlinMultiplatformCommonCompilerOptions> {
+            override val options: KotlinMultiplatformCommonCompilerOptions =
+                project.objects.newInstance(KotlinMultiplatformCommonCompilerOptionsDefault::class.java)
+        }
+
+
+    @Suppress("DEPRECATION")
+    @Deprecated("Replaced with compilerOptions.options", replaceWith = ReplaceWith("compilerOptions.options"))
+    override val kotlinOptions: KotlinMultiplatformCommonOptions = object : KotlinMultiplatformCommonOptions {
+        override val options: KotlinMultiplatformCommonCompilerOptions
+            get() = compilerOptions.options
+    }
 }
 
 interface KotlinNativeFragmentMetadataCompilationData :
@@ -164,7 +177,17 @@ internal open class KotlinNativeFragmentMetadataCompilationDataImpl(
     override val isActive: Boolean
         get() = fragment.isNativeShared() && fragment.containingVariants.count() > 1
 
-    override val kotlinOptions: NativeCompileOptions = NativeCompileOptions { languageSettings }
+    override val compilerOptions: HasCompilerOptions<KotlinCommonCompilerOptions> = NativeCompilerOptions(
+        project,
+        languageSettings
+    )
+
+    @Suppress("DEPRECATION")
+    @Deprecated("Replaced with compilerOptions.options", replaceWith = ReplaceWith("compilerOptions.options"))
+    override val kotlinOptions: KotlinCommonOptions = object : KotlinCommonOptions {
+        override val options: KotlinCommonCompilerOptions
+            get() = compilerOptions.options
+    }
 
     override val konanTarget: KonanTarget
         get() {
@@ -175,7 +198,8 @@ internal open class KotlinNativeFragmentMetadataCompilationDataImpl(
                 ?: HostManager.host
         }
 
-    // FIXME endorsed libs?
+    @Suppress("DeprecatedCallableAddReplaceWith")
+    @Deprecated("Please declare explicit dependency on kotlinx-cli. This option is scheduled to be removed in 1.9.0")
     override val enableEndorsedLibs: Boolean
         get() = false
 }

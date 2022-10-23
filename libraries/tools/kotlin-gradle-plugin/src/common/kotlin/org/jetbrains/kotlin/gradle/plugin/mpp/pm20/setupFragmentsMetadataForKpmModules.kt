@@ -73,9 +73,11 @@ private fun configureMetadataExposure(module: GradleKpmModule) {
     val sourcesArtifactAppendix = dashSeparatedName(module.moduleClassifier, "all", "sources")
     val sourcesArtifact = sourcesJarTaskNamed(
         module.disambiguateName("allSourcesJar"),
+        module.name,
         project,
         lazy { GradleKpmFragmentSourcesProvider().getAllFragmentSourcesAsMap(module).entries.associate { it.key.fragmentName to it.value.get() } },
-        sourcesArtifactAppendix
+        sourcesArtifactAppendix,
+        "module",
     )
     DocumentationVariantConfigurator().createSourcesElementsConfiguration(
         project, sourceElementsConfigurationName(module),
@@ -253,7 +255,7 @@ private class GradleKpmMetadataCompilationTasksConfigurator(project: Project) : 
 private fun resolvedMetadataProviders(fragment: GradleKpmFragment) =
     fragment.withRefinesClosure.map {
         FragmentResolvedMetadataProvider(
-            fragment.project.tasks.withType<TransformKotlinGranularMetadataForFragment>().named(transformFragmentMetadataTaskName(it))
+            fragment.project.tasks.withType<GradleKpmMetadataDependencyTransformationTask>().named(transformFragmentMetadataTaskName(it))
         )
     }
 
@@ -264,7 +266,7 @@ private fun createExtractMetadataTask(
 ) {
     project.tasks.register(
         transformFragmentMetadataTaskName(fragment),
-        TransformKotlinGranularMetadataForFragment::class.java,
+        GradleKpmMetadataDependencyTransformationTask::class.java,
         fragment,
         transformation
     ).configure { task ->

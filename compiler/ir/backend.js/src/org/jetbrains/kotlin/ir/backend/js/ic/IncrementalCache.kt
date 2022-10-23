@@ -84,6 +84,7 @@ class IncrementalCache(private val library: KotlinLibrary, cachePath: String) {
 
     fun buildModuleArtifactAndCommitCache(
         moduleName: String,
+        externalModuleName: String?,
         rebuiltFileFragments: Map<KotlinSourceFile, JsIrFragmentAndBinaryAst>,
         signatureToIndexMapping: Map<KotlinSourceFile, Map<IdSignature, Int>>
     ): ModuleArtifact {
@@ -98,20 +99,23 @@ class IncrementalCache(private val library: KotlinLibrary, cachePath: String) {
             SrcFileArtifact(srcFile.path, rebuiltFileFragment?.fragment, binaryAstFile)
         }
 
-        return ModuleArtifact(moduleName, fileArtifacts, cacheDir, forceRebuildJs)
+        return ModuleArtifact(moduleName, fileArtifacts, cacheDir, forceRebuildJs, externalModuleName)
     }
 
     data class ModifiedFiles(
-        val modified: Map<KotlinSourceFile, KotlinSourceFileMetadata> = emptyMap(),
-        val removed: Map<KotlinSourceFile, KotlinSourceFileMetadata> = emptyMap(),
-        val newFiles: Set<KotlinSourceFile> = emptySet()
+        val dirtyFiles: Map<KotlinSourceFile, KotlinSourceFileMetadata> = emptyMap(),
+        val removedFiles: Map<KotlinSourceFile, KotlinSourceFileMetadata> = emptyMap(),
+        val newFiles: Set<KotlinSourceFile> = emptySet(),
+        val modifiedConfigFiles: Set<KotlinSourceFile> = emptySet(),
     )
 
     fun collectModifiedFiles(configHash: ICHash): ModifiedFiles {
+        var isConfigModified = false
         val klibFileHash = library.libraryFile.javaFile().fileHashForIC()
         cacheHeader = when {
             cacheHeader.configHash != configHash -> {
                 cacheDir.deleteRecursively()
+                isConfigModified = cacheHeader.configHash != ICHash()
                 CacheHeader(klibFileHash, configHash)
             }
             cacheHeader.klibFileHash != klibFileHash -> CacheHeader(klibFileHash, configHash)
@@ -120,14 +124,14 @@ class IncrementalCache(private val library: KotlinLibrary, cachePath: String) {
 
         val cachedFingerprints = loadCachedFingerprints()
         val deletedFiles = cachedFingerprints.keys.toMutableSet()
-        val newFiles = mutableSetOf<KotlinSourceFile>()
+        val unknownFiles = mutableSetOf<KotlinSourceFile>()
 
         val newFingerprints = kotlinLibraryHeader.sourceFiles.mapIndexed { index, file -> file to library.fingerprint(index) }
         val modifiedFiles = buildMap(newFingerprints.size) {
             for ((file, fileNewFingerprint) in newFingerprints) {
                 val oldFingerprint = cachedFingerprints[file]
                 if (oldFingerprint == null) {
-                    newFiles += file
+                    unknownFiles += file
                 }
                 if (oldFingerprint != fileNewFingerprint) {
                     val metadata = fetchSourceFileMetadata(file, false)
@@ -147,7 +151,13 @@ class IncrementalCache(private val library: KotlinLibrary, cachePath: String) {
         forceRebuildJs = deletedFiles.isNotEmpty()
         commitCacheHeader(newFingerprints)
 
-        return ModifiedFiles(modifiedFiles, removedFilesMetadata, newFiles)
+        val (newFiles, modifiedConfigFiles) = if (isConfigModified) {
+            emptySet<KotlinSourceFile>() to unknownFiles
+        } else {
+            unknownFiles to emptySet<KotlinSourceFile>()
+        }
+
+        return ModifiedFiles(modifiedFiles, removedFilesMetadata, newFiles, modifiedConfigFiles)
     }
 
     fun fetchSourceFileFullMetadata(srcFile: KotlinSourceFile): KotlinSourceFileMetadata {
@@ -213,7 +223,7 @@ class IncrementalCache(private val library: KotlinLibrary, cachePath: String) {
 
     private fun commitSourceFileMetadata(srcFile: KotlinSourceFile, signatureToIndexMapping: Map<IdSignature, Int>) {
         val headerCacheFile = srcFile.getCacheFile(METADATA_SUFFIX)
-        val sourceFileMetadata = kotlinLibrarySourceFileMetadata[srcFile] ?: notFoundIcError("metadata", libraryFile, srcFile)
+        val sourceFileMetadata = kotlinLibrarySourceFileMetadata[srcFile] ?: return
         if (sourceFileMetadata.isEmpty()) {
             headerCacheFile.delete()
             return

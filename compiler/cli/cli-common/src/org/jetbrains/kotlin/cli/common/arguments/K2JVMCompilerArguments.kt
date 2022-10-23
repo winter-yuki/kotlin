@@ -8,7 +8,6 @@ package org.jetbrains.kotlin.cli.common.arguments
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.config.*
-import kotlin.reflect.KVisibility
 
 class K2JVMCompilerArguments : CommonCompilerArguments() {
     companion object {
@@ -37,7 +36,10 @@ class K2JVMCompilerArguments : CommonCompilerArguments() {
     )
     var jdkHome: String? by NullableStringFreezableVar(null)
 
-    @GradleOption(DefaultValues.BooleanFalseDefault::class)
+    @GradleOption(
+        value = DefaultValues.BooleanFalseDefault::class,
+        gradleInputType = GradleInputTypes.INPUT
+    )
     @Argument(value = "-no-jdk", description = "Don't automatically include the Java runtime into the classpath")
     var noJdk: Boolean by FreezableVar(false)
 
@@ -64,13 +66,16 @@ class K2JVMCompilerArguments : CommonCompilerArguments() {
     )
     var scriptTemplates: Array<String>? by FreezableVar(null)
 
-    @GradleOption(DefaultValues.StringNullDefault::class)
+    @GradleOption(
+        value = DefaultValues.StringNullDefault::class,
+        gradleInputType = GradleInputTypes.INPUT
+    )
     @Argument(value = "-module-name", valueDescription = "<name>", description = "Name of the generated .kotlin_module file")
     var moduleName: String? by NullableStringFreezableVar(null)
 
     @GradleOption(
         value = DefaultValues.JvmTargetVersions::class,
-        backingFieldVisibility = KVisibility.INTERNAL
+        gradleInputType = GradleInputTypes.INPUT
     )
     @Argument(
         value = "-jvm-target",
@@ -79,7 +84,10 @@ class K2JVMCompilerArguments : CommonCompilerArguments() {
     )
     var jvmTarget: String? by NullableStringFreezableVar(null)
 
-    @GradleOption(DefaultValues.BooleanFalseDefault::class)
+    @GradleOption(
+        value = DefaultValues.BooleanFalseDefault::class,
+        gradleInputType = GradleInputTypes.INPUT
+    )
     @Argument(value = "-java-parameters", description = "Generate metadata for Java 1.8 reflection on method parameters")
     var javaParameters: Boolean by FreezableVar(false)
 
@@ -91,7 +99,6 @@ class K2JVMCompilerArguments : CommonCompilerArguments() {
     )
     var useIR: Boolean by FreezableVar(false)
 
-    @GradleOption(DefaultValues.BooleanFalseDefault::class)
     @Argument(value = "-Xuse-old-backend", description = "Use the old JVM backend")
     var useOldBackend: Boolean by FreezableVar(false)
 
@@ -199,9 +206,6 @@ class K2JVMCompilerArguments : CommonCompilerArguments() {
         description = "Path to JSON file to dump Java to Kotlin declaration mappings"
     )
     var declarationsOutputPath: String? by NullableStringFreezableVar(null)
-
-    @Argument(value = "-Xsingle-module", description = "Combine modules for source files and binary dependencies into a single module")
-    var singleModule: Boolean by FreezableVar(false)
 
     @Argument(
         value = "-Xsuppress-missing-builtins-error",
@@ -435,6 +439,12 @@ Also sets `-jvm-target` value equal to the selected JDK version"""
     var noUnifiedNullChecks: Boolean by FreezableVar(false)
 
     @Argument(
+        value = "-Xno-source-debug-extension",
+        description = "Do not generate @kotlin.jvm.internal.SourceDebugExtension annotation on a class with the copy of SMAP"
+    )
+    var noSourceDebugExtension: Boolean by FreezableVar(false)
+
+    @Argument(
         value = "-Xprofile",
         valueDescription = "<profilerPath:command:outputDir>",
         description = "Debug option: Run compiler with async profiler and save snapshots to `outputDir`; `command` is passed to async-profiler on start.\n" +
@@ -517,6 +527,24 @@ Also sets `-jvm-target` value equal to the selected JDK version"""
                 "Currently this includes spilling all variables in a suspending context regardless their liveness."
     )
     var enableDebugMode: Boolean by FreezableVar(false)
+
+    @Argument(
+        value = "-Xignore-const-optimization-errors",
+        description = "Ignore all compilation exceptions while optimizing some constant expressions."
+    )
+    var ignoreConstOptimizationErrors: Boolean by FreezableVar(false)
+
+    @Argument(
+        value = "-Xno-new-java-annotation-targets",
+        description = "Do not generate Java 1.8+ targets for Kotlin annotation classes"
+    )
+    var noNewJavaAnnotationTargets: Boolean by FreezableVar(false)
+
+    @Argument(
+        value = "-Xuse-old-innerclasses-logic",
+        description = "Use old logic for generation of InnerClasses attributes"
+    )
+    var oldInnerClassesLogic: Boolean by FreezableVar(false)
 
     override fun configureAnalysisFlags(collector: MessageCollector, languageVersion: LanguageVersion): MutableMap<AnalysisFlag<*>, Any> {
         val result = super.configureAnalysisFlags(collector, languageVersion)

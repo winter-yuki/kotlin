@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2022 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 @file:Suppress(
@@ -161,15 +161,15 @@ public class Byte private constructor(public val value: Byte) : Number(), Compar
     public inline operator fun times(other: Double): Double =
         this.toDouble() * other
 
-    /** Divides this value by the other value. */
+    /** Divides this value by the other value, truncating the result to an integer that is closer to zero. */
     public inline operator fun div(other: Byte): Int =
         this.toInt() / other.toInt()
 
-    /** Divides this value by the other value. */
+    /** Divides this value by the other value, truncating the result to an integer that is closer to zero. */
     public inline operator fun div(other: Short): Int =
         this.toInt() / other.toInt()
 
-    /** Divides this value by the other value. */
+    /** Divides this value by the other value, truncating the result to an integer that is closer to zero. */
     public inline operator fun div(other: Int): Int =
         this.toInt() / other
 
@@ -197,15 +197,27 @@ public class Byte private constructor(public val value: Byte) : Number(), Compar
     public inline operator fun rem(other: Int): Int =
         this.toInt() % other
 
-    /** Calculates the remainder of dividing this value by the other value. */
+    /**
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
+     * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
+     */
     public inline operator fun rem(other: Long): Long =
         this.toLong() % other
 
-    /** Calculates the remainder of dividing this value by the other value. */
+    /**
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
+     * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
+     */
     public inline operator fun rem(other: Float): Float =
         this.toFloat() % other
 
-    /** Calculates the remainder of dividing this value by the other value. */
+    /**
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
+     * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
+     */
     public inline operator fun rem(other: Double): Double =
         this.toDouble() % other
 
@@ -232,6 +244,62 @@ public class Byte private constructor(public val value: Byte) : Number(), Compar
     /** Returns the negative of this value. */
     public inline operator fun unaryMinus(): Int =
         -this.toInt()
+
+    /** Creates a range from this value to the specified [other] value. */
+    public operator fun rangeTo(other: Byte): IntRange {
+        return IntRange(this.toInt(), other.toInt())
+    }
+
+    /** Creates a range from this value to the specified [other] value. */
+    public operator fun rangeTo(other: Short): IntRange {
+        return IntRange(this.toInt(), other.toInt())
+    }
+
+    /** Creates a range from this value to the specified [other] value. */
+    public operator fun rangeTo(other: Int): IntRange {
+        return IntRange(this.toInt(), other.toInt())
+    }
+
+    /** Creates a range from this value to the specified [other] value. */
+    public operator fun rangeTo(other: Long): LongRange {
+        return LongRange(this.toLong(), other.toLong())
+    }
+
+    /**
+     * Creates a range from this value up to but excluding the specified [other] value.
+     *
+     * If the [other] value is less than or equal to `this` value, then the returned range is empty.
+     */
+    @SinceKotlin("1.7")
+    @ExperimentalStdlibApi
+    public operator fun rangeUntil(other: Byte): IntRange = this until other
+
+    /**
+     * Creates a range from this value up to but excluding the specified [other] value.
+     *
+     * If the [other] value is less than or equal to `this` value, then the returned range is empty.
+     */
+    @SinceKotlin("1.7")
+    @ExperimentalStdlibApi
+    public operator fun rangeUntil(other: Short): IntRange = this until other
+
+    /**
+     * Creates a range from this value up to but excluding the specified [other] value.
+     *
+     * If the [other] value is less than or equal to `this` value, then the returned range is empty.
+     */
+    @SinceKotlin("1.7")
+    @ExperimentalStdlibApi
+    public operator fun rangeUntil(other: Int): IntRange = this until other
+
+    /**
+     * Creates a range from this value up to but excluding the specified [other] value.
+     *
+     * If the [other] value is less than or equal to `this` value, then the returned range is empty.
+     */
+    @SinceKotlin("1.7")
+    @ExperimentalStdlibApi
+    public operator fun rangeUntil(other: Long): LongRange = this until other
 
     /** Returns this value. */
     public override inline fun toByte(): Byte =
@@ -290,26 +358,6 @@ public class Byte private constructor(public val value: Byte) : Number(), Compar
      * The resulting `Double` value represents the same numerical value as this `Byte`.
      */
     public override fun toDouble(): Double = wasm_f64_convert_i32_s(this.toInt())
-
-    /** Creates a range from this value to the specified [other] value. */
-    public operator fun rangeTo(other: Byte): IntRange {
-        return IntRange(this.toInt(), other.toInt())
-    }
-
-    /** Creates a range from this value to the specified [other] value. */
-    public operator fun rangeTo(other: Short): IntRange {
-        return IntRange(this.toInt(), other.toInt())
-    }
-
-    /** Creates a range from this value to the specified [other] value. */
-    public operator fun rangeTo(other: Int): IntRange {
-        return IntRange(this.toInt(), other.toInt())
-    }
-
-    /** Creates a range from this value to the specified [other] value. */
-    public operator fun rangeTo(other: Long): LongRange {
-        return LongRange(this.toLong(), other.toLong())
-    }
 
     /** Performs a bitwise AND operation between the two values. */
     @SinceKotlin("1.1")
@@ -501,19 +549,19 @@ public class Short private constructor(public val value: Short) : Number(), Comp
     public inline operator fun times(other: Double): Double =
         this.toDouble() * other
 
-    /** Divides this value by the other value. */
+    /** Divides this value by the other value, truncating the result to an integer that is closer to zero. */
     public inline operator fun div(other: Byte): Int =
         this.toInt() / other.toInt()
 
-    /** Divides this value by the other value. */
+    /** Divides this value by the other value, truncating the result to an integer that is closer to zero. */
     public inline operator fun div(other: Short): Int =
         this.toInt() / other.toInt()
 
-    /** Divides this value by the other value. */
+    /** Divides this value by the other value, truncating the result to an integer that is closer to zero. */
     public inline operator fun div(other: Int): Int =
         this.toInt() / other
 
-    /** Divides this value by the other value. */
+    /** Divides this value by the other value, truncating the result to an integer that is closer to zero. */
     public inline operator fun div(other: Long): Long =
         this.toLong() / other
 
@@ -525,27 +573,51 @@ public class Short private constructor(public val value: Short) : Number(), Comp
     public inline operator fun div(other: Double): Double =
         this.toDouble() / other
 
-    /** Calculates the remainder of dividing this value by the other value. */
+    /**
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
+     * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
+     */
     public inline operator fun rem(other: Byte): Int =
         this.toInt() % other.toInt()
 
-    /** Calculates the remainder of dividing this value by the other value. */
+    /**
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
+     * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
+     */
     public inline operator fun rem(other: Short): Int =
         this.toInt() % other.toInt()
 
-    /** Calculates the remainder of dividing this value by the other value. */
+    /**
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
+     * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
+     */
     public inline operator fun rem(other: Int): Int =
         this.toInt() % other
 
-    /** Calculates the remainder of dividing this value by the other value. */
+    /**
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
+     * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
+     */
     public inline operator fun rem(other: Long): Long =
         this.toLong() % other
 
-    /** Calculates the remainder of dividing this value by the other value. */
+    /**
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
+     * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
+     */
     public inline operator fun rem(other: Float): Float =
         this.toFloat() % other
 
-    /** Calculates the remainder of dividing this value by the other value. */
+    /**
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
+     * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
+     */
     public inline operator fun rem(other: Double): Double =
         this.toDouble() % other
 
@@ -592,6 +664,42 @@ public class Short private constructor(public val value: Short) : Number(), Comp
     public operator fun rangeTo(other: Long): LongRange {
         return LongRange(this.toLong(), other)
     }
+
+    /**
+     * Creates a range from this value up to but excluding the specified [other] value.
+     *
+     * If the [other] value is less than or equal to `this` value, then the returned range is empty.
+     */
+    @SinceKotlin("1.7")
+    @ExperimentalStdlibApi
+    public operator fun rangeUntil(other: Byte): IntRange = this until other
+
+    /**
+     * Creates a range from this value up to but excluding the specified [other] value.
+     *
+     * If the [other] value is less than or equal to `this` value, then the returned range is empty.
+     */
+    @SinceKotlin("1.7")
+    @ExperimentalStdlibApi
+    public operator fun rangeUntil(other: Short): IntRange = this until other
+
+    /**
+     * Creates a range from this value up to but excluding the specified [other] value.
+     *
+     * If the [other] value is less than or equal to `this` value, then the returned range is empty.
+     */
+    @SinceKotlin("1.7")
+    @ExperimentalStdlibApi
+    public operator fun rangeUntil(other: Int): IntRange = this until other
+
+    /**
+     * Creates a range from this value up to but excluding the specified [other] value.
+     *
+     * If the [other] value is less than or equal to `this` value, then the returned range is empty.
+     */
+    @SinceKotlin("1.7")
+    @ExperimentalStdlibApi
+    public operator fun rangeUntil(other: Long): LongRange = this until other
 
     /** Performs a bitwise AND operation between the two values. */
     @SinceKotlin("1.1")
@@ -845,19 +953,19 @@ public class Int private constructor(val value: Int) : Number(), Comparable<Int>
     public inline operator fun times(other: Double): Double =
         this.toDouble() * other
 
-    /** Divides this value by the other value. */
+    /** Divides this value by the other value, truncating the result to an integer that is closer to zero. */
     public inline operator fun div(other: Byte): Int =
         this / other.toInt()
 
-    /** Divides this value by the other value. */
+    /** Divides this value by the other value, truncating the result to an integer that is closer to zero. */
     public inline operator fun div(other: Short): Int =
         this / other.toInt()
 
-    /** Divides this value by the other value. */
+    /** Divides this value by the other value, truncating the result to an integer that is closer to zero. */
     public operator fun div(other: Int): Int =
         if (this == Int.MIN_VALUE && other == -1) Int.MIN_VALUE else wasm_i32_div_s(this, other)
 
-    /** Divides this value by the other value. */
+    /** Divides this value by the other value, truncating the result to an integer that is closer to zero. */
     public inline operator fun div(other: Long): Long =
         this.toLong() / other
 
@@ -873,24 +981,44 @@ public class Int private constructor(val value: Int) : Number(), Comparable<Int>
     public inline operator fun rem(other: Byte): Int =
         this % other.toInt()
 
-    /** Calculates the remainder of dividing this value by the other value. */
+    /**
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
+     * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
+     */
     public inline operator fun rem(other: Short): Int =
         this % other.toInt()
 
-    /** Calculates the remainder of dividing this value by the other value. */
+    /**
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
+     * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
+     */
     @WasmOp(WasmOp.I32_REM_S)
     public operator fun rem(other: Int): Int =
         implementedAsIntrinsic
 
-    /** Calculates the remainder of dividing this value by the other value. */
+    /**
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
+     * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
+     */
     public inline operator fun rem(other: Long): Long =
         this.toLong() % other
 
-    /** Calculates the remainder of dividing this value by the other value. */
+    /**
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
+     * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
+     */
     public inline operator fun rem(other: Float): Float =
         this.toFloat() % other
 
-    /** Calculates the remainder of dividing this value by the other value. */
+    /**
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
+     * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
+     */
     public inline operator fun rem(other: Double): Double =
         this.toDouble() % other
 
@@ -916,6 +1044,62 @@ public class Int private constructor(val value: Int) : Number(), Comparable<Int>
 
     /** Returns the negative of this value. */
     public inline operator fun unaryMinus(): Int = 0 - this
+
+    /** Creates a range from this value to the specified [other] value. */
+    public operator fun rangeTo(other: Byte): IntRange {
+        return IntRange(this, other.toInt())
+    }
+
+    /** Creates a range from this value to the specified [other] value. */
+    public operator fun rangeTo(other: Short): IntRange {
+        return IntRange(this, other.toInt())
+    }
+
+    /** Creates a range from this value to the specified [other] value. */
+    public operator fun rangeTo(other: Int): IntRange {
+        return IntRange(this, other.toInt())
+    }
+
+    /** Creates a range from this value to the specified [other] value. */
+    public operator fun rangeTo(other: Long): LongRange {
+        return LongRange(this.toLong(), other.toLong())
+    }
+
+    /**
+     * Creates a range from this value up to but excluding the specified [other] value.
+     *
+     * If the [other] value is less than or equal to `this` value, then the returned range is empty.
+     */
+    @SinceKotlin("1.7")
+    @ExperimentalStdlibApi
+    public operator fun rangeUntil(other: Byte): IntRange = this until other
+
+    /**
+     * Creates a range from this value up to but excluding the specified [other] value.
+     *
+     * If the [other] value is less than or equal to `this` value, then the returned range is empty.
+     */
+    @SinceKotlin("1.7")
+    @ExperimentalStdlibApi
+    public operator fun rangeUntil(other: Short): IntRange = this until other
+
+    /**
+     * Creates a range from this value up to but excluding the specified [other] value.
+     *
+     * If the [other] value is less than or equal to `this` value, then the returned range is empty.
+     */
+    @SinceKotlin("1.7")
+    @ExperimentalStdlibApi
+    public operator fun rangeUntil(other: Int): IntRange = this until other
+
+    /**
+     * Creates a range from this value up to but excluding the specified [other] value.
+     *
+     * If the [other] value is less than or equal to `this` value, then the returned range is empty.
+     */
+    @SinceKotlin("1.7")
+    @ExperimentalStdlibApi
+    public operator fun rangeUntil(other: Long): LongRange = this until other
 
     /**
      * Shifts this value left by the [bitCount] number of bits.
@@ -965,26 +1149,6 @@ public class Int private constructor(val value: Int) : Number(), Comparable<Int>
     /** Inverts the bits in this value. */
     public inline fun inv(): Int =
         this.xor(-1)
-
-    /** Creates a range from this value to the specified [other] value. */
-    public operator fun rangeTo(other: Byte): IntRange {
-        return IntRange(this, other.toInt())
-    }
-
-    /** Creates a range from this value to the specified [other] value. */
-    public operator fun rangeTo(other: Short): IntRange {
-        return IntRange(this, other.toInt())
-    }
-
-    /** Creates a range from this value to the specified [other] value. */
-    public operator fun rangeTo(other: Int): IntRange {
-        return IntRange(this, other.toInt())
-    }
-
-    /** Creates a range from this value to the specified [other] value. */
-    public operator fun rangeTo(other: Long): LongRange {
-        return LongRange(this.toLong(), other.toLong())
-    }
 
     /**
      * Converts this [Int] value to [Byte].
@@ -1238,19 +1402,19 @@ public class Long private constructor(val value: Long) : Number(), Comparable<Lo
     public inline operator fun times(other: Double): Double =
         this.toDouble() * other
 
-    /** Divides this value by the other value. */
+    /** Divides this value by the other value, truncating the result to an integer that is closer to zero. */
     public inline operator fun div(other: Byte): Long =
         this / other.toLong()
 
-    /** Divides this value by the other value. */
+    /** Divides this value by the other value, truncating the result to an integer that is closer to zero. */
     public inline operator fun div(other: Short): Long =
         this / other.toLong()
 
-    /** Divides this value by the other value. */
+    /** Divides this value by the other value, truncating the result to an integer that is closer to zero. */
     public inline operator fun div(other: Int): Long =
         this / other.toLong()
 
-    /** Divides this value by the other value. */
+    /** Divides this value by the other value, truncating the result to an integer that is closer to zero. */
     public operator fun div(other: Long): Long =
         if (this == Long.MIN_VALUE && other == -1L) Long.MIN_VALUE else wasm_i64_div_s(this, other)
 
@@ -1262,28 +1426,52 @@ public class Long private constructor(val value: Long) : Number(), Comparable<Lo
     public inline operator fun div(other: Double): Double =
         this.toDouble() / other
 
-    /** Calculates the remainder of dividing this value by the other value. */
+    /**
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
+     * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
+     */
     public inline operator fun rem(other: Byte): Long =
         this % other.toLong()
 
-    /** Calculates the remainder of dividing this value by the other value. */
+    /**
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
+     * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
+     */
     public inline operator fun rem(other: Short): Long =
         this % other.toLong()
 
-    /** Calculates the remainder of dividing this value by the other value. */
+    /**
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
+     * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
+     */
     public inline operator fun rem(other: Int): Long =
         this % other.toLong()
 
-    /** Calculates the remainder of dividing this value by the other value. */
+    /**
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
+     * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
+     */
     @WasmOp(WasmOp.I64_REM_S)
     public operator fun rem(other: Long): Long =
         implementedAsIntrinsic
 
-    /** Calculates the remainder of dividing this value by the other value. */
+    /**
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
+     * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
+     */
     public inline operator fun rem(other: Float): Float =
         this.toFloat() % other
 
-    /** Calculates the remainder of dividing this value by the other value. */
+    /**
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
+     * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
+     */
     public inline operator fun rem(other: Double): Double =
         this.toDouble() % other
 
@@ -1329,6 +1517,42 @@ public class Long private constructor(val value: Long) : Number(), Comparable<Lo
     public operator fun rangeTo(other: Long): LongRange {
         return LongRange(this, other.toLong())
     }
+
+    /**
+     * Creates a range from this value up to but excluding the specified [other] value.
+     *
+     * If the [other] value is less than or equal to `this` value, then the returned range is empty.
+     */
+    @SinceKotlin("1.7")
+    @ExperimentalStdlibApi
+    public operator fun rangeUntil(other: Byte): LongRange = this until other
+
+    /**
+     * Creates a range from this value up to but excluding the specified [other] value.
+     *
+     * If the [other] value is less than or equal to `this` value, then the returned range is empty.
+     */
+    @SinceKotlin("1.7")
+    @ExperimentalStdlibApi
+    public operator fun rangeUntil(other: Short): LongRange = this until other
+
+    /**
+     * Creates a range from this value up to but excluding the specified [other] value.
+     *
+     * If the [other] value is less than or equal to `this` value, then the returned range is empty.
+     */
+    @SinceKotlin("1.7")
+    @ExperimentalStdlibApi
+    public operator fun rangeUntil(other: Int): LongRange = this until other
+
+    /**
+     * Creates a range from this value up to but excluding the specified [other] value.
+     *
+     * If the [other] value is less than or equal to `this` value, then the returned range is empty.
+     */
+    @SinceKotlin("1.7")
+    @ExperimentalStdlibApi
+    public operator fun rangeUntil(other: Long): LongRange = this until other
 
     /**
      * Shifts this value left by the [bitCount] number of bits.
@@ -1657,27 +1881,51 @@ public class Float private constructor(public val value: Float) : Number(), Comp
     public inline operator fun div(other: Double): Double =
         this.toDouble() / other
 
-    /** Calculates the remainder of dividing this value by the other value. */
+    /**
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
+     * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
+     */
     public inline operator fun rem(other: Byte): Float =
         this % other.toFloat()
 
-    /** Calculates the remainder of dividing this value by the other value. */
+    /**
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
+     * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
+     */
     public inline operator fun rem(other: Short): Float =
         this % other.toFloat()
 
-    /** Calculates the remainder of dividing this value by the other value. */
+    /**
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
+     * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
+     */
     public inline operator fun rem(other: Int): Float =
         this % other.toFloat()
 
-    /** Calculates the remainder of dividing this value by the other value. */
+    /**
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
+     * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
+     */
     public inline operator fun rem(other: Long): Float =
         this % other.toFloat()
 
-    /** Calculates the remainder of dividing this value by the other value. */
+    /**
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
+     * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
+     */
     public operator fun rem(other: Float): Float =
         this - (wasm_f32_nearest(this / other) * other)
 
-    /** Calculates the remainder of dividing this value by the other value. */
+    /**
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
+     * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
+     */
     public inline operator fun rem(other: Double): Double =
         this.toDouble() % other
 
@@ -1729,7 +1977,7 @@ public class Float private constructor(public val value: Float) : Number(), Comp
     /**
      * Converts this [Float] value to [Int].
      *
-     * The fractional part, if any, is rounded down.
+     * The fractional part, if any, is rounded down towards zero.
      * Returns zero if this `Float` value is `NaN`, [Int.MIN_VALUE] if it's less than `Int.MIN_VALUE`,
      * [Int.MAX_VALUE] if it's bigger than `Int.MAX_VALUE`.
      */
@@ -1740,7 +1988,7 @@ public class Float private constructor(public val value: Float) : Number(), Comp
     /**
      * Converts this [Float] value to [Long].
      *
-     * The fractional part, if any, is rounded down.
+     * The fractional part, if any, is rounded down towards zero.
      * Returns zero if this `Float` value is `NaN`, [Long.MIN_VALUE] if it's less than `Long.MIN_VALUE`,
      * [Long.MAX_VALUE] if it's bigger than `Long.MAX_VALUE`.
      */
@@ -1973,27 +2221,51 @@ public class Double private constructor(public val value: Double) : Number(), Co
     public operator fun div(other: Double): Double =
         implementedAsIntrinsic
 
-    /** Calculates the remainder of dividing this value by the other value. */
+    /**
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
+     * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
+     */
     public inline operator fun rem(other: Byte): Double =
         this % other.toDouble()
 
-    /** Calculates the remainder of dividing this value by the other value. */
+    /**
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
+     * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
+     */
     public inline operator fun rem(other: Short): Double =
         this % other.toDouble()
 
-    /** Calculates the remainder of dividing this value by the other value. */
+    /**
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
+     * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
+     */
     public inline operator fun rem(other: Int): Double =
         this % other.toDouble()
 
-    /** Calculates the remainder of dividing this value by the other value. */
+    /**
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
+     * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
+     */
     public inline operator fun rem(other: Long): Double =
         this % other.toDouble()
 
-    /** Calculates the remainder of dividing this value by the other value. */
+    /**
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
+     * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
+     */
     public inline operator fun rem(other: Float): Double =
         this % other.toDouble()
 
-    /** Calculates the remainder of dividing this value by the other value. */
+    /**
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
+     * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
+     */
     public operator fun rem(other: Double): Double =
         this - (wasm_f64_nearest(this / other) * other)
 
@@ -2046,7 +2318,7 @@ public class Double private constructor(public val value: Double) : Number(), Co
     /**
      * Converts this [Double] value to [Int].
      *
-     * The fractional part, if any, is rounded down.
+     * The fractional part, if any, is rounded down towards zero.
      * Returns zero if this `Double` value is `NaN`, [Int.MIN_VALUE] if it's less than `Int.MIN_VALUE`,
      * [Int.MAX_VALUE] if it's bigger than `Int.MAX_VALUE`.
      */
@@ -2057,7 +2329,7 @@ public class Double private constructor(public val value: Double) : Number(), Co
     /**
      * Converts this [Double] value to [Long].
      *
-     * The fractional part, if any, is rounded down.
+     * The fractional part, if any, is rounded down towards zero.
      * Returns zero if this `Double` value is `NaN`, [Long.MIN_VALUE] if it's less than `Long.MIN_VALUE`,
      * [Long.MAX_VALUE] if it's bigger than `Long.MAX_VALUE`.
      */

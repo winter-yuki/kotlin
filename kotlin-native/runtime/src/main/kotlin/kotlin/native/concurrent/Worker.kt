@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
+ * Copyright 2010-2022 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
  * that can be found in the LICENSE file.
  */
 
@@ -60,6 +60,16 @@ public value class Worker @PublishedApi internal constructor(val id: Int) {
         @Deprecated("Use kotlinx.cinterop.StableRef instead", level = DeprecationLevel.WARNING)
         public fun fromCPointer(pointer: COpaquePointer?): Worker =
                 if (pointer != null) Worker(pointer.toLong().toInt()) else throw IllegalArgumentException()
+
+        /**
+         * Get a list of all unterminated workers.
+         *
+         * Thread safety: If some other thread calls [Worker.requestTermination] at the same time then this may
+         * return a [Worker] that's already terminated.
+         */
+        @ExperimentalStdlibApi
+        public val activeWorkers: List<Worker>
+            get() = getActiveWorkersInternal().map { Worker(it) }
     }
 
     /**
@@ -74,6 +84,14 @@ public value class Worker @PublishedApi internal constructor(val id: Int) {
 
     /**
      * Plan job for further execution in the worker. Execute is a two-phase operation:
+     * 1. [producer] function is executed on the caller's thread.
+     * 2. the result of [producer] and [job] function pointer is being added to jobs queue
+     * of the selected worker. Note that [job] must not capture any state itself.
+     *
+     * Parameter [mode] has no effect.
+     *
+     * Behavior is more complex in case of legacy memory manager:
+     *
      * - first [producer] function is executed, and resulting object and whatever it refers to
      * is analyzed for being an isolated object subgraph, if in checked mode.
      * - Afterwards, this disconnected object graph and [job] function pointer is being added to jobs queue
@@ -98,10 +116,13 @@ public value class Worker @PublishedApi internal constructor(val id: Int) {
             throw RuntimeException("Shall not be called directly")
 
     /**
-     * Plan job for further execution in the worker. [operation] parameter must be either frozen, or execution to be
-     * planned on the current worker. Otherwise [IllegalStateException] will be thrown.
+     * Plan job for further execution in the worker.
+     *
      * With -Xworker-exception-handling=use-hook, if the worker was created with `errorReporting` set to true, any exception escaping from [operation] will
      * be handled by [processUnhandledException].
+     *
+     * Legacy MM: [operation] parameter must be either frozen, or execution to be planned on the current worker.
+     * Otherwise [IllegalStateException] will be thrown.
      *
      * @param afterMicroseconds defines after how many microseconds delay execution shall happen, 0 means immediately,
      * @throws [IllegalArgumentException] on negative values of [afterMicroseconds].
@@ -170,6 +191,15 @@ public value class Worker @PublishedApi internal constructor(val id: Int) {
      */
     @Deprecated("Use kotlinx.cinterop.StableRef instead", level = DeprecationLevel.WARNING)
     public fun asCPointer() : COpaquePointer? = id.toLong().toCPointer()
+
+    /**
+     * Get platform thread id of the worker thread.
+     *
+     * Usually returns `pthread_t` casted to [ULong].
+     */
+    @ExperimentalStdlibApi
+    public val platformThreadId: ULong
+        get() = getPlatfromThreadIdInternal(id)
 }
 
 /**

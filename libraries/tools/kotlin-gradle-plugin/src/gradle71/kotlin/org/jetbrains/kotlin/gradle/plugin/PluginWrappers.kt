@@ -12,6 +12,10 @@ import org.gradle.api.Project
 import org.gradle.api.file.SourceDirectorySet
 import org.gradle.api.model.ObjectFactory
 import org.gradle.tooling.provider.model.ToolingModelBuilderRegistry
+import org.jetbrains.kotlin.gradle.plugin.internal.ConfigurationTimePropertiesAccessor
+import org.jetbrains.kotlin.gradle.plugin.internal.ConfigurationTimePropertiesAccessorG71
+import org.jetbrains.kotlin.gradle.plugin.internal.IdeaSyncDetector
+import org.jetbrains.kotlin.gradle.plugin.internal.IdeaSyncDetectorG71
 import javax.inject.Inject
 
 private const val PLUGIN_VARIANT_NAME = "gradle71"
@@ -137,5 +141,10 @@ open class KotlinPlatformCommonPlugin : KotlinPlatformPluginBase("common") {
     }
 }
 
-@Suppress("unused")
-private fun Project.registerVariantImplementations() {}
+private fun Project.registerVariantImplementations() {
+    val factories = VariantImplementationFactories.get(gradle)
+    factories[IdeaSyncDetector.IdeaSyncDetectorVariantFactory::class] =
+        IdeaSyncDetectorG71.IdeaSyncDetectorVariantFactoryG71()
+    factories[ConfigurationTimePropertiesAccessor.ConfigurationTimePropertiesAccessorVariantFactory::class] =
+        ConfigurationTimePropertiesAccessorG71.ConfigurationTimePropertiesAccessorVariantFactoryG71()
+}

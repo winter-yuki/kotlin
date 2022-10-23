@@ -23,7 +23,7 @@ import org.jetbrains.kotlin.analysis.project.structure.KtModule
 import org.jetbrains.kotlin.analysis.utils.printer.parentOfType
 import org.jetbrains.kotlin.psi
 import org.jetbrains.kotlin.psi.*
-import org.jetbrains.kotlin.utils.errorWithAttachment
+import org.jetbrains.kotlin.analysis.utils.errors.buildErrorWithAttachment
 
 internal class KtFirSymbolContainingDeclarationProvider(
     override val analysisSession: KtFirAnalysisSession,
@@ -39,7 +39,7 @@ internal class KtFirSymbolContainingDeclarationProvider(
             val classId = symbol.callableIdIfNonLocal?.classId
             if (classId != null) {
                 with(analysisSession) {
-                    return classId.getCorrespondingToplevelClassOrObjectSymbol()
+                    return getClassOrObjectSymbolByClassId(classId)
                 }
             }
         }
@@ -63,7 +63,7 @@ internal class KtFirSymbolContainingDeclarationProvider(
     }
 
     override fun getContainingModule(symbol: KtSymbol): KtModule {
-       return symbol.getContainingKtModule(analysisSession.firResolveSession)
+        return symbol.getContainingKtModule(analysisSession.firResolveSession)
     }
 
     private fun getContainingDeclarationForBackingFieldSymbol(symbol: KtSymbolWithKind): KtSymbolWithKind {
@@ -87,7 +87,7 @@ internal class KtFirSymbolContainingDeclarationProvider(
     private fun getContainingPsi(symbol: KtFirSymbol<*>): KtDeclaration {
         val source = symbol.firSymbol.source
         val thisSource = when (source?.kind) {
-            null -> errorWithAttachment("PSI should present for declaration built by Kotlin code") {
+            null -> buildErrorWithAttachment("PSI should present for declaration built by Kotlin code") {
                 withSymbolAttachment("symbolForContainingPsi", symbol)
             }
 
@@ -99,19 +99,19 @@ internal class KtFirSymbolContainingDeclarationProvider(
             KtFakeSourceElementKind.ItLambdaParameter -> return source.psi as KtFunctionLiteral
             KtRealSourceElementKind -> source.psi!!
             else ->
-                errorWithAttachment("errorWithAttachment FirSourceElement: kind=${source.kind} element=${source.psi!!::class.simpleName}") {
+                buildErrorWithAttachment("errorWithAttachment FirSourceElement: kind=${source.kind} element=${source.psi!!::class.simpleName}") {
                     withSymbolAttachment("symbolForContainingPsi", symbol)
                 }
         }
 
         return when (symbol.origin) {
             KtSymbolOrigin.SOURCE -> thisSource.getContainingKtDeclaration()
-                ?: errorWithAttachment("Containing declaration should present for non-toplevel declaration") {
+                ?: buildErrorWithAttachment("Containing declaration should present for non-toplevel declaration") {
                     withSymbolAttachment("symbolForContainingPsi", symbol)
                 }
 
             KtSymbolOrigin.SOURCE_MEMBER_GENERATED -> thisSource as KtDeclaration
-            else -> errorWithAttachment("Unsupported declaration origin ${symbol.origin}") {
+            else -> buildErrorWithAttachment("Unsupported declaration origin ${symbol.origin}") {
                 withSymbolAttachment("symbolForContainingPsi", symbol)
             }
         }
@@ -128,7 +128,7 @@ internal class KtFirSymbolContainingDeclarationProvider(
         check(symbol.symbolKind == KtSymbolKind.CLASS_MEMBER)
 
         fun error(message: String): Nothing {
-            errorWithAttachment(message) {
+            buildErrorWithAttachment(message) {
                 withSymbolAttachment("symbolToGetContaining", symbol)
             }
         }
@@ -160,7 +160,7 @@ internal class KtFirSymbolContainingDeclarationProvider(
             }
             else -> error("We should not have a ${symbol::class} from a library")
         } ?: error("outerClassId should not be null for member declaration")
-        val containingClass = containingClassId.getCorrespondingToplevelClassOrObjectSymbol()
+        val containingClass = getClassOrObjectSymbolByClassId(containingClassId)
         return containingClass ?: error("Class by class id should exists")
     }
 }

@@ -128,14 +128,7 @@ internal open class KaptConfig<TASK : KaptTask>(
                 if ("-source" in result || "--source" in result || "--release" in result) return@also
 
                 if (defaultJavaSourceCompatibility.isPresent) {
-                    val atLeast12Java =
-                        if (isConfigurationCacheAvailable(project.gradle)) {
-                            val currentJavaVersion =
-                                JavaVersion.parse(project.providers.systemProperty("java.version").forUseAtConfigurationTime().get())
-                            currentJavaVersion.feature >= 12
-                        } else {
-                            SystemInfo.isJavaVersionAtLeast(12, 0, 0)
-                        }
+                    val atLeast12Java = SystemInfo.isJavaVersionAtLeast(12, 0, 0)
                     val sourceOptionKey = if (atLeast12Java) {
                         "--source"
                     } else {
@@ -199,7 +192,7 @@ internal class KaptWithoutKotlincConfig : KaptConfig<KaptWithoutKotlincTask> {
                     val kaptDependency = "org.jetbrains.kotlin:kotlin-annotation-processing-gradle:${project.getKotlinPluginVersion()}"
                     listOf(
                         project.dependencies.create(kaptDependency),
-                        project.kotlinDependency(
+                        project.dependencies.kotlinDependency(
                             "kotlin-stdlib",
                             project.topLevelExtension.coreLibrariesVersion
                         )
@@ -222,36 +215,6 @@ internal class KaptWithoutKotlincConfig : KaptConfig<KaptWithoutKotlincTask> {
             val kotlinSourceDir = objectFactory.fileCollection().from(task.kotlinSourcesDestinationDir)
             val nonAndroidDslOptions = getNonAndroidDslApOptions(ext, project, kotlinSourceDir, null, null)
             task.kaptPluginOptions.add(nonAndroidDslOptions.toCompilerPluginOptions())
-        }
-    }
-}
-
-internal class KaptWithKotlincConfig(kotlinCompileTask: KotlinCompile, ext: KaptExtension) :
-    KaptConfig<KaptWithKotlincTask>(kotlinCompileTask, ext) {
-
-    init {
-        configureTask { task ->
-            if (project.isIncrementalKapt()) {
-                val incAptCacheOption = task.incAptCache.locationOnly.map { incAptCacheDir ->
-                    CompilerPluginOptions().also {
-                        it.addPluginArgument(
-                            KAPT_SUBPLUGIN_ID, SubpluginOption("incrementalCache", lazy { incAptCacheDir.asFile.absolutePath })
-                        )
-                    }
-                }
-                task.kaptPluginOptions.add(incAptCacheOption)
-            }
-
-            task.compilerClasspath.from(providers.provider { kotlinCompileTask.defaultCompilerClasspath })
-            task.pluginClasspath.from(kotlinCompileTask.pluginClasspath)
-            task.additionalPluginOptionsAsInputs.value(kotlinCompileTask.pluginOptions).disallowChanges()
-            task.compileKotlinArgumentsContributor.set(providers.provider { kotlinCompileTask.compilerArgumentsContributor })
-            task.javaPackagePrefix.set(providers.provider { kotlinCompileTask.javaPackagePrefix })
-            task.reportingSettings.set(providers.provider { kotlinCompileTask.reportingSettings() })
-            propertiesProvider.kotlinDaemonJvmArgs?.let {
-                task.kotlinDaemonJvmArguments.value(it.split("\\s+".toRegex())).disallowChanges()
-            }
-            task.compilerExecutionStrategy.value(propertiesProvider.kotlinCompilerExecutionStrategy).disallowChanges()
         }
     }
 }

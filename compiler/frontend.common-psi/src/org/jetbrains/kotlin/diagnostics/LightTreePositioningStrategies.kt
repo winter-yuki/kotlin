@@ -17,9 +17,12 @@ import org.jetbrains.kotlin.KtSourceElement
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.lexer.KtTokens.*
 import org.jetbrains.kotlin.psi.KtParameter.VAL_VAR_TOKEN_SET
+import org.jetbrains.kotlin.psi.KtValueArgument
+import org.jetbrains.kotlin.psi.stubs.elements.KtClassElementType
 import org.jetbrains.kotlin.psi.stubs.elements.KtConstantExpressionElementType
 import org.jetbrains.kotlin.psi.stubs.elements.KtStringTemplateExpressionElementType
 import org.jetbrains.kotlin.psi.stubs.elements.KtStubElementTypes
+import org.jetbrains.kotlin.psi.stubs.elements.KtTokenSets
 import org.jetbrains.kotlin.utils.addToStdlib.runUnless
 
 object LightTreePositioningStrategies {
@@ -541,14 +544,31 @@ object LightTreePositioningStrategies {
                 }
             }
             val nodeToStart = when (node.tokenType) {
-                in KtTokens.QUALIFIED_ACCESS -> tree.findLastChildByType(node, KtNodeTypes.CALL_EXPRESSION) ?: node
+                in QUALIFIED_ACCESS -> tree.findLastChildByType(node, KtNodeTypes.CALL_EXPRESSION) ?: node
+                KtNodeTypes.CLASS -> tree.findLastChildByType(node, KtNodeTypes.SUPER_TYPE_LIST) ?: node
                 else -> node
             }
-            return tree.findDescendantByType(nodeToStart, KtNodeTypes.VALUE_ARGUMENT_LIST)?.let { valueArgumentList ->
-                tree.findLastChildByType(valueArgumentList, KtTokens.RPAR)?.let { rpar ->
-                    markElement(rpar, startOffset, endOffset, tree, node)
+            val argumentList = nodeToStart.takeIf { nodeToStart.tokenType == KtNodeTypes.VALUE_ARGUMENT_LIST }
+                ?: tree.findChildByType(nodeToStart, KtNodeTypes.VALUE_ARGUMENT_LIST)
+            return when {
+                argumentList != null -> {
+                    val rightParenthesis = tree.findLastChildByType(argumentList, RPAR)
+                        ?: return markElement(nodeToStart, startOffset, endOffset, tree, node)
+                    val lastArgument = tree.findLastChildByType(argumentList, KtNodeTypes.VALUE_ARGUMENT)
+                    if (lastArgument != null) {
+                        markRange(lastArgument, rightParenthesis, startOffset, endOffset, tree, node)
+                    } else {
+                        markRange(nodeToStart, rightParenthesis, startOffset, endOffset, tree, node)
+                    }
                 }
-            } ?: markElement(nodeToStart, startOffset, endOffset, tree, node)
+
+                nodeToStart.tokenType == KtNodeTypes.CALL_EXPRESSION -> markElement(
+                    tree.findChildByType(nodeToStart, KtNodeTypes.REFERENCE_EXPRESSION) ?: nodeToStart,
+                    startOffset, endOffset, tree, node,
+                )
+
+                else -> markElement(nodeToStart, startOffset, endOffset, tree, node)
+            }
         }
     }
 
@@ -596,7 +616,7 @@ object LightTreePositioningStrategies {
                 return super.mark(node, startOffset, endOffset, tree)
             }
             if (node.tokenType == KtNodeTypes.TYPE_REFERENCE) {
-                val typeElement = tree.findChildByType(node, KtStubElementTypes.TYPE_ELEMENT_TYPES)
+                val typeElement = tree.findChildByType(node, KtTokenSets.TYPE_ELEMENT_TYPES)
                 if (typeElement != null) {
                     val referencedTypeExpression = tree.referencedTypeExpression(typeElement)
                     if (referencedTypeExpression != null) {
@@ -612,7 +632,7 @@ object LightTreePositioningStrategies {
         return when (node.tokenType) {
             KtNodeTypes.USER_TYPE -> findChildByType(node, KtNodeTypes.REFERENCE_EXPRESSION)
                 ?: findChildByType(node, KtNodeTypes.ENUM_ENTRY_SUPERCLASS_REFERENCE_EXPRESSION)
-            KtNodeTypes.NULLABLE_TYPE -> findChildByType(node, KtStubElementTypes.TYPE_ELEMENT_TYPES)
+            KtNodeTypes.NULLABLE_TYPE -> findChildByType(node, KtTokenSets.TYPE_ELEMENT_TYPES)
                 ?.let { referencedTypeExpression(it) }
             else -> null
         }
@@ -687,7 +707,7 @@ object LightTreePositioningStrategies {
                     return markElement(nodeToMark, startOffset, endOffset, tree, node)
                 }
                 node.tokenType == KtNodeTypes.IMPORT_DIRECTIVE -> {
-                    val nodeToMark = tree.findChildByType(node, KtStubElementTypes.INSIDE_DIRECTIVE_EXPRESSIONS) ?: node
+                    val nodeToMark = tree.findChildByType(node, KtTokenSets.INSIDE_DIRECTIVE_EXPRESSIONS) ?: node
                     return markElement(nodeToMark, startOffset, endOffset, tree, node)
                 }
                 node.tokenType != KtNodeTypes.DOT_QUALIFIED_EXPRESSION &&

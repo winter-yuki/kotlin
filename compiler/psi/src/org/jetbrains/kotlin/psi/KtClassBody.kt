@@ -23,10 +23,14 @@ import org.jetbrains.kotlin.KtNodeTypes
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.stubs.KotlinPlaceHolderStub
 import org.jetbrains.kotlin.psi.stubs.elements.KtStubElementTypes
-import org.jetbrains.kotlin.psi.stubs.elements.KtStubElementTypes.*
-import java.util.*
+import org.jetbrains.kotlin.psi.stubs.elements.KtStubElementTypes.CLASS_BODY
+import org.jetbrains.kotlin.psi.stubs.elements.KtStubElementTypes.MODIFIER_LIST
+import org.jetbrains.kotlin.psi.stubs.elements.KtTokenSets.DECLARATION_TYPES
 
 class KtClassBody : KtElementImplStub<KotlinPlaceHolderStub<KtClassBody>>, KtDeclarationContainer {
+    private val lBraceTokenSet = TokenSet.create(KtTokens.LBRACE)
+    private val rBraceTokenSet = TokenSet.create(KtTokens.RBRACE)
+
     constructor(node: ASTNode) : super(node)
 
     constructor(stub: KotlinPlaceHolderStub<KtClassBody>) : super(stub, CLASS_BODY)
@@ -56,10 +60,10 @@ class KtClassBody : KtElementImplStub<KotlinPlaceHolderStub<KtClassBody>>, KtDec
         get() = getStubOrPsiChildrenAsList(KtStubElementTypes.OBJECT_DECLARATION).filter { it.isCompanion() }
 
     val rBrace: PsiElement?
-        get() = node.getChildren(TokenSet.create(KtTokens.RBRACE)).singleOrNull()?.psi
+        get() = node.getChildren(rBraceTokenSet).singleOrNull()?.psi
 
     val lBrace: PsiElement?
-        get() = node.getChildren(TokenSet.create(KtTokens.LBRACE)).singleOrNull()?.psi
+        get() = node.getChildren(lBraceTokenSet).singleOrNull()?.psi
 
     /**
      * @return annotations that do not belong to any declaration due to incomplete code or syntax errors

@@ -7,8 +7,9 @@ package org.jetbrains.kotlin.fir.symbols.impl
 
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.diagnostics.ConeDiagnostic
+import org.jetbrains.kotlin.fir.expressions.FirExpression
 import org.jetbrains.kotlin.fir.references.FirControlFlowGraphReference
-import org.jetbrains.kotlin.fir.symbols.ensureResolved
+import org.jetbrains.kotlin.fir.symbols.lazyResolveToPhase
 import org.jetbrains.kotlin.name.CallableId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
@@ -39,12 +40,18 @@ open class FirPropertySymbol(
     val hasInitializer: Boolean
         get() = fir.initializer != null
 
+    val resolvedInitializer: FirExpression?
+        get() {
+            lazyResolveToPhase(FirResolvePhase.BODY_RESOLVE)
+            return fir.initializer
+        }
+
     val hasDelegate: Boolean
         get() = fir.delegate != null
 
     val controlFlowGraphReference: FirControlFlowGraphReference?
         get() {
-            ensureResolved(FirResolvePhase.BODY_RESOLVE)
+            lazyResolveToPhase(FirResolvePhase.BODY_RESOLVE)
             return fir.controlFlowGraphReference
         }
 
@@ -76,7 +83,16 @@ class FirBackingFieldSymbol(callableId: CallableId) : FirVariableSymbol<FirBacki
 
 class FirDelegateFieldSymbol(callableId: CallableId) : FirVariableSymbol<FirProperty>(callableId)
 
-class FirFieldSymbol(callableId: CallableId) : FirVariableSymbol<FirField>(callableId)
+class FirFieldSymbol(callableId: CallableId) : FirVariableSymbol<FirField>(callableId) {
+    val hasInitializer: Boolean
+        get() = fir.initializer != null
+
+    val isVal: Boolean
+        get() = fir.isVal
+
+    val isVar: Boolean
+        get() = fir.isVar
+}
 
 class FirEnumEntrySymbol(callableId: CallableId) : FirVariableSymbol<FirEnumEntry>(callableId)
 

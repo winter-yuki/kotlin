@@ -55,25 +55,21 @@ class NewConstraintSystemImpl(
      * If remove spread operator then call `checkState` will resolve to itself
      *   instead of fun checkState(vararg allowedState: State)
      */
-    @Suppress("RemoveRedundantSpreadOperator")
     private fun checkState(a: State) {
         if (!AbstractTypeChecker.RUN_SLOW_ASSERTIONS) return
         checkState(*arrayOf(a))
     }
 
-    @Suppress("RemoveRedundantSpreadOperator")
     private fun checkState(a: State, b: State) {
         if (!AbstractTypeChecker.RUN_SLOW_ASSERTIONS) return
         checkState(*arrayOf(a, b))
     }
 
-    @Suppress("RemoveRedundantSpreadOperator")
     private fun checkState(a: State, b: State, c: State) {
         if (!AbstractTypeChecker.RUN_SLOW_ASSERTIONS) return
         checkState(*arrayOf(a, b, c))
     }
 
-    @Suppress("RemoveRedundantSpreadOperator")
     private fun checkState(a: State, b: State, c: State, d: State) {
         if (!AbstractTypeChecker.RUN_SLOW_ASSERTIONS) return
         checkState(*arrayOf(a, b, c, d))
@@ -293,7 +289,7 @@ class NewConstraintSystemImpl(
     private fun isProperTypeImpl(type: KotlinTypeMarker): Boolean =
         !type.contains {
             val capturedType = it.asSimpleType()?.asCapturedType()
-            // TODO: change NewCapturedType to markered one for FE-IR
+
             val typeToCheck = if (capturedType is CapturedTypeMarker && capturedType.captureStatus() == CaptureStatus.FROM_EXPRESSION)
                 capturedType.typeConstructorProjection().takeUnless { projection -> projection.isStarProjection() }?.getType()
             else

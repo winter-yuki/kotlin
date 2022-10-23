@@ -9,11 +9,12 @@ plugins {
 kotlin.sourceSets.configureEach {
     languageSettings.apiVersion = "1.4"
     languageSettings.languageVersion = "1.4"
-    languageSettings.optIn("org.jetbrains.kotlin.gradle.kpm.idea.InternalKotlinGradlePluginApi")
+    languageSettings.optIn("org.jetbrains.kotlin.gradle.InternalKotlinGradlePluginApi")
 }
 
 dependencies {
     api(project(":kotlin-tooling-core"))
+    api(project(":kotlin-gradle-plugin-annotations"))
     implementation(kotlinStdlib())
     testImplementation(gradleApi())
     testImplementation(gradleKotlinDsl())
@@ -45,13 +46,15 @@ publish(moduleMetadata = true) {
     val kotlinLibraryComponent = components[ADHOC_COMPONENT_NAME] as AdhocComponentWithVariants
 
     kotlinLibraryComponent.addVariantsFromConfiguration(configurations.testFixturesApiElements.get()) {
-        mapToMavenScope("compile")
         skipUnpublishable()
+        mapToMavenScope("compile")
+        mapToOptional()
     }
 
     kotlinLibraryComponent.addVariantsFromConfiguration(configurations.testFixturesRuntimeElements.get()) {
-        mapToMavenScope("runtime")
         skipUnpublishable()
+        mapToMavenScope("runtime")
+        mapToOptional()
     }
 }
 

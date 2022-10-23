@@ -199,11 +199,9 @@ std_support::vector<ObjHeader*> Alive(mm::ThreadData& threadData) {
     return objects;
 }
 
-using Color = gc::ConcurrentMarkAndSweep::ObjectData::Color;
-
-Color GetColor(ObjHeader* objHeader) {
+bool IsMarked(ObjHeader* objHeader) {
     auto nodeRef = mm::ObjectFactory<gc::ConcurrentMarkAndSweep>::NodeRef::From(objHeader);
-    return nodeRef.ObjectData().color();
+    return nodeRef.ObjectData().marked();
 }
 
 WeakCounter& InstallWeakCounter(mm::ThreadData& threadData, ObjHeader* objHeader, ObjHeader** location) {
@@ -216,8 +214,12 @@ WeakCounter& InstallWeakCounter(mm::ThreadData& threadData, ObjHeader* objHeader
     return weakCounter;
 }
 
-class ConcurrentMarkAndSweepTest : public testing::Test {
+class ConcurrentMarkAndSweepTest : public testing::TestWithParam<gc::ConcurrentMarkAndSweep::MarkingBehavior> {
 public:
+
+    ConcurrentMarkAndSweepTest() {
+        mm::GlobalData::Instance().gc().impl().gc().SetMarkingBehaviorForTests(GetParam());
+    }
 
     ~ConcurrentMarkAndSweepTest() {
         mm::GlobalsRegistry::Instance().ClearForTests();
@@ -233,7 +235,7 @@ private:
 
 } // namespace
 
-TEST_F(ConcurrentMarkAndSweepTest, RootSet) {
+TEST_P(ConcurrentMarkAndSweepTest, RootSet) {
     RunInNewThread([](mm::ThreadData& threadData) {
         GlobalObjectHolder global1{threadData};
         GlobalObjectArrayHolder global2{threadData};
@@ -246,12 +248,12 @@ TEST_F(ConcurrentMarkAndSweepTest, RootSet) {
                 Alive(threadData),
                 testing::UnorderedElementsAre(
                         global1.header(), global2.header(), global3.header(), stack1.header(), stack2.header(), stack3.header()));
-        ASSERT_THAT(GetColor(global1.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(global2.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(global3.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(stack1.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(stack2.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(stack3.header()), Color::kWhite);
+        ASSERT_THAT(IsMarked(global1.header()), false);
+        ASSERT_THAT(IsMarked(global2.header()), false);
+        ASSERT_THAT(IsMarked(global3.header()), false);
+        ASSERT_THAT(IsMarked(stack1.header()), false);
+        ASSERT_THAT(IsMarked(stack2.header()), false);
+        ASSERT_THAT(IsMarked(stack3.header()), false);
 
         threadData.gc().ScheduleAndWaitFullGC();
 
@@ -259,16 +261,16 @@ TEST_F(ConcurrentMarkAndSweepTest, RootSet) {
                 Alive(threadData),
                 testing::UnorderedElementsAre(
                         global1.header(), global2.header(), global3.header(), stack1.header(), stack2.header(), stack3.header()));
-        EXPECT_THAT(GetColor(global1.header()), Color::kWhite);
-        EXPECT_THAT(GetColor(global2.header()), Color::kWhite);
-        EXPECT_THAT(GetColor(global3.header()), Color::kWhite);
-        EXPECT_THAT(GetColor(stack1.header()), Color::kWhite);
-        EXPECT_THAT(GetColor(stack2.header()), Color::kWhite);
-        EXPECT_THAT(GetColor(stack3.header()), Color::kWhite);
+        EXPECT_THAT(IsMarked(global1.header()), false);
+        EXPECT_THAT(IsMarked(global2.header()), false);
+        EXPECT_THAT(IsMarked(global3.header()), false);
+        EXPECT_THAT(IsMarked(stack1.header()), false);
+        EXPECT_THAT(IsMarked(stack2.header()), false);
+        EXPECT_THAT(IsMarked(stack3.header()), false);
     });
 }
 
-TEST_F(ConcurrentMarkAndSweepTest, InterconnectedRootSet) {
+TEST_P(ConcurrentMarkAndSweepTest, InterconnectedRootSet) {
     RunInNewThread([](mm::ThreadData& threadData) {
         GlobalObjectHolder global1{threadData};
         GlobalObjectArrayHolder global2{threadData};
@@ -292,12 +294,12 @@ TEST_F(ConcurrentMarkAndSweepTest, InterconnectedRootSet) {
                 Alive(threadData),
                 testing::UnorderedElementsAre(
                         global1.header(), global2.header(), global3.header(), stack1.header(), stack2.header(), stack3.header()));
-        ASSERT_THAT(GetColor(global1.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(global2.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(global3.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(stack1.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(stack2.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(stack3.header()), Color::kWhite);
+        ASSERT_THAT(IsMarked(global1.header()), false);
+        ASSERT_THAT(IsMarked(global2.header()), false);
+        ASSERT_THAT(IsMarked(global3.header()), false);
+        ASSERT_THAT(IsMarked(stack1.header()), false);
+        ASSERT_THAT(IsMarked(stack2.header()), false);
+        ASSERT_THAT(IsMarked(stack3.header()), false);
 
         threadData.gc().ScheduleAndWaitFullGC();
 
@@ -305,23 +307,23 @@ TEST_F(ConcurrentMarkAndSweepTest, InterconnectedRootSet) {
                 Alive(threadData),
                 testing::UnorderedElementsAre(
                         global1.header(), global2.header(), global3.header(), stack1.header(), stack2.header(), stack3.header()));
-        EXPECT_THAT(GetColor(global1.header()), Color::kWhite);
-        EXPECT_THAT(GetColor(global2.header()), Color::kWhite);
-        EXPECT_THAT(GetColor(global3.header()), Color::kWhite);
-        EXPECT_THAT(GetColor(stack1.header()), Color::kWhite);
-        EXPECT_THAT(GetColor(stack2.header()), Color::kWhite);
-        EXPECT_THAT(GetColor(stack3.header()), Color::kWhite);
+        EXPECT_THAT(IsMarked(global1.header()), false);
+        EXPECT_THAT(IsMarked(global2.header()), false);
+        EXPECT_THAT(IsMarked(global3.header()), false);
+        EXPECT_THAT(IsMarked(stack1.header()), false);
+        EXPECT_THAT(IsMarked(stack2.header()), false);
+        EXPECT_THAT(IsMarked(stack3.header()), false);
     });
 }
 
-TEST_F(ConcurrentMarkAndSweepTest, FreeObjects) {
+TEST_P(ConcurrentMarkAndSweepTest, FreeObjects) {
     RunInNewThread([](mm::ThreadData& threadData) {
         auto& object1 = AllocateObject(threadData);
         auto& object2 = AllocateObject(threadData);
 
         ASSERT_THAT(Alive(threadData), testing::UnorderedElementsAre(object1.header(), object2.header()));
-        ASSERT_THAT(GetColor(object1.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(object2.header()), Color::kWhite);
+        ASSERT_THAT(IsMarked(object1.header()), false);
+        ASSERT_THAT(IsMarked(object2.header()), false);
 
         threadData.gc().ScheduleAndWaitFullGC();
 
@@ -329,14 +331,14 @@ TEST_F(ConcurrentMarkAndSweepTest, FreeObjects) {
     });
 }
 
-TEST_F(ConcurrentMarkAndSweepTest, FreeObjectsWithFinalizers) {
+TEST_P(ConcurrentMarkAndSweepTest, FreeObjectsWithFinalizers) {
     RunInNewThread([this](mm::ThreadData& threadData) {
         auto& object1 = AllocateObjectWithFinalizer(threadData);
         auto& object2 = AllocateObjectWithFinalizer(threadData);
 
         ASSERT_THAT(Alive(threadData), testing::UnorderedElementsAre(object1.header(), object2.header()));
-        ASSERT_THAT(GetColor(object1.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(object2.header()), Color::kWhite);
+        ASSERT_THAT(IsMarked(object1.header()), false);
+        ASSERT_THAT(IsMarked(object2.header()), false);
 
         EXPECT_CALL(finalizerHook(), Call(object1.header()));
         EXPECT_CALL(finalizerHook(), Call(object2.header()));
@@ -346,7 +348,7 @@ TEST_F(ConcurrentMarkAndSweepTest, FreeObjectsWithFinalizers) {
     });
 }
 
-TEST_F(ConcurrentMarkAndSweepTest, FreeObjectWithFreeWeak) {
+TEST_P(ConcurrentMarkAndSweepTest, FreeObjectWithFreeWeak) {
     RunInNewThread([](mm::ThreadData& threadData) {
         auto& object1 = AllocateObject(threadData);
         auto& weak1 = ([&threadData, &object1]() -> WeakCounter& {
@@ -355,8 +357,8 @@ TEST_F(ConcurrentMarkAndSweepTest, FreeObjectWithFreeWeak) {
         })();
 
         ASSERT_THAT(Alive(threadData), testing::UnorderedElementsAre(object1.header(), weak1.header()));
-        ASSERT_THAT(GetColor(object1.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(weak1.header()), Color::kWhite);
+        ASSERT_THAT(IsMarked(object1.header()), false);
+        ASSERT_THAT(IsMarked(weak1.header()), false);
         ASSERT_THAT(weak1->referred, object1.header());
 
         threadData.gc().ScheduleAndWaitFullGCWithFinalizers();
@@ -365,26 +367,26 @@ TEST_F(ConcurrentMarkAndSweepTest, FreeObjectWithFreeWeak) {
     });
 }
 
-TEST_F(ConcurrentMarkAndSweepTest, FreeObjectWithHoldedWeak) {
+TEST_P(ConcurrentMarkAndSweepTest, FreeObjectWithHoldedWeak) {
     RunInNewThread([](mm::ThreadData& threadData) {
         auto& object1 = AllocateObject(threadData);
         StackObjectHolder stack{threadData};
         auto& weak1 = InstallWeakCounter(threadData, object1.header(), &stack->field1);
 
         ASSERT_THAT(Alive(threadData), testing::UnorderedElementsAre(object1.header(), weak1.header(), stack.header()));
-        ASSERT_THAT(GetColor(object1.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(weak1.header()), Color::kWhite);
+        ASSERT_THAT(IsMarked(object1.header()), false);
+        ASSERT_THAT(IsMarked(weak1.header()), false);
         ASSERT_THAT(weak1->referred, object1.header());
 
         threadData.gc().ScheduleAndWaitFullGC();
 
         EXPECT_THAT(Alive(threadData), testing::UnorderedElementsAre(weak1.header(), stack.header()));
-        EXPECT_THAT(GetColor(weak1.header()), Color::kWhite);
+        EXPECT_THAT(IsMarked(weak1.header()), false);
         EXPECT_THAT(weak1->referred, nullptr);
     });
 }
 
-TEST_F(ConcurrentMarkAndSweepTest, ObjectReferencedFromRootSet) {
+TEST_P(ConcurrentMarkAndSweepTest, ObjectReferencedFromRootSet) {
     RunInNewThread([](mm::ThreadData& threadData) {
         GlobalObjectHolder global{threadData};
         StackObjectHolder stack{threadData};
@@ -402,12 +404,12 @@ TEST_F(ConcurrentMarkAndSweepTest, ObjectReferencedFromRootSet) {
                 Alive(threadData),
                 testing::UnorderedElementsAre(
                         global.header(), stack.header(), object1.header(), object2.header(), object3.header(), object4.header()));
-        ASSERT_THAT(GetColor(global.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(stack.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(object1.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(object2.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(object3.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(object4.header()), Color::kWhite);
+        ASSERT_THAT(IsMarked(global.header()), false);
+        ASSERT_THAT(IsMarked(stack.header()), false);
+        ASSERT_THAT(IsMarked(object1.header()), false);
+        ASSERT_THAT(IsMarked(object2.header()), false);
+        ASSERT_THAT(IsMarked(object3.header()), false);
+        ASSERT_THAT(IsMarked(object4.header()), false);
 
         threadData.gc().ScheduleAndWaitFullGC();
 
@@ -415,16 +417,16 @@ TEST_F(ConcurrentMarkAndSweepTest, ObjectReferencedFromRootSet) {
                 Alive(threadData),
                 testing::UnorderedElementsAre(
                         global.header(), stack.header(), object1.header(), object2.header(), object3.header(), object4.header()));
-        EXPECT_THAT(GetColor(global.header()), Color::kWhite);
-        EXPECT_THAT(GetColor(stack.header()), Color::kWhite);
-        EXPECT_THAT(GetColor(object1.header()), Color::kWhite);
-        EXPECT_THAT(GetColor(object2.header()), Color::kWhite);
-        EXPECT_THAT(GetColor(object3.header()), Color::kWhite);
-        EXPECT_THAT(GetColor(object4.header()), Color::kWhite);
+        EXPECT_THAT(IsMarked(global.header()), false);
+        EXPECT_THAT(IsMarked(stack.header()), false);
+        EXPECT_THAT(IsMarked(object1.header()), false);
+        EXPECT_THAT(IsMarked(object2.header()), false);
+        EXPECT_THAT(IsMarked(object3.header()), false);
+        EXPECT_THAT(IsMarked(object4.header()), false);
     });
 }
 
-TEST_F(ConcurrentMarkAndSweepTest, ObjectsWithCycles) {
+TEST_P(ConcurrentMarkAndSweepTest, ObjectsWithCycles) {
     RunInNewThread([](mm::ThreadData& threadData) {
         GlobalObjectHolder global{threadData};
         StackObjectHolder stack{threadData};
@@ -449,14 +451,14 @@ TEST_F(ConcurrentMarkAndSweepTest, ObjectsWithCycles) {
                 testing::UnorderedElementsAre(
                         global.header(), stack.header(), object1.header(), object2.header(), object3.header(), object4.header(),
                         object5.header(), object6.header()));
-        ASSERT_THAT(GetColor(global.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(stack.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(object1.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(object2.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(object3.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(object4.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(object5.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(object6.header()), Color::kWhite);
+        ASSERT_THAT(IsMarked(global.header()), false);
+        ASSERT_THAT(IsMarked(stack.header()), false);
+        ASSERT_THAT(IsMarked(object1.header()), false);
+        ASSERT_THAT(IsMarked(object2.header()), false);
+        ASSERT_THAT(IsMarked(object3.header()), false);
+        ASSERT_THAT(IsMarked(object4.header()), false);
+        ASSERT_THAT(IsMarked(object5.header()), false);
+        ASSERT_THAT(IsMarked(object6.header()), false);
 
         threadData.gc().ScheduleAndWaitFullGC();
 
@@ -464,16 +466,16 @@ TEST_F(ConcurrentMarkAndSweepTest, ObjectsWithCycles) {
                 Alive(threadData),
                 testing::UnorderedElementsAre(
                         global.header(), stack.header(), object1.header(), object2.header(), object3.header(), object4.header()));
-        EXPECT_THAT(GetColor(global.header()), Color::kWhite);
-        EXPECT_THAT(GetColor(stack.header()), Color::kWhite);
-        EXPECT_THAT(GetColor(object1.header()), Color::kWhite);
-        EXPECT_THAT(GetColor(object2.header()), Color::kWhite);
-        EXPECT_THAT(GetColor(object3.header()), Color::kWhite);
-        EXPECT_THAT(GetColor(object4.header()), Color::kWhite);
+        EXPECT_THAT(IsMarked(global.header()), false);
+        EXPECT_THAT(IsMarked(stack.header()), false);
+        EXPECT_THAT(IsMarked(object1.header()), false);
+        EXPECT_THAT(IsMarked(object2.header()), false);
+        EXPECT_THAT(IsMarked(object3.header()), false);
+        EXPECT_THAT(IsMarked(object4.header()), false);
     });
 }
 
-TEST_F(ConcurrentMarkAndSweepTest, ObjectsWithCyclesAndFinalizers) {
+TEST_P(ConcurrentMarkAndSweepTest, ObjectsWithCyclesAndFinalizers) {
     RunInNewThread([this](mm::ThreadData& threadData) {
         GlobalObjectHolder global{threadData};
         StackObjectHolder stack{threadData};
@@ -498,14 +500,14 @@ TEST_F(ConcurrentMarkAndSweepTest, ObjectsWithCyclesAndFinalizers) {
                 testing::UnorderedElementsAre(
                         global.header(), stack.header(), object1.header(), object2.header(), object3.header(), object4.header(),
                         object5.header(), object6.header()));
-        ASSERT_THAT(GetColor(global.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(stack.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(object1.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(object2.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(object3.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(object4.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(object5.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(object6.header()), Color::kWhite);
+        ASSERT_THAT(IsMarked(global.header()), false);
+        ASSERT_THAT(IsMarked(stack.header()), false);
+        ASSERT_THAT(IsMarked(object1.header()), false);
+        ASSERT_THAT(IsMarked(object2.header()), false);
+        ASSERT_THAT(IsMarked(object3.header()), false);
+        ASSERT_THAT(IsMarked(object4.header()), false);
+        ASSERT_THAT(IsMarked(object5.header()), false);
+        ASSERT_THAT(IsMarked(object6.header()), false);
 
         EXPECT_CALL(finalizerHook(), Call(object5.header()));
         EXPECT_CALL(finalizerHook(), Call(object6.header()));
@@ -515,16 +517,16 @@ TEST_F(ConcurrentMarkAndSweepTest, ObjectsWithCyclesAndFinalizers) {
                 Alive(threadData),
                 testing::UnorderedElementsAre(
                         global.header(), stack.header(), object1.header(), object2.header(), object3.header(), object4.header()));
-        EXPECT_THAT(GetColor(global.header()), Color::kWhite);
-        EXPECT_THAT(GetColor(stack.header()), Color::kWhite);
-        EXPECT_THAT(GetColor(object1.header()), Color::kWhite);
-        EXPECT_THAT(GetColor(object2.header()), Color::kWhite);
-        EXPECT_THAT(GetColor(object3.header()), Color::kWhite);
-        EXPECT_THAT(GetColor(object4.header()), Color::kWhite);
+        EXPECT_THAT(IsMarked(global.header()), false);
+        EXPECT_THAT(IsMarked(stack.header()), false);
+        EXPECT_THAT(IsMarked(object1.header()), false);
+        EXPECT_THAT(IsMarked(object2.header()), false);
+        EXPECT_THAT(IsMarked(object3.header()), false);
+        EXPECT_THAT(IsMarked(object4.header()), false);
     });
 }
 
-TEST_F(ConcurrentMarkAndSweepTest, ObjectsWithCyclesIntoRootSet) {
+TEST_P(ConcurrentMarkAndSweepTest, ObjectsWithCyclesIntoRootSet) {
     RunInNewThread([](mm::ThreadData& threadData) {
         GlobalObjectHolder global{threadData};
         StackObjectHolder stack{threadData};
@@ -537,22 +539,22 @@ TEST_F(ConcurrentMarkAndSweepTest, ObjectsWithCyclesIntoRootSet) {
         object2->field1 = stack.header();
 
         ASSERT_THAT(Alive(threadData), testing::UnorderedElementsAre(global.header(), stack.header(), object1.header(), object2.header()));
-        ASSERT_THAT(GetColor(global.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(stack.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(object1.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(object2.header()), Color::kWhite);
+        ASSERT_THAT(IsMarked(global.header()), false);
+        ASSERT_THAT(IsMarked(stack.header()), false);
+        ASSERT_THAT(IsMarked(object1.header()), false);
+        ASSERT_THAT(IsMarked(object2.header()), false);
 
         threadData.gc().ScheduleAndWaitFullGC();
 
         EXPECT_THAT(Alive(threadData), testing::UnorderedElementsAre(global.header(), stack.header(), object1.header(), object2.header()));
-        EXPECT_THAT(GetColor(global.header()), Color::kWhite);
-        EXPECT_THAT(GetColor(stack.header()), Color::kWhite);
-        EXPECT_THAT(GetColor(object1.header()), Color::kWhite);
-        EXPECT_THAT(GetColor(object2.header()), Color::kWhite);
+        EXPECT_THAT(IsMarked(global.header()), false);
+        EXPECT_THAT(IsMarked(stack.header()), false);
+        EXPECT_THAT(IsMarked(object1.header()), false);
+        EXPECT_THAT(IsMarked(object2.header()), false);
     });
 }
 
-TEST_F(ConcurrentMarkAndSweepTest, RunGCTwice) {
+TEST_P(ConcurrentMarkAndSweepTest, RunGCTwice) {
     RunInNewThread([](mm::ThreadData& threadData) {
         GlobalObjectHolder global{threadData};
         StackObjectHolder stack{threadData};
@@ -577,14 +579,14 @@ TEST_F(ConcurrentMarkAndSweepTest, RunGCTwice) {
                 testing::UnorderedElementsAre(
                         global.header(), stack.header(), object1.header(), object2.header(), object3.header(), object4.header(),
                         object5.header(), object6.header()));
-        ASSERT_THAT(GetColor(global.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(stack.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(object1.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(object2.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(object3.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(object4.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(object5.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(object6.header()), Color::kWhite);
+        ASSERT_THAT(IsMarked(global.header()), false);
+        ASSERT_THAT(IsMarked(stack.header()), false);
+        ASSERT_THAT(IsMarked(object1.header()), false);
+        ASSERT_THAT(IsMarked(object2.header()), false);
+        ASSERT_THAT(IsMarked(object3.header()), false);
+        ASSERT_THAT(IsMarked(object4.header()), false);
+        ASSERT_THAT(IsMarked(object5.header()), false);
+        ASSERT_THAT(IsMarked(object6.header()), false);
 
         threadData.gc().ScheduleAndWaitFullGC();
         threadData.gc().ScheduleAndWaitFullGC();
@@ -593,16 +595,16 @@ TEST_F(ConcurrentMarkAndSweepTest, RunGCTwice) {
                 Alive(threadData),
                 testing::UnorderedElementsAre(
                         global.header(), stack.header(), object1.header(), object2.header(), object3.header(), object4.header()));
-        EXPECT_THAT(GetColor(global.header()), Color::kWhite);
-        EXPECT_THAT(GetColor(stack.header()), Color::kWhite);
-        EXPECT_THAT(GetColor(object1.header()), Color::kWhite);
-        EXPECT_THAT(GetColor(object2.header()), Color::kWhite);
-        EXPECT_THAT(GetColor(object3.header()), Color::kWhite);
-        EXPECT_THAT(GetColor(object4.header()), Color::kWhite);
+        EXPECT_THAT(IsMarked(global.header()), false);
+        EXPECT_THAT(IsMarked(stack.header()), false);
+        EXPECT_THAT(IsMarked(object1.header()), false);
+        EXPECT_THAT(IsMarked(object2.header()), false);
+        EXPECT_THAT(IsMarked(object3.header()), false);
+        EXPECT_THAT(IsMarked(object4.header()), false);
     });
 }
 
-TEST_F(ConcurrentMarkAndSweepTest, PermanentObjects) {
+TEST_P(ConcurrentMarkAndSweepTest, PermanentObjects) {
     RunInNewThread([](mm::ThreadData& threadData) {
         GlobalPermanentObjectHolder global1{threadData};
         GlobalObjectHolder global2{threadData};
@@ -615,16 +617,16 @@ TEST_F(ConcurrentMarkAndSweepTest, PermanentObjects) {
         global2->field1 = global1.header();
 
         ASSERT_THAT(Alive(threadData), testing::UnorderedElementsAre(global2.header()));
-        EXPECT_THAT(GetColor(global2.header()), Color::kWhite);
+        EXPECT_THAT(IsMarked(global2.header()), false);
 
         threadData.gc().ScheduleAndWaitFullGC();
 
         EXPECT_THAT(Alive(threadData), testing::UnorderedElementsAre(global2.header()));
-        EXPECT_THAT(GetColor(global2.header()), Color::kWhite);
+        EXPECT_THAT(IsMarked(global2.header()), false);
     });
 }
 
-TEST_F(ConcurrentMarkAndSweepTest, SameObjectInRootSet) {
+TEST_P(ConcurrentMarkAndSweepTest, SameObjectInRootSet) {
     RunInNewThread([](mm::ThreadData& threadData) {
         GlobalObjectHolder global{threadData};
         StackObjectHolder stack(*global);
@@ -634,14 +636,14 @@ TEST_F(ConcurrentMarkAndSweepTest, SameObjectInRootSet) {
 
         ASSERT_THAT(global.header(), stack.header());
         ASSERT_THAT(Alive(threadData), testing::UnorderedElementsAre(global.header(), object.header()));
-        EXPECT_THAT(GetColor(global.header()), Color::kWhite);
-        EXPECT_THAT(GetColor(object.header()), Color::kWhite);
+        EXPECT_THAT(IsMarked(global.header()), false);
+        EXPECT_THAT(IsMarked(object.header()), false);
 
         threadData.gc().ScheduleAndWaitFullGC();
 
         EXPECT_THAT(Alive(threadData), testing::UnorderedElementsAre(global.header(), object.header()));
-        EXPECT_THAT(GetColor(global.header()), Color::kWhite);
-        EXPECT_THAT(GetColor(object.header()), Color::kWhite);
+        EXPECT_THAT(IsMarked(global.header()), false);
+        EXPECT_THAT(IsMarked(object.header()), false);
     });
 }
 
@@ -710,7 +712,7 @@ private:
 
 } // namespace
 
-TEST_F(ConcurrentMarkAndSweepTest, MultipleMutatorsCollect) {
+TEST_P(ConcurrentMarkAndSweepTest, MultipleMutatorsCollect) {
     std_support::vector<Mutator> mutators(kDefaultThreadCount);
     std_support::vector<ObjHeader*> globals(kDefaultThreadCount);
     std_support::vector<ObjHeader*> locals(kDefaultThreadCount);
@@ -766,7 +768,7 @@ TEST_F(ConcurrentMarkAndSweepTest, MultipleMutatorsCollect) {
     }
 }
 
-TEST_F(ConcurrentMarkAndSweepTest, MultipleMutatorsAllCollect) {
+TEST_P(ConcurrentMarkAndSweepTest, MultipleMutatorsAllCollect) {
     std_support::vector<Mutator> mutators(kDefaultThreadCount);
     std_support::vector<ObjHeader*> globals(kDefaultThreadCount);
     std_support::vector<ObjHeader*> locals(kDefaultThreadCount);
@@ -828,7 +830,7 @@ TEST_F(ConcurrentMarkAndSweepTest, MultipleMutatorsAllCollect) {
     }
 }
 
-TEST_F(ConcurrentMarkAndSweepTest, MultipleMutatorsAddToRootSetAfterCollectionRequested) {
+TEST_P(ConcurrentMarkAndSweepTest, MultipleMutatorsAddToRootSetAfterCollectionRequested) {
     std_support::vector<Mutator> mutators(kDefaultThreadCount);
     std_support::vector<ObjHeader*> globals(kDefaultThreadCount);
     std_support::vector<ObjHeader*> locals(kDefaultThreadCount);
@@ -900,7 +902,7 @@ TEST_F(ConcurrentMarkAndSweepTest, MultipleMutatorsAddToRootSetAfterCollectionRe
     }
 }
 
-TEST_F(ConcurrentMarkAndSweepTest, CrossThreadReference) {
+TEST_P(ConcurrentMarkAndSweepTest, CrossThreadReference) {
     std_support::vector<Mutator> mutators(kDefaultThreadCount);
     std_support::vector<ObjHeader*> globals(kDefaultThreadCount);
     std_support::vector<ObjHeader*> locals(kDefaultThreadCount);
@@ -966,7 +968,7 @@ TEST_F(ConcurrentMarkAndSweepTest, CrossThreadReference) {
     }
 }
 
-TEST_F(ConcurrentMarkAndSweepTest, MultipleMutatorsWeaks) {
+TEST_P(ConcurrentMarkAndSweepTest, MultipleMutatorsWeaks) {
     std_support::vector<Mutator> mutators(kDefaultThreadCount);
     ObjHeader* globalRoot = nullptr;
     WeakCounter* weak = nullptr;
@@ -1018,7 +1020,7 @@ TEST_F(ConcurrentMarkAndSweepTest, MultipleMutatorsWeaks) {
     }
 }
 
-TEST_F(ConcurrentMarkAndSweepTest, NewThreadsWhileRequestingCollection) {
+TEST_P(ConcurrentMarkAndSweepTest, NewThreadsWhileRequestingCollection) {
     std_support::vector<Mutator> mutators(kDefaultThreadCount);
     std_support::vector<ObjHeader*> globals(2 * kDefaultThreadCount);
     std_support::vector<ObjHeader*> locals(2 * kDefaultThreadCount);
@@ -1100,7 +1102,7 @@ TEST_F(ConcurrentMarkAndSweepTest, NewThreadsWhileRequestingCollection) {
 }
 
 
-TEST_F(ConcurrentMarkAndSweepTest, FreeObjectWithFreeWeakReversedOrder) {
+TEST_P(ConcurrentMarkAndSweepTest, FreeObjectWithFreeWeakReversedOrder) {
     std_support::vector<Mutator> mutators(2);
     std::atomic<test_support::Object<Payload>*> object1 = nullptr;
     std::atomic<WeakCounter*> weak = nullptr;
@@ -1110,13 +1112,14 @@ TEST_F(ConcurrentMarkAndSweepTest, FreeObjectWithFreeWeakReversedOrder) {
         auto& object1_local = AllocateObject(threadData);
         object1 = &object1_local;
         global1->field1 = object1_local.header();
-        while (weak.load() == nullptr);
+        while (weak.load() == nullptr)
+            ;
         threadData.gc().ScheduleAndWaitFullGC();
 
         ASSERT_THAT(Alive(threadData), testing::UnorderedElementsAre(object1_local.header(), weak.load()->header(), global1.header()));
-        ASSERT_THAT(GetColor(global1.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(object1_local.header()), Color::kWhite);
-        ASSERT_THAT(GetColor(weak.load()->header()), Color::kWhite);
+        ASSERT_THAT(IsMarked(global1.header()), false);
+        ASSERT_THAT(IsMarked(object1_local.header()), false);
+        ASSERT_THAT(IsMarked(weak.load()->header()), false);
         ASSERT_THAT((*weak.load())->referred, object1_local.header());
 
         global1->field1 = nullptr;
@@ -1139,3 +1142,61 @@ TEST_F(ConcurrentMarkAndSweepTest, FreeObjectWithFreeWeakReversedOrder) {
     f0.wait();
     f1.wait();
 }
+
+TEST_P(ConcurrentMarkAndSweepTest, MutatorsCanMarkOwnLocals) {
+    std_support::vector<Mutator> mutators(kDefaultThreadCount);
+    std_support::vector<ObjHeader*> globals(kDefaultThreadCount);
+    std_support::vector<ObjHeader*> locals(kDefaultThreadCount);
+    std_support::vector<ObjHeader*> reachablesLocals(kDefaultThreadCount);
+    std_support::vector<ObjHeader*> reachablesGlobals(kDefaultThreadCount);
+
+    auto expandRootSet = [&globals, &locals, &reachablesLocals, &reachablesGlobals](mm::ThreadData& threadData, Mutator& mutator, int i) {
+        auto& global = mutator.AddGlobalRoot();
+        auto& local = mutator.AddStackRoot();
+        auto& reachableLocal = AllocateObject(threadData);
+        auto& reachableGlobal = AllocateObject(threadData);
+        local->field1 = reachableLocal.header();
+        global->field1 = reachableGlobal.header();
+        globals[i] = global.header();
+        locals[i] = local.header();
+        reachablesLocals[i] = reachableLocal.header();
+        reachablesGlobals[i] = reachableGlobal.header();
+    };
+
+    for (int i = 0; i < kDefaultThreadCount; ++i) {
+        mutators[i]
+                .Execute([i, expandRootSet](mm::ThreadData& threadData, Mutator& mutator) { expandRootSet(threadData, mutator, i); })
+                .wait();
+    }
+
+    std_support::vector<std::future<void>> gcFutures(kDefaultThreadCount);
+
+    mm::GlobalData::Instance().gc().impl().gc().SetMarkingRequested(0);
+
+    for (int i = 0; i < kDefaultThreadCount; ++i) {
+        gcFutures[i] = mutators[i]
+            .Execute([](mm::ThreadData& threadData, Mutator& mutator) { threadData.gc().impl().gc().OnSuspendForGC(); });
+    }
+
+    if (GetParam() == gc::ConcurrentMarkAndSweep::kMarkOwnStack) {
+        mm::GlobalData::Instance().gc().impl().gc().WaitForThreadsReadyToMark();
+        mm::GlobalData::Instance().gc().impl().gc().CollectRootSetAndStartMarking(gc::GCHandle::createFakeForTests());
+    }
+
+    for (int i = 0; i < kDefaultThreadCount; ++i) {
+        gcFutures[i].wait();
+        // Verify that threads marked their own locals (but not their globals) according to the configured marking behavior:
+        ASSERT_THAT(IsMarked(reachablesLocals[i]), GetParam() == kotlin::gc::ConcurrentMarkAndSweep::kMarkOwnStack);
+        ASSERT_THAT(IsMarked(reachablesGlobals[i]), false);
+    }
+
+    for (auto& future : gcFutures) {
+        future.wait();
+    }
+}
+
+INSTANTIATE_TEST_SUITE_P(,
+                         ConcurrentMarkAndSweepTest,
+                         testing::Values(gc::ConcurrentMarkAndSweep::MarkingBehavior::kDoNotMark, gc::ConcurrentMarkAndSweep::MarkingBehavior::kMarkOwnStack),
+                         [] (const testing::TestParamInfo<gc::ConcurrentMarkAndSweep::MarkingBehavior>& behavior) { return (behavior.param == gc::ConcurrentMarkAndSweep::MarkingBehavior::kDoNotMark) ? "SingleThreadedMarking" : "MutatorsMarkOwnStack"; });
+

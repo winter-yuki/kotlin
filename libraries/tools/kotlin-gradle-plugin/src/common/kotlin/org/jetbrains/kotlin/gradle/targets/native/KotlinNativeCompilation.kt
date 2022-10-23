@@ -11,41 +11,18 @@ import org.gradle.api.NamedDomainObjectContainer
 import org.gradle.api.Project
 import org.gradle.api.tasks.TaskProvider
 import org.jetbrains.kotlin.gradle.dsl.KotlinCommonOptions
-import org.jetbrains.kotlin.gradle.plugin.*
+import org.jetbrains.kotlin.gradle.plugin.HasCompilerOptions
+import org.jetbrains.kotlin.gradle.plugin.KotlinCompilationWithResources
+import org.jetbrains.kotlin.gradle.plugin.PropertiesProvider
 import org.jetbrains.kotlin.gradle.plugin.mpp.pm20.KotlinNativeCompilationData
 import org.jetbrains.kotlin.gradle.plugin.mpp.pm20.KotlinNativeFragmentMetadataCompilationData
+import org.jetbrains.kotlin.gradle.targets.native.NativeCompilerOptions
 import org.jetbrains.kotlin.gradle.tasks.KotlinNativeCompile
 import org.jetbrains.kotlin.gradle.utils.lowerCamelCaseName
 import org.jetbrains.kotlin.konan.target.KonanTarget
 import java.io.File
 import java.util.concurrent.Callable
 import javax.inject.Inject
-
-internal class NativeCompileOptions(languageSettingsProvider: () -> LanguageSettingsBuilder) : KotlinCommonOptions {
-    private val languageSettings: LanguageSettingsBuilder by lazy(languageSettingsProvider)
-
-    override var apiVersion: String?
-        get() = languageSettings.apiVersion
-        set(value) {
-            languageSettings.apiVersion = value
-        }
-
-    override var languageVersion: String?
-        get() = languageSettings.languageVersion
-        set(value) {
-            languageSettings.languageVersion = value
-        }
-    
-    override var useK2: Boolean
-        get() = false
-        set(@Suppress("UNUSED_PARAMETER") value) {}
-
-    override var allWarningsAsErrors: Boolean = false
-    override var suppressWarnings: Boolean = false
-    override var verbose: Boolean = false
-
-    override var freeCompilerArgs: List<String> = listOf()
-}
 
 abstract class AbstractKotlinNativeCompilation(
     override val konanTarget: KonanTarget,
@@ -55,17 +32,25 @@ abstract class AbstractKotlinNativeCompilation(
 ),
     KotlinNativeCompilationData<KotlinCommonOptions> {
 
+    @Suppress("DEPRECATION")
+    @Deprecated("Accessing task instance directly is deprecated", replaceWith = ReplaceWith("compileTaskProvider"))
     override val compileKotlinTask: KotlinNativeCompile
         get() = super.compileKotlinTask as KotlinNativeCompile
 
-    @Suppress("UNCHECKED_CAST")
+    @Suppress("UNCHECKED_CAST", "DEPRECATION")
+    @Deprecated("Replaced with compileTaskProvider", replaceWith = ReplaceWith("compileTaskProvider"))
     override val compileKotlinTaskProvider: TaskProvider<out KotlinNativeCompile>
         get() = super.compileKotlinTaskProvider as TaskProvider<out KotlinNativeCompile>
+
+    @Suppress("UNCHECKED_CAST")
+    override val compileTaskProvider: TaskProvider<KotlinNativeCompile>
+        get() = super.compileTaskProvider as TaskProvider<KotlinNativeCompile>
 
     internal val useGenericPluginArtifact: Boolean
         get() = project.nativeUseEmbeddableCompilerJar
 
     // Endorsed library controller.
+    @Deprecated("Please declare explicit dependency on kotlinx-cli. This option is scheduled to be removed in 1.9.0")
     override var enableEndorsedLibs: Boolean = false
 }
 
@@ -94,9 +79,12 @@ abstract class KotlinNativeCompilation @Inject constructor(
     override val target: KotlinNativeTarget
         get() = super.target as KotlinNativeTarget
 
+    override val compilerOptions: NativeCompilerOptions
+        get() = super.compilerOptions as NativeCompilerOptions
+
     // Interop DSL.
     val cinterops = project.container(DefaultCInteropSettings::class.java) { cinteropName ->
-        project.objects.newInstance(DefaultCInteropSettings::class.java, project, cinteropName, this)
+        project.objects.newInstance(DefaultCInteropSettings::class.java, cinteropName, this)
     }
 
     fun cinterops(action: Action<NamedDomainObjectContainer<DefaultCInteropSettings>>) = action.execute(cinterops)

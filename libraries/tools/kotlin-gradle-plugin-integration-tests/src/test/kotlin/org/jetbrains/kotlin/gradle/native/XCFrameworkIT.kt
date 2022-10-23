@@ -27,7 +27,7 @@ class XCFrameworkIT : BaseGradleIT() {
     override val defaultGradleVersion = GradleVersionRequired.FOR_MPP_SUPPORT
     override fun defaultBuildOptions() = super.defaultBuildOptions().copy(
         androidHome = KtTestUtil.findAndroidSdk(),
-        androidGradlePluginVersion = AGPVersion.v3_6_0
+        androidGradlePluginVersion = AGPVersion.v4_1_0
     )
 
     @Test
@@ -35,15 +35,23 @@ class XCFrameworkIT : BaseGradleIT() {
         with(Project("appleXCFramework")) {
             build("assembleSharedDebugXCFramework") {
                 assertSuccessful()
-                assertTasksExecuted(":shared:linkDebugFrameworkIosArm64")
                 assertTasksExecuted(":shared:linkDebugFrameworkIosX64")
+                assertTasksExecuted(":shared:linkDebugFrameworkIosArm64")
+                assertTasksExecuted(":shared:linkDebugFrameworkIosArm32")
+                assertTasksExecuted(":shared:linkDebugFrameworkIosSimulatorArm64")
+                assertTasksExecuted(":shared:assembleDebugIosFatFrameworkForSharedXCFramework")
+                assertTasksExecuted(":shared:assembleDebugIosSimulatorFatFrameworkForSharedXCFramework")
                 assertTasksExecuted(":shared:linkDebugFrameworkWatchosArm32")
                 assertTasksExecuted(":shared:linkDebugFrameworkWatchosArm64")
+                assertTasksExecuted(":shared:linkDebugFrameworkWatchosDeviceArm64")
+                assertTasksExecuted(":shared:linkDebugFrameworkWatchosSimulatorArm64")
+                assertTasksExecuted(":shared:linkDebugFrameworkWatchosX86")
                 assertTasksExecuted(":shared:linkDebugFrameworkWatchosX64")
                 assertTasksExecuted(":shared:assembleDebugWatchosFatFrameworkForSharedXCFramework")
+                assertTasksExecuted(":shared:assembleDebugWatchosSimulatorFatFrameworkForSharedXCFramework")
                 assertTasksExecuted(":shared:assembleSharedDebugXCFramework")
                 assertFileExists("/shared/build/XCFrameworks/debug/shared.xcframework")
-                assertFileExists("/shared/build/XCFrameworks/debug/shared.xcframework/ios-arm64/dSYMs/shared.framework.dSYM")
+                assertFileExists("/shared/build/XCFrameworks/debug/shared.xcframework/ios-arm64_x86_64-simulator/dSYMs/shared.framework.dSYM")
                 assertFileExists("/shared/build/sharedXCFrameworkTemp/fatframework/debug/watchos/shared.framework")
                 assertFileExists("/shared/build/sharedXCFrameworkTemp/fatframework/debug/watchos/shared.framework.dSYM")
             }
@@ -54,6 +62,7 @@ class XCFrameworkIT : BaseGradleIT() {
                 assertTasksUpToDate(":shared:linkDebugFrameworkIosX64")
                 assertTasksUpToDate(":shared:linkDebugFrameworkWatchosArm32")
                 assertTasksUpToDate(":shared:linkDebugFrameworkWatchosArm64")
+                assertTasksUpToDate(":shared:linkDebugFrameworkWatchosDeviceArm64")
                 assertTasksUpToDate(":shared:linkDebugFrameworkWatchosX64")
                 assertTasksUpToDate(":shared:assembleDebugWatchosFatFrameworkForSharedXCFramework")
                 assertTasksUpToDate(":shared:assembleSharedDebugXCFramework")
@@ -123,6 +132,41 @@ class XCFrameworkIT : BaseGradleIT() {
             build("tasks") {
                 assertFailed()
                 assertContains("All inner frameworks in XCFramework 'shared' should have same names. But there are two with 'awesome' and 'shared' names")
+            }
+        }
+    }
+
+    @Test
+    fun `assemble framework does nothing when no sources rather than fail`() {
+        with(transformProjectWithPluginsDsl("appleXCFramework")) {
+            projectDir.resolve("shared/src").deleteRecursively()
+            build(":shared:assembleXCFramework") {
+                assertSuccessful()
+                assertTasksSkipped(
+                    ":shared:assembleSharedDebugXCFramework",
+                    ":shared:assembleSharedReleaseXCFramework",
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `check assemble framework handles dashes in its name correctly`() {
+        with(transformProjectWithPluginsDsl("appleXCFramework")) {
+            with(gradleBuildScript("shared")) {
+                var text = readText()
+                text = text.replace("baseName = \"shared\"", "baseName = \"sha-red\"")
+                text = text.replace("XCFramework()", "XCFramework(\"sha-red\")")
+                writeText(text)
+            }
+
+            build(":shared:assembleSha-redXCFramework") {
+                assertSuccessful()
+                assertTasksExecuted(
+                    ":shared:assembleSha-redDebugXCFramework",
+                    ":shared:assembleSha-redReleaseXCFramework",
+                )
+                assertNotContains("differs from inner frameworks name")
             }
         }
     }

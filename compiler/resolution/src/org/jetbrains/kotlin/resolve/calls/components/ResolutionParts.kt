@@ -29,9 +29,7 @@ import org.jetbrains.kotlin.types.error.ErrorUtils
 import org.jetbrains.kotlin.types.model.*
 import org.jetbrains.kotlin.types.typeUtil.*
 import org.jetbrains.kotlin.utils.SmartList
-import org.jetbrains.kotlin.utils.addToStdlib.cast
 import org.jetbrains.kotlin.utils.addToStdlib.compactIfPossible
-import org.jetbrains.kotlin.utils.addToStdlib.safeAs
 
 internal object CheckVisibility : ResolutionPart() {
     override fun ResolutionCandidate.process(workIndex: Int) {
@@ -662,9 +660,25 @@ internal object CheckReceivers : ResolutionPart() {
                 candidateDescriptor.dispatchReceiverParameter,
                 shouldCheckImplicitInvoke = true,
             )
+
             1 -> {
-                if (resolvedCall.extensionReceiverArgument == null) {
-                    resolvedCall.extensionReceiverArgument = chooseExtensionReceiverCandidate() ?: return
+                var extensionReceiverArgument = resolvedCall.extensionReceiverArgument
+                if (extensionReceiverArgument == null) {
+                    extensionReceiverArgument = chooseExtensionReceiverCandidate() ?: return
+                    resolvedCall.extensionReceiverArgument = extensionReceiverArgument
+                }
+                val checkBuilderInferenceRestriction =
+                    !callComponents.languageVersionSettings
+                        .supportsFeature(LanguageFeature.NoBuilderInferenceWithoutAnnotationRestriction)
+                if (checkBuilderInferenceRestriction &&
+                    extensionReceiverArgument.receiver.receiverValue.type is StubTypeForBuilderInference
+                ) {
+                    addDiagnostic(
+                        StubBuilderInferenceReceiver(
+                            extensionReceiverArgument,
+                            candidateDescriptor.extensionReceiverParameter!!
+                        )
+                    )
                 }
                 checkReceiver(
                     resolvedCall.extensionReceiverArgument,
@@ -688,7 +702,10 @@ internal object CheckReceivers : ResolutionPart() {
         val extensionReceiverParameter = candidateDescriptor.extensionReceiverParameter ?: return null
         val compatible = receiverCandidates.mapNotNull { getReceiverArgumentWithConstraintIfCompatible(it, extensionReceiverParameter) }
         return when (compatible.size) {
-            0 -> null
+            0 -> {
+                addDiagnostic(NoMatchingContextReceiver())
+                null
+            }
             1 -> compatible.single().argument
             else -> {
                 addDiagnostic(ContextReceiverAmbiguity())
@@ -788,21 +805,35 @@ internal object CheckSuperExpressionCallPart : ResolutionPart() {
 
         if (callComponents.statelessCallbacks.isSuperExpression(resolvedCall.dispatchReceiverArgument)) {
             if (candidateDescriptor is CallableMemberDescriptor) {
-                if (candidateDescriptor.modality == Modality.ABSTRACT) {
-                    addDiagnostic(AbstractSuperCall(resolvedCall.dispatchReceiverArgument!!))
-                } else if (candidateDescriptor.kind == CallableMemberDescriptor.Kind.FAKE_OVERRIDE &&
-                    candidateDescriptor.overriddenDescriptors.size > 1
-                ) {
-                    if (candidateDescriptor.overriddenDescriptors.firstOrNull { !it.isInsideInterface }?.modality == Modality.ABSTRACT) {
-                        addDiagnostic(AbstractFakeOverrideSuperCall)
-                    }
-                }
+                checkSuperCandidateDescriptor(candidateDescriptor)
             }
         }
 
         val extensionReceiver = resolvedCall.extensionReceiverArgument
         if (extensionReceiver != null && callComponents.statelessCallbacks.isSuperExpression(extensionReceiver)) {
             addDiagnostic(SuperAsExtensionReceiver(extensionReceiver))
+        }
+    }
+
+    private fun ResolutionCandidate.checkSuperCandidateDescriptor(candidateDescriptor: CallableMemberDescriptor) {
+        if (candidateDescriptor.modality == Modality.ABSTRACT) {
+            addDiagnostic(AbstractSuperCall(resolvedCall.dispatchReceiverArgument!!))
+        } else if (candidateDescriptor.kind == CallableMemberDescriptor.Kind.FAKE_OVERRIDE) {
+            var intersectionFakeOverrideDescriptor = candidateDescriptor
+            while (intersectionFakeOverrideDescriptor.overriddenDescriptors.size == 1) {
+                intersectionFakeOverrideDescriptor = intersectionFakeOverrideDescriptor.overriddenDescriptors.first()
+                if (intersectionFakeOverrideDescriptor.kind != CallableMemberDescriptor.Kind.FAKE_OVERRIDE) {
+                    return
+                }
+            }
+            if (intersectionFakeOverrideDescriptor.overriddenDescriptors.size > 1) {
+                if (intersectionFakeOverrideDescriptor.overriddenDescriptors.firstOrNull {
+                        !it.isInsideInterface
+                    }?.modality == Modality.ABSTRACT
+                ) {
+                    addDiagnostic(AbstractFakeOverrideSuperCall)
+                }
+            }
         }
     }
 }
@@ -818,7 +849,7 @@ internal object ErrorDescriptorResolutionPart : ResolutionPart() {
         resolvedCall.knownParametersSubstitutor = EmptySubstitutor
         resolvedCall.argumentToCandidateParameter = emptyMap()
 
-        kotlinCall.explicitReceiver?.safeAs<SimpleKotlinCallArgument>()?.let {
+        (kotlinCall.explicitReceiver as? SimpleKotlinCallArgument)?.let {
             resolveKotlinArgument(it, null, ReceiverInfo.notReceiver)
         }
         for (argument in kotlinCall.argumentsInParenthesis) {
@@ -885,8 +916,10 @@ internal object CheckIncompatibleTypeVariableUpperBounds : ResolutionPart() {
      * Check if the candidate was already discriminated by `CompatibilityOfTypeVariableAsIntersectionTypePart` resolution part
      * If it's true we shouldn't mark the candidate with warning, but should mark with error, to repeat the existing proper behaviour
      */
-    private fun ResolutionCandidate.wasPreviouslyDiscriminated(upperTypes: List<KotlinTypeMarker>) =
-        callComponents.statelessCallbacks.isOldIntersectionIsEmpty(upperTypes.cast())
+    private fun ResolutionCandidate.wasPreviouslyDiscriminated(upperTypes: List<KotlinTypeMarker>): Boolean {
+        @Suppress("UNCHECKED_CAST")
+        return callComponents.statelessCallbacks.isOldIntersectionIsEmpty(upperTypes as List<KotlinType>)
+    }
 
     override fun ResolutionCandidate.process(workIndex: Int) = with(getSystem().asConstraintSystemCompleterContext()) {
         val constraintSystem = getSystem()
@@ -901,6 +934,9 @@ internal object CheckIncompatibleTypeVariableUpperBounds : ResolutionPart() {
                     markCandidateForCompatibilityResolve(needToReportWarning = false)
                     continue
                 }
+                (variableWithConstraints.typeVariable as? TypeVariableFromCallableDescriptor)?.originalTypeParameter?.let { parameter ->
+                    resolvedCall.typeArgumentMappingByOriginal.getTypeArgument(parameter)
+                } is SimpleTypeArgument -> continue
                 else -> {
                     val emptyIntersectionTypeInfo = constraintSystem.getEmptyIntersectionTypeKind(upperTypes) ?: continue
                     val isInferredEmptyIntersectionForbidden = callComponents.languageVersionSettings.supportsFeature(

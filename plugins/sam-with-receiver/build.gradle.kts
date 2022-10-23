@@ -6,10 +6,10 @@ plugins {
 }
 
 dependencies {
-    embedded(project(":kotlin-sam-with-receiver-compiler-plugin.common"))
-    embedded(project(":kotlin-sam-with-receiver-compiler-plugin.k1"))
-    embedded(project(":kotlin-sam-with-receiver-compiler-plugin.k2"))
-    embedded(project(":kotlin-sam-with-receiver-compiler-plugin.cli"))
+    embedded(project(":kotlin-sam-with-receiver-compiler-plugin.common")) { isTransitive = false }
+    embedded(project(":kotlin-sam-with-receiver-compiler-plugin.k1")) { isTransitive = false }
+    embedded(project(":kotlin-sam-with-receiver-compiler-plugin.k2")) { isTransitive = false }
+    embedded(project(":kotlin-sam-with-receiver-compiler-plugin.cli")) { isTransitive = false }
 
     testApi(project(":compiler:backend"))
     testApi(project(":compiler:cli"))
@@ -26,8 +26,6 @@ dependencies {
     testImplementation(projectTests(":compiler:tests-common"))
     testImplementation(commonDependency("junit:junit"))
 
-    testCompileOnly(project(":kotlin-reflect-api"))
-    testRuntimeOnly(project(":kotlin-reflect"))
     testRuntimeOnly(project(":core:descriptors.runtime"))
     testRuntimeOnly(project(":compiler:fir:fir-serialization"))
 

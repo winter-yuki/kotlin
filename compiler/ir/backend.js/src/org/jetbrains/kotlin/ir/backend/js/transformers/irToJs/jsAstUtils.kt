@@ -7,12 +7,13 @@ package org.jetbrains.kotlin.ir.backend.js.transformers.irToJs
 
 import org.jetbrains.kotlin.backend.common.compilationException
 import org.jetbrains.kotlin.ir.IrElement
+import org.jetbrains.kotlin.ir.IrFileEntry
 import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
+import org.jetbrains.kotlin.ir.backend.js.JsIrBackendContext
 import org.jetbrains.kotlin.ir.backend.js.JsStatementOrigins
+import org.jetbrains.kotlin.ir.backend.js.sourceMapsInfo
 import org.jetbrains.kotlin.ir.backend.js.utils.*
-import org.jetbrains.kotlin.ir.declarations.IrClass
-import org.jetbrains.kotlin.ir.declarations.IrFunction
-import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
+import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.expressions.*
 import org.jetbrains.kotlin.ir.symbols.IrFunctionSymbol
 import org.jetbrains.kotlin.ir.util.*
@@ -20,8 +21,22 @@ import org.jetbrains.kotlin.ir.visitors.acceptChildrenVoid
 import org.jetbrains.kotlin.ir.visitors.acceptVoid
 import org.jetbrains.kotlin.js.backend.ast.*
 import org.jetbrains.kotlin.js.common.isValidES5Identifier
+import org.jetbrains.kotlin.js.config.SourceMapNamesPolicy
+import org.jetbrains.kotlin.js.config.SourceMapSourceEmbedding
 import org.jetbrains.kotlin.util.OperatorNameConventions
 import org.jetbrains.kotlin.utils.addIfNotNull
+import java.io.FileInputStream
+import java.io.IOException
+import java.io.InputStreamReader
+import java.nio.charset.StandardCharsets
+
+
+fun jsUndefined(context: IrNamer, backendContext: JsIrBackendContext): JsExpression {
+    return when (val void = backendContext.getVoid()) {
+        is IrGetField -> context.getNameForField(void.symbol.owner).makeRef()
+        else -> JsNullLiteral()
+    }
+}
 
 fun jsVar(name: JsName, initializer: IrExpression?, context: JsGenerationContext): JsVars {
     val jsInitializer = initializer?.accept(IrElementToJsExpressionTransformer(), context)
@@ -30,35 +45,62 @@ fun jsVar(name: JsName, initializer: IrExpression?, context: JsGenerationContext
 
 fun <T : JsNode> IrWhen.toJsNode(
     tr: BaseIrElementToJsNodeTransformer<T, JsGenerationContext>,
-    data: JsGenerationContext,
+    context: JsGenerationContext,
     node: (JsExpression, T, T?) -> T,
     implicitElse: T? = null
 ): T? =
     branches.foldRight(implicitElse) { br, n ->
-        val body = br.result.accept(tr, data)
+        val body = br.result.accept(tr, context)
         if (isElseBranch(br)) body
         else {
-            val condition = br.condition.accept(IrElementToJsExpressionTransformer(), data)
-            node(condition, body, n)
+            val condition = br.condition.accept(IrElementToJsExpressionTransformer(), context)
+            node(condition, body, n).withSource(br, context)
         }
     }
 
 fun jsElementAccess(name: String, receiver: JsExpression?): JsExpression =
-    if (receiver == null || name.isValidES5Identifier()) {
-        JsNameRef(JsName(name, false), receiver)
+    jsElementAccess(JsName(name, false), receiver)
+
+fun jsElementAccess(name: JsName, receiver: JsExpression?): JsExpression =
+    if (receiver == null || name.ident.isValidES5Identifier()) {
+        JsNameRef(name, receiver)
     } else {
-        JsArrayAccess(receiver, JsStringLiteral(name))
+        JsArrayAccess(receiver, JsStringLiteral(name.ident))
     }
 
 fun jsAssignment(left: JsExpression, right: JsExpression) = JsBinaryOperation(JsBinaryOperator.ASG, left, right)
 
-fun prototypeOf(classNameRef: JsExpression) = JsNameRef(Namer.PROTOTYPE_NAME, classNameRef)
+fun prototypeOf(classNameRef: JsExpression, context: JsStaticContext) =
+    JsInvocation(
+        context
+            .getNameForStaticFunction(context.backendContext.intrinsics.jsPrototypeOfSymbol.owner)
+            .makeRef(),
+        classNameRef
+    )
+
+fun objectCreate(prototype: JsExpression, context: JsStaticContext) =
+    JsInvocation(
+        context
+            .getNameForStaticFunction(context.backendContext.intrinsics.jsObjectCreateSymbol.owner)
+            .makeRef(),
+        prototype
+    )
+
+fun defineProperty(obj: JsExpression, name: String, getter: JsExpression?, setter: JsExpression?, context: JsStaticContext) =
+    JsInvocation(
+        context
+            .getNameForStaticFunction(context.backendContext.intrinsics.jsDefinePropertySymbol.owner)
+            .makeRef(),
+        obj,
+        JsStringLiteral(name),
+        *listOf(getter, setter)
+            .dropLastWhile { it == null }
+            .map { it ?: jsUndefined(context, context.backendContext) }
+            .toTypedArray()
+    )
 
 fun translateFunction(declaration: IrFunction, name: JsName?, context: JsGenerationContext): JsFunction {
-    val jsFun = declaration.getJsFunAnnotation()
-    if (jsFun != null) {
-        // JsFun internal annotation must have string containing valid function expression
-        val function = (parseJsCode(jsFun)!!.single() as JsExpressionStatement).expression as JsFunction
+    context.staticContext.backendContext.getJsCodeForFunction(declaration.symbol)?.let { function ->
         function.name = name
         return function
     }
@@ -75,6 +117,7 @@ fun translateFunction(declaration: IrFunction, name: JsName?, context: JsGenerat
     val body = declaration.body?.accept(IrElementToJsStatementTransformer(), functionContext) as? JsBlock ?: JsBlock()
 
     val function = JsFunction(emptyScope, body, "member function ${name ?: "annon"}")
+        .withSource(declaration, context, useNameOf = declaration)
 
     function.name = name
 
@@ -159,7 +202,7 @@ fun translateCall(
         } else {
             val qualifierName = context.getNameForClass(klass).makeRef()
             val targetName = context.getNameForMemberFunction(target)
-            val qPrototype = JsNameRef(targetName, prototypeOf(qualifierName))
+            val qPrototype = JsNameRef(targetName, prototypeOf(qualifierName, context.staticContext))
             JsNameRef(Namer.CALL_FUNCTION, qPrototype)
         }
 
@@ -328,6 +371,7 @@ fun translateCallArguments(
     expression: IrMemberAccessExpression<IrFunctionSymbol>,
     context: JsGenerationContext,
     transformer: IrElementToJsExpressionTransformer,
+    allowDropTailVoids: Boolean = true
 ): List<JsExpression> {
     val size = expression.valueArgumentsCount
 
@@ -336,13 +380,15 @@ fun translateCallArguments(
     val validWithNullArgs = expression.validWithNullArgs()
     val arguments = (0 until size)
         .mapTo(ArrayList(size)) { index ->
-            val argument = expression.getValueArgument(index)
-            argument?.accept(transformer, context)
+            expression.getValueArgument(index).checkOnNullability(validWithNullArgs)
         }
-        .onEach { result ->
-            if (result == null) {
-                assert(validWithNullArgs)
-            }
+        .dropLastWhile {
+            allowDropTailVoids &&
+                    it is IrGetField &&
+                    it.symbol.owner.correspondingPropertySymbol == context.staticContext.backendContext.intrinsics.void
+        }
+        .map {
+            it?.accept(transformer, context)
         }
         .mapIndexed { index, result ->
             val isEmptyExternalVararg = validWithNullArgs &&
@@ -355,33 +401,23 @@ fun translateCallArguments(
             } else result
         }
         .dropLastWhile { it == null }
-        .map { it ?: JsPrefixOperation(JsUnaryOperator.VOID, JsIntLiteral(1)) }
+        .map { it ?: jsUndefined(context, context.staticContext.backendContext) }
 
     check(!expression.symbol.isSuspend) { "Suspend functions should be lowered" }
     return arguments
 }
 
+private fun IrExpression?.checkOnNullability(validWithNullArgs: Boolean) =
+    also {
+        if (it == null) {
+            assert(validWithNullArgs)
+        }
+    }
+
 private fun IrMemberAccessExpression<*>.validWithNullArgs() =
     this is IrFunctionAccessExpression && symbol.owner.isExternalOrInheritedFromExternal()
 
 fun JsStatement.asBlock() = this as? JsBlock ?: JsBlock(this)
-
-fun defineProperty(receiver: JsExpression, name: String, value: () -> JsExpression): JsInvocation {
-    val objectDefineProperty = JsNameRef("defineProperty", Namer.JS_OBJECT)
-    return JsInvocation(objectDefineProperty, receiver, JsStringLiteral(name), value())
-}
-
-fun defineProperty(receiver: JsExpression, name: String, getter: JsExpression?, setter: JsExpression? = null) =
-    defineProperty(receiver, name) {
-        JsObjectLiteral(true).apply {
-            propertyInitializers += JsPropertyInitializer(JsStringLiteral("configurable"), JsBooleanLiteral(true))
-            if (getter != null)
-                propertyInitializers += JsPropertyInitializer(JsStringLiteral("get"), getter)
-            if (setter != null)
-                propertyInitializers += JsPropertyInitializer(JsStringLiteral("set"), setter)
-        }
-    }
-
 
 // Partially copied from org.jetbrains.kotlin.js.translate.utils.JsAstUtils
 object JsAstUtils {
@@ -485,24 +521,106 @@ object JsAstUtils {
     }
 }
 
-internal fun <T : JsNode> T.withSource(node: IrElement, context: JsGenerationContext): T {
-    addSourceInfoIfNeed(node, context)
+internal fun <T : JsNode> T.withSource(
+    node: IrElement,
+    context: JsGenerationContext,
+    useNameOf: IrDeclarationWithName? = null,
+    container: IrDeclaration? = null
+): T {
+    addSourceInfoIfNeed(node, context, useNameOf, container)
     return this
 }
 
 @Suppress("NOTHING_TO_INLINE")
-private inline fun <T : JsNode> T.addSourceInfoIfNeed(node: IrElement, context: JsGenerationContext) {
-    if (!context.staticContext.genSourcemaps) return
-
-    if (node.startOffset == UNDEFINED_OFFSET || node.endOffset == UNDEFINED_OFFSET) return
-
-    val fileEntry = context.currentFile.fileEntry
-
-    val path = fileEntry.name
-    val startLine = fileEntry.getLineNumber(node.startOffset)
-    val startColumn = fileEntry.getColumnNumber(node.startOffset)
+private inline fun <T : JsNode> T.addSourceInfoIfNeed(
+    node: IrElement,
+    context: JsGenerationContext,
+    useNameOf: IrDeclarationWithName?,
+    container: IrDeclaration?
+) {
+    val sourceMapsInfo = context.staticContext.backendContext.sourceMapsInfo ?: return
+    val originalName = useNameOf?.originalNameForUseInSourceMap(sourceMapsInfo.namesPolicy)
+    val location = context.getStartLocationForIrElement(node, originalName) ?: return
+    val isNodeFromCurrentModule = context.currentFile.module.descriptor == context.staticContext.backendContext.module
 
     // TODO maybe it's better to fix in JsExpressionStatement
     val locationTarget = if (this is JsExpressionStatement) this.expression else this
-    locationTarget.source = JsLocation(path, startLine, startColumn)
+
+    if (locationTarget is JsBlock && (node is IrBlockBody || node is IrBlock)) {
+        locationTarget.closingBraceSource = if (container is IrConstructor) {
+            // This is a hack. Without this special case, the closing brace in the generated code for constructors would always be mapped
+            // to the closing brace of the Kotlin class declaration.
+            context.getStartLocationForIrElement(node)
+        } else {
+            context.getEndLocationForIrElement(node)?.run {
+                // Assuming that endOffset for IrBlock and IrBlockBody points to the character after the closing brace.
+                // TODO: This doesn't produce good results if the node originates from an expression body
+                // (meaning, in the source code; not to be confused with IrExpressionBody)
+                if (startChar > 0) copy(startChar = startChar - 1) else null
+            }
+        }
+    }
+
+    locationTarget.source = when (sourceMapsInfo.sourceMapContentEmbedding) {
+        SourceMapSourceEmbedding.NEVER -> location
+        SourceMapSourceEmbedding.INLINING -> if (isNodeFromCurrentModule) location else location.withEmbeddedSource(context)
+        SourceMapSourceEmbedding.ALWAYS -> location.withEmbeddedSource(context)
+    }
+}
+
+private fun JsLocation.withEmbeddedSource(
+    @Suppress("UNUSED_PARAMETER")
+    context: JsGenerationContext
+): JsLocationWithEmbeddedSource {
+    // FIXME: fileIdentity is used to distinguish between different files with the same paths.
+    // For now we use the file's path to read its content, which makes fileIdentity useless.
+    // However, when we have a mechanism to reliably get the source code from an IrFile or IrFileEntry no matter what's stored
+    // in fileEntry.name (including the source code for external libraries or klibs with relative paths in them).
+    // Another issue is that JS AST serializer/deserializer ignores fileIdentity, which means that this will not work with incremental
+    // compilation.
+    return JsLocationWithEmbeddedSource(this, fileIdentity = null /*context.currentFile.fileEntry*/) {
+        try {
+            InputStreamReader(FileInputStream(file), StandardCharsets.UTF_8)
+        } catch (e: IOException) {
+            // TODO: If the source file is not available at path (e. g. it's an stdlib file), use heuristics to find it.
+            // If all heuristics fail, use dumpKotlinLike() on freshly deserialized IrFile.
+            null
+        }
+    }
+}
+
+fun IrElement.getStartSourceLocation(container: IrDeclaration): JsLocation? {
+    val fileEntry = container.fileOrNull?.fileEntry ?: return null
+    return getStartSourceLocation(fileEntry)
+}
+
+fun IrElement.getStartSourceLocation(fileEntry: IrFileEntry) =
+    getSourceLocation(fileEntry) { startOffset }
+
+inline fun IrElement.getSourceLocation(fileEntry: IrFileEntry, offsetSelector: IrElement.() -> Int): JsLocation? {
+    if (startOffset == UNDEFINED_OFFSET || endOffset == UNDEFINED_OFFSET) return null
+    val path = fileEntry.name
+    val offset = offsetSelector()
+    val startLine = fileEntry.getLineNumber(offset)
+    val startColumn = fileEntry.getColumnNumber(offset)
+    return JsLocation(path, startLine, startColumn)
+}
+
+/**
+ * Returns a name of the original Kotlin declaration, or null, if it is a compiler generated declaration.
+ */
+private fun IrDeclarationWithName.originalNameForUseInSourceMap(policy: SourceMapNamesPolicy): String? {
+    if (policy == SourceMapNamesPolicy.NO) return null
+    when (this) {
+        is IrField -> correspondingPropertySymbol?.let {
+            return it.owner.originalNameForUseInSourceMap(policy)
+        }
+
+        is IrFunction -> if (policy == SourceMapNamesPolicy.FULLY_QUALIFIED_NAMES) {
+            fqNameWhenAvailable?.let {
+                return it.asString()
+            }
+        }
+    }
+    return name.asString()
 }

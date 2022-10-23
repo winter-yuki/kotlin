@@ -12,6 +12,7 @@ import org.jetbrains.kotlin.asJava.LightClassGenerationSupport
 import org.jetbrains.kotlin.asJava.elements.FakeFileForLightClass
 import org.jetbrains.kotlin.asJava.elements.KtLightModifierListDescriptorBased
 import org.jetbrains.kotlin.asJava.hasInterfaceDefaultImpls
+import org.jetbrains.kotlin.asJava.toLightClass
 import org.jetbrains.kotlin.builtins.jvm.JavaToKotlinClassMap
 import org.jetbrains.kotlin.config.JvmDefaultMode
 import org.jetbrains.kotlin.descriptors.ClassDescriptor
@@ -31,11 +32,10 @@ private class KtLightClassModifierList(containingClass: KtLightClassForSourceDec
 }
 
 // light class for top level or (inner/nested of top level) source declarations
-abstract class KtLightClassImpl @JvmOverloads constructor(
+abstract class KtLightClassImpl constructor(
     classOrObject: KtClassOrObject,
     jvmDefaultMode: JvmDefaultMode,
-    forceUsingOldLightClasses: Boolean = false
-) : KtLightClassForSourceDeclaration(classOrObject, jvmDefaultMode, forceUsingOldLightClasses) {
+) : KtLightClassForSourceDeclaration(classOrObject, jvmDefaultMode) {
     fun getDescriptor() =
         LightClassGenerationSupport.getInstance(project).resolveToDescriptor(classOrObject) as? ClassDescriptor
 
@@ -134,7 +134,7 @@ abstract class KtLightClassImpl @JvmOverloads constructor(
     private val _containingFile: PsiFile by lazyPub {
         object : FakeFileForLightClass(
             classOrObject.containingKtFile,
-            { if (classOrObject.isTopLevel()) this else KotlinLightClassFactory.createClass(getOutermostClassOrObject(classOrObject))!! },
+            { if (classOrObject.isTopLevel()) this else getOutermostClassOrObject(classOrObject).toLightClass()!! },
         ) {
             override fun findReferenceAt(offset: Int) = ktFile.findReferenceAt(offset)
 
@@ -168,9 +168,7 @@ abstract class KtLightClassImpl @JvmOverloads constructor(
             // inner classes with null names can't be searched for and can't be used from java anyway
             // we can't prohibit creating light classes with null names either since they can contain members
             .filter { it.name != null }
-            .mapNotNullTo(result) {
-                KotlinLightClassFactory.createClass(it)
-            }
+            .mapNotNullTo(result, KtClassOrObject::toLightClass)
 
         if (classOrObject.hasInterfaceDefaultImpls && jvmDefaultMode != JvmDefaultMode.ALL_INCOMPATIBLE) {
             result.add(createClassForInterfaceDefaultImpls())
@@ -186,11 +184,10 @@ abstract class KtLightClassImpl @JvmOverloads constructor(
 
         val containingClassOrObject = (classOrObject.parent as? KtClassBody)?.parent as? KtClassOrObject
         if (containingClassOrObject != null) {
-            return KotlinLightClassFactory.createClass(containingClassOrObject)
+            return containingClassOrObject.toLightClass()
         }
 
-        // TODO: should return null
-        return super.getContainingClass()
+        return null
     }
 
     companion object {

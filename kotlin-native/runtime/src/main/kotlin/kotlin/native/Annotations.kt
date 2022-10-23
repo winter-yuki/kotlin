@@ -1,22 +1,22 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
+ * Copyright 2010-2022 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
  * that can be found in the LICENSE file.
  */
 
 package kotlin.native
 
 import kotlin.experimental.ExperimentalObjCName
+import kotlin.experimental.ExperimentalObjCRefinement
 import kotlin.reflect.KClass
 
 /**
- * [SymbolName] annotation is deprecated and became internal. Please avoid using it.
- * It is dangerous when combined with the new experimental memory manager.
+ * [SymbolName] is a dangerous deprecated and internal annotation. Please avoid using it.
+ *
  * If you absolutely need to use the annotation, please comment at
  * [KT-46649](https://youtrack.jetbrains.com/issue/KT-46649).
  */
 @RequiresOptIn(
-        message = "@SymbolName annotation is internal. " +
-                "It is dangerous when combined with the new experimental memory manager. " +
+        message = "@SymbolName is dangerous deprecated and internal annotation. " +
                 "See https://youtrack.jetbrains.com/issue/KT-46649",
         level = RequiresOptIn.Level.ERROR
 )
@@ -25,8 +25,8 @@ import kotlin.reflect.KClass
 internal annotation class SymbolNameIsInternal
 
 /**
- * This annotation is deprecated and became internal. Please avoid using it.
- * It is dangerous when combined with the new experimental memory manager.
+ * This is a dangerous deprecated and internal annotation. Please avoid using it.
+ *
  * If you absolutely need to use the annotation, please comment at
  * [KT-46649](https://youtrack.jetbrains.com/issue/KT-46649).
  */
@@ -100,3 +100,58 @@ public actual annotation class CName(actual val externName: String = "", actual 
 @MustBeDocumented
 @ExperimentalObjCName
 public actual annotation class ObjCName(actual val name: String = "", actual val swiftName: String = "", actual val exact: Boolean = false)
+
+/**
+ * Meta-annotation that instructs the Kotlin compiler to remove the annotated function or property from the public Objective-C API.
+ *
+ * Annotation processors that refine the public Objective-C API can annotate their annotations with this meta-annotation
+ * to have the original declarations automatically removed from the public API.
+ *
+ * Note: only annotations with [AnnotationTarget.FUNCTION] and/or [AnnotationTarget.PROPERTY] are supported.
+ */
+@Target(AnnotationTarget.ANNOTATION_CLASS)
+@Retention(AnnotationRetention.BINARY)
+@MustBeDocumented
+@ExperimentalObjCRefinement
+public actual annotation class HidesFromObjC
+
+/**
+ * Instructs the Kotlin compiler to remove this function or property from the public Objective-C API.
+ */
+@HidesFromObjC
+@Target(AnnotationTarget.PROPERTY, AnnotationTarget.FUNCTION)
+@Retention(AnnotationRetention.BINARY)
+@MustBeDocumented
+@ExperimentalObjCRefinement
+public actual annotation class HiddenFromObjC
+
+/**
+ * Meta-annotation that instructs the Kotlin compiler to mark the annotated function or property as
+ * `swift_private` in the generated Objective-C API.
+ *
+ * Annotation processors that refine the public API in Swift can annotate their annotations with this meta-annotation
+ * to automatically hide the annotated declarations from Swift.
+ *
+ * See Apple's documentation of the [`NS_REFINED_FOR_SWIFT`](https://developer.apple.com/documentation/swift/objective-c_and_c_code_customization/improving_objective-c_api_declarations_for_swift)
+ * macro for more information on refining Objective-C declarations in Swift.
+ *
+ * Note: only annotations with [AnnotationTarget.FUNCTION] and/or [AnnotationTarget.PROPERTY] are supported.
+ */
+@Target(AnnotationTarget.ANNOTATION_CLASS)
+@Retention(AnnotationRetention.BINARY)
+@MustBeDocumented
+@ExperimentalObjCRefinement
+public actual annotation class RefinesInSwift
+
+/**
+ * Instructs the Kotlin compiler to mark this function or property as `swift_private` in the generated Objective-C API.
+ *
+ * See Apple's documentation of the [`NS_REFINED_FOR_SWIFT`](https://developer.apple.com/documentation/swift/objective-c_and_c_code_customization/improving_objective-c_api_declarations_for_swift)
+ * macro for more information on refining Objective-C declarations in Swift.
+ */
+@RefinesInSwift
+@Target(AnnotationTarget.PROPERTY, AnnotationTarget.FUNCTION)
+@Retention(AnnotationRetention.BINARY)
+@MustBeDocumented
+@ExperimentalObjCRefinement
+public actual annotation class ShouldRefineInSwift

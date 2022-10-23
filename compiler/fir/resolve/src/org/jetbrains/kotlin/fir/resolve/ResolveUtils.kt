@@ -40,8 +40,8 @@ import org.jetbrains.kotlin.fir.scopes.impl.delegatedWrapperData
 import org.jetbrains.kotlin.fir.scopes.impl.importedFromObjectData
 import org.jetbrains.kotlin.fir.scopes.processOverriddenFunctions
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
-import org.jetbrains.kotlin.fir.symbols.ensureResolved
 import org.jetbrains.kotlin.fir.symbols.impl.*
+import org.jetbrains.kotlin.fir.symbols.lazyResolveToPhase
 import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.fir.types.builder.buildErrorTypeRef
 import org.jetbrains.kotlin.fir.types.builder.buildResolvedTypeRef
@@ -55,7 +55,6 @@ import org.jetbrains.kotlin.types.ConstantValueKind
 import org.jetbrains.kotlin.types.SmartcastStability
 import org.jetbrains.kotlin.types.model.safeSubstitute
 import org.jetbrains.kotlin.utils.addIfNotNull
-import org.jetbrains.kotlin.utils.addToStdlib.safeAs
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
 
@@ -183,7 +182,7 @@ fun BodyResolveComponents.typeForQualifier(resolvedQualifier: FirResolvedQualifi
     val classSymbol = resolvedQualifier.symbol
     val resultType = resolvedQualifier.resultType
     if (classSymbol != null) {
-        classSymbol.ensureResolved(FirResolvePhase.TYPES)
+        classSymbol.lazyResolveToPhase(FirResolvePhase.TYPES)
         val declaration = classSymbol.fir
         if (declaration !is FirTypeAlias || resolvedQualifier.typeArguments.isEmpty()) {
             typeForQualifierByDeclaration(declaration, resultType, session)?.let { return it }
@@ -222,8 +221,7 @@ internal fun typeForQualifierByDeclaration(declaration: FirDeclaration, resultTy
 }
 
 private fun FirPropertyWithExplicitBackingFieldResolvedNamedReference.getNarrowedDownSymbol(): FirBasedSymbol<*> {
-    val propertyReceiver = resolvedSymbol.safeAs<FirPropertySymbol>()
-        ?: return resolvedSymbol
+    val propertyReceiver = resolvedSymbol as? FirPropertySymbol ?: return resolvedSymbol
 
     // This can happen in case of 2 properties referencing
     // each other recursively. See: Jet81.fir.kt
@@ -362,24 +360,24 @@ private fun FirResolvedTypeRef.tryApplySelfCast(selfCastInfo: SelfTypeCastInfo, 
 
 fun BodyResolveComponents.transformQualifiedAccessUsingSmartcastInfo(
     qualifiedAccessExpression: FirQualifiedAccessExpression
-): FirQualifiedAccessExpression {
+): FirExpression {
+    val (stability, typesFromSmartCast) =
+        dataFlowAnalyzer.getTypeUsingSmartcastInfo(qualifiedAccessExpression)
+            ?: return qualifiedAccessExpression
     val builder = transformExpressionUsingSmartcastInfo(
         qualifiedAccessExpression,
-        dataFlowAnalyzer::getTypeUsingSmartcastInfo,
-        ::FirExpressionWithSmartcastBuilder,
-        ::FirExpressionWithSmartcastToNothingBuilder
+        stability, typesFromSmartCast
     ) ?: return qualifiedAccessExpression
     return builder.build()
 }
 
 fun BodyResolveComponents.transformWhenSubjectExpressionUsingSmartcastInfo(
     whenSubjectExpression: FirWhenSubjectExpression
-): FirWhenSubjectExpression {
+): FirExpression {
+    val (stability, typesFromSmartCast) = dataFlowAnalyzer.getTypeUsingSmartcastInfo(whenSubjectExpression) ?: return whenSubjectExpression
     val builder = transformExpressionUsingSmartcastInfo(
         whenSubjectExpression,
-        dataFlowAnalyzer::getTypeUsingSmartcastInfo,
-        ::FirWhenSubjectExpressionWithSmartcastBuilder,
-        ::FirWhenSubjectExpressionWithSmartcastToNothingBuilder
+        stability, typesFromSmartCast
     ) ?: return whenSubjectExpression
     return builder.build()
 }
@@ -387,13 +385,18 @@ fun BodyResolveComponents.transformWhenSubjectExpressionUsingSmartcastInfo(
 private val ConeKotlinType.isKindOfNothing
     get() = lowerBoundIfFlexible().let { it.isNothing || it.isNullableNothing }
 
-private inline fun <T : FirExpression> BodyResolveComponents.transformExpressionUsingSmartcastInfo(
+private fun FirSmartCastExpressionBuilder.applyResultTypeRef() {
+    typeRef =
+        if (smartcastStability == SmartcastStability.STABLE_VALUE)
+            smartcastType.copyWithNewSourceKind(KtFakeSourceElementKind.ImplicitTypeRef)
+        else
+            originalExpression.typeRef.copyWithNewSourceKind(KtFakeSourceElementKind.ImplicitTypeRef)
+}
+private fun <T : FirExpression> BodyResolveComponents.transformExpressionUsingSmartcastInfo(
     expression: T,
-    smartcastExtractor: (T) -> Pair<PropertyStability, MutableList<ConeKotlinType>>?,
-    smartcastBuilder: () -> FirWrappedExpressionWithSmartcastBuilder<T>,
-    smartcastToNothingBuilder: () -> FirWrappedExpressionWithSmartcastToNothingBuilder<T>
-): FirWrappedExpressionWithSmartcastBuilder<T>? {
-    val (stability, typesFromSmartCast) = smartcastExtractor(expression) ?: return null
+    stability: PropertyStability,
+    typesFromSmartCast: MutableList<ConeKotlinType>
+): FirSmartCastExpressionBuilder? {
     val smartcastStability = stability.impliedSmartcastStability
         ?: if (dataFlowAnalyzer.isAccessToUnstableLocalVariable(expression)) {
             SmartcastStability.CAPTURED_VARIABLE
@@ -435,20 +438,24 @@ private inline fun <T : FirExpression> BodyResolveComponents.transformExpression
             annotations += expression.resultType.annotations
             delegatedTypeRef = expression.resultType
         }
-        return smartcastToNothingBuilder().apply {
+        return FirSmartCastExpressionBuilder().apply {
             originalExpression = expression
+            source = originalExpression.source?.fakeElement(KtFakeSourceElementKind.SmartCastExpression)
             smartcastType = intersectedTypeRef
             smartcastTypeWithoutNullableNothing = reducedIntersectedTypeRef
             this.typesFromSmartCast = typesFromSmartCast
             this.smartcastStability = smartcastStability
+            applyResultTypeRef()
         }
     }
 
-    return smartcastBuilder().apply {
+    return FirSmartCastExpressionBuilder().apply {
         originalExpression = expression
+        source = originalExpression.source?.fakeElement(KtFakeSourceElementKind.SmartCastExpression)
         smartcastType = intersectedTypeRef
         this.typesFromSmartCast = typesFromSmartCast
         this.smartcastStability = smartcastStability
+        applyResultTypeRef()
     }
 }
 
@@ -459,7 +466,7 @@ fun FirCheckedSafeCallSubject.propagateTypeFromOriginalReceiver(
 ) {
     // If the receiver expression is smartcast to `null`, it would have `Nothing?` as its type, which may not have members called by user
     // code. Hence, we fallback to the type before intersecting with `Nothing?`.
-    val receiverType = ((nullableReceiverExpression as? FirExpressionWithSmartcastToNothing)
+    val receiverType = ((nullableReceiverExpression as? FirSmartCastExpression)
         ?.takeIf { it.isStable }
         ?.smartcastTypeWithoutNullableNothing
         ?: nullableReceiverExpression.typeRef)
@@ -535,7 +542,7 @@ private fun initialTypeOfCandidate(candidate: Candidate, typeRef: FirResolvedTyp
 }
 
 fun FirCallableDeclaration.getContainingClass(session: FirSession): FirRegularClass? =
-    this.containingClass()?.let { lookupTag ->
+    this.containingClassLookupTag()?.let { lookupTag ->
         session.symbolProvider.getSymbolByLookupTag(lookupTag)?.fir as? FirRegularClass
     }
 

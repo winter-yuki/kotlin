@@ -93,7 +93,7 @@ internal class PropertyReferenceLowering(val context: JvmBackendContext) : IrEle
     // Plain Java fields do not have a getter, but can be referenced nonetheless. The signature should be the one
     // that a getter would have, if it existed.
     private val IrField.fakeGetterSignature: String
-        get() = "${JvmAbi.getterName(name.asString())}()${context.methodSignatureMapper.mapReturnType(this)}"
+        get() = "${JvmAbi.getterName(name.asString())}()${context.defaultMethodSignatureMapper.mapReturnType(this)}"
 
     private fun IrBuilderWithScope.computeSignatureString(expression: IrMemberAccessExpression<*>): IrExpression {
         if (expression is IrLocalDelegatedPropertyReference) {
@@ -262,7 +262,7 @@ internal class PropertyReferenceLowering(val context: JvmBackendContext) : IrEle
         parentClassId?.let { containerId ->
             // This function was imported from a jar. Didn't run the inline class lowering yet though - have to map manually.
             val replaced = context.inlineClassReplacements.getReplacementFunction(this) ?: this
-            val signature = context.methodSignatureMapper.mapSignatureSkipGeneric(replaced)
+            val signature = context.defaultMethodSignatureMapper.mapSignatureSkipGeneric(replaced)
             val localIndex = signature.valueParameters.take(index + if (replaced.extensionReceiverParameter != null) 1 else 0)
                 .sumOf { it.asmType.size } + (if (replaced.dispatchReceiverParameter != null) 1 else 0)
             // Null checks are removed during inlining, so we can ignore them.
@@ -351,7 +351,12 @@ internal class PropertyReferenceLowering(val context: JvmBackendContext) : IrEle
         call.putValueArgument(index++, computeSignatureString(expression))
         if (useOptimizedSuperClass) {
             val isPackage = (container is IrClass && container.isFileClass) || container is IrPackageFragment
-            call.putValueArgument(index, irInt(if (isPackage) 1 else 0))
+            val isJavaSynthetic = (expression.symbol.owner as? IrProperty)?.let {
+                it.backingField == null &&
+                        (it.origin == IrDeclarationOrigin.SYNTHETIC_JAVA_PROPERTY_DELEGATE
+                                || it.origin == IrDeclarationOrigin.IR_EXTERNAL_JAVA_DECLARATION_STUB)
+            } ?: false
+            call.putValueArgument(index, irInt((if (isPackage) 1 else 0) or (if (isJavaSynthetic) 2 else 0)))
         }
     }
 

@@ -24,12 +24,12 @@ import org.gradle.api.logging.Logger
 import org.gradle.api.logging.Logging
 import org.gradle.api.model.ObjectFactory
 import org.gradle.tooling.provider.model.ToolingModelBuilderRegistry
-import org.jetbrains.kotlin.compilerRunner.registerCommonizerClasspathConfigurationIfNecessary
+import org.jetbrains.kotlin.compilerRunner.maybeCreateCommonizerClasspathConfiguration
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.*
 import org.jetbrains.kotlin.gradle.internal.KOTLIN_COMPILER_EMBEDDABLE
 import org.jetbrains.kotlin.gradle.internal.KOTLIN_MODULE_GROUP
 import org.jetbrains.kotlin.gradle.logging.kotlinDebug
-import org.jetbrains.kotlin.gradle.plugin.KotlinMultiplatformAndroidGradlePluginCompatibilityHealthCheck.runMultiplatformAndroidGradlePluginCompatibilityHealthCheck
 import org.jetbrains.kotlin.gradle.plugin.KotlinMultiplatformAndroidGradlePluginCompatibilityHealthCheck.runMultiplatformAndroidGradlePluginCompatibilityHealthCheckWhenAndroidIsApplied
 import org.jetbrains.kotlin.gradle.plugin.internal.*
 import org.jetbrains.kotlin.gradle.plugin.internal.BasePluginConfiguration
@@ -41,8 +41,8 @@ import org.jetbrains.kotlin.gradle.plugin.mpp.pm20.KotlinPm20ProjectExtension
 import org.jetbrains.kotlin.gradle.plugin.sources.DefaultKotlinSourceSetFactory
 import org.jetbrains.kotlin.gradle.plugin.sources.kpm.FragmentMappedKotlinSourceSetFactory
 import org.jetbrains.kotlin.gradle.plugin.statistics.KotlinBuildStatsService
-import org.jetbrains.kotlin.gradle.report.BuildMetricsReporterService
-import org.jetbrains.kotlin.gradle.report.HttpReportService
+import org.jetbrains.kotlin.gradle.report.BuildMetricsService
+import org.jetbrains.kotlin.gradle.report.BuildReportsService
 import org.jetbrains.kotlin.gradle.targets.js.KotlinJsCompilerAttribute
 import org.jetbrains.kotlin.gradle.targets.js.KotlinJsPlugin
 import org.jetbrains.kotlin.gradle.targets.js.npm.addNpmDependencyExtension
@@ -83,21 +83,22 @@ abstract class DefaultKotlinBasePlugin : KotlinBasePlugin {
 
         addKotlinCompilerConfiguration(project)
 
+        project.registerDefaultVariantImplementations()
+
         project.configurations.maybeCreate(PLUGIN_CLASSPATH_CONFIGURATION_NAME).apply {
             isVisible = false
             isCanBeConsumed = false
             addGradlePluginMetadataAttributes(project)
         }
 
-        KotlinGradleBuildServices.registerIfAbsent(project).get()
-        KotlinGradleBuildServices.detectKotlinPluginLoadedInMultipleProjects(project, kotlinPluginVersion)
+        KotlinGradleBuildServices.registerIfAbsent(project.gradle).get().detectKotlinPluginLoadedInMultipleProjects(project, kotlinPluginVersion)
 
-        BuildMetricsReporterService.registerIfAbsent(project)?.also {
-            BuildEventsListenerRegistryHolder.getInstance(project).listenerRegistry.onTaskCompletion(it)
-        }
-
-        HttpReportService.registerIfAbsent(project, kotlinPluginVersion)?.also {
-            BuildEventsListenerRegistryHolder.getInstance(project).listenerRegistry.onTaskCompletion(it)
+        BuildMetricsService.registerIfAbsent(project)?.also { buildMetricsService ->
+            val buildEventsListenerRegistryHolder = BuildEventsListenerRegistryHolder.getInstance(project)
+            buildEventsListenerRegistryHolder.listenerRegistry.onTaskCompletion(buildMetricsService)
+            BuildReportsService.registerIfAbsent(project, buildMetricsService).also {
+                buildEventsListenerRegistryHolder.listenerRegistry.onTaskCompletion(it)
+            }
         }
     }
 
@@ -118,6 +119,34 @@ abstract class DefaultKotlinBasePlugin : KotlinBasePlugin {
                     project.configurations.named(COMPILER_CLASSPATH_CONFIGURATION_NAME)
                 )
             }
+    }
+
+    private fun Project.registerDefaultVariantImplementations() {
+        val factories = VariantImplementationFactories.get(project.gradle)
+        factories.putIfAbsent(
+            MavenPluginConfigurator.MavenPluginConfiguratorVariantFactory::class,
+            MavenPluginConfigurator.DefaultMavenPluginConfiguratorVariantFactory()
+        )
+
+        factories.putIfAbsent(
+            JavaSourceSetsAccessor.JavaSourceSetsAccessorVariantFactory::class,
+            DefaultJavaSourceSetsAccessorVariantFactory()
+        )
+
+        factories.putIfAbsent(
+            BasePluginConfiguration.BasePluginConfigurationVariantFactory::class,
+            DefaultBasePluginConfigurationVariantFactory()
+        )
+
+        factories.putIfAbsent(
+            IdeaSyncDetector.IdeaSyncDetectorVariantFactory::class,
+            DefaultIdeaSyncDetectorVariantFactory()
+        )
+
+        factories.putIfAbsent(
+            ConfigurationTimePropertiesAccessor.ConfigurationTimePropertiesAccessorVariantFactory::class,
+            DefaultConfigurationTimePropertiesAccessorVariantFactory()
+        )
     }
 
     protected fun setupAttributeMatchingStrategy(
@@ -159,9 +188,7 @@ abstract class KotlinBasePluginWrapper : DefaultKotlinBasePlugin() {
             isTransitive = false
             addGradlePluginMetadataAttributes(project)
         }
-        project.registerCommonizerClasspathConfigurationIfNecessary()
-
-        project.registerDefaultVariantImplementations()
+        project.maybeCreateCommonizerClasspathConfiguration()
 
         project.createKotlinExtension(projectExtensionClass).apply {
             coreLibrariesVersion = kotlinPluginVersion
@@ -186,24 +213,6 @@ abstract class KotlinBasePluginWrapper : DefaultKotlinBasePlugin() {
         project.addNpmDependencyExtension()
 
         project.registerBuildKotlinToolingMetadataTask()
-    }
-
-    private fun Project.registerDefaultVariantImplementations() {
-        val factories = VariantImplementationFactories.get(project.gradle)
-        factories.putIfAbsent(
-            MavenPluginConfigurator.MavenPluginConfiguratorVariantFactory::class,
-            MavenPluginConfigurator.DefaultMavenPluginConfiguratorVariantFactory()
-        )
-
-        factories.putIfAbsent(
-            JavaSourceSetsAccessor.JavaSourceSetsAccessorVariantFactory::class,
-            DefaultJavaSourceSetsAccessorVariantFactory()
-        )
-
-        factories.putIfAbsent(
-            BasePluginConfiguration.BasePluginConfigurationVariantFactory::class,
-            DefaultBasePluginConfigurationVariantFactory()
-        )
     }
 
     internal open fun createTestRegistry(project: Project) = KotlinTestsRegistry(project)

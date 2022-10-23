@@ -18,7 +18,6 @@ import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.resolve.jvm.JvmClassName
 import org.jetbrains.kotlin.serialization.deserialization.descriptors.DeserializedMemberDescriptor
-import org.jetbrains.kotlin.utils.addToStdlib.safeAs
 
 object JvmFileClassUtil {
     val JVM_NAME: FqName = FqName("kotlin.jvm.JvmName")
@@ -70,7 +69,7 @@ object JvmFileClassUtil {
 
         if (jvmName == null && jvmPackageName == null) return null
 
-        val isMultifileClass = findAnnotationEntryOnFileNoResolve(file, JVM_MULTIFILE_CLASS_SHORT) != null
+        val isMultifileClass = file.isJvmMultifileClassFile
 
         return ParsedJvmFileClassAnnotations(jvmName, jvmPackageName, isMultifileClass)
     }
@@ -90,7 +89,7 @@ object JvmFileClassUtil {
         val stringTemplateExpression = annotation.valueArguments.firstOrNull()?.run {
             when (this) {
                 is KtValueArgument -> stringTemplateExpression
-                else -> getArgumentExpression().safeAs<KtStringTemplateExpression>()
+                else -> getArgumentExpression() as? KtStringTemplateExpression
             }
         } ?: return null
 
@@ -122,10 +121,12 @@ val KtFile.javaFileFacadeFqName: FqName
         return facadeFqName
     }
 
+val KtFile.isJvmMultifileClassFile: Boolean
+    get() = JvmFileClassUtil.findAnnotationEntryOnFileNoResolve(this, JVM_MULTIFILE_CLASS_SHORT) != null
+
 private val LOG = Logger.getInstance("JvmFileClassUtil")
 
-fun KtDeclaration.isInsideJvmMultifileClassFile() =
-    JvmFileClassUtil.findAnnotationEntryOnFileNoResolve(containingKtFile, JVM_MULTIFILE_CLASS_SHORT) != null
+fun KtDeclaration.isInsideJvmMultifileClassFile() = containingKtFile.isJvmMultifileClassFile
 
 val FqName.internalNameWithoutInnerClasses: String
     get() = JvmClassName.byFqNameWithoutInnerClasses(this).internalName

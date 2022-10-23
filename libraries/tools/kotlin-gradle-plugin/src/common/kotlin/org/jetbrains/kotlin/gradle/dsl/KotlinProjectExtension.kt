@@ -6,11 +6,14 @@
 package org.jetbrains.kotlin.gradle.dsl
 
 import org.gradle.api.Action
+import org.gradle.api.GradleException
+import org.gradle.api.Named
 import org.gradle.api.NamedDomainObjectContainer
 import org.gradle.api.Project
 import org.gradle.api.internal.plugins.DslObject
 import org.gradle.jvm.toolchain.JavaLanguageVersion
 import org.gradle.jvm.toolchain.JavaToolchainSpec
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.plugin.*
 import org.jetbrains.kotlin.gradle.plugin.PropertiesProvider.Companion.kotlinPropertiesProvider
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinAndroidTarget
@@ -28,6 +31,7 @@ import org.jetbrains.kotlin.gradle.utils.castIsolatedKotlinPluginClassLoaderAwar
 import org.jetbrains.kotlin.gradle.utils.lowerCamelCaseName
 import org.jetbrains.kotlin.konan.target.CompilerOutputKind
 import org.jetbrains.kotlin.statistics.metrics.StringMetrics
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import kotlin.reflect.KClass
 
@@ -111,6 +115,29 @@ abstract class KotlinTopLevelExtension(internal val project: Project) : KotlinTo
     override fun explicitApiWarning() {
         explicitApi = ExplicitApiMode.Warning
     }
+
+    /**
+     * Can be used to configure objects that are not yet created, or will be created in
+     * 'afterEvaluate' (e.g. typically Android source sets containing flavors and buildTypes)
+     *
+     * Will fail project evaluation if the domain object is not created before 'afterEvaluate' listeners in the buildscript.
+     *
+     * @param configure: Called inline, if the value is already present. Called once the domain object is created.
+     */
+    @ExperimentalKotlinGradlePluginApi
+    fun <T : Named> NamedDomainObjectContainer<T>.invokeWhenCreated(name: String, configure: T.() -> Unit) {
+        val invoked = AtomicBoolean(false)
+        matching { it.name == name }.all { value -> if (!invoked.getAndSet(true)) value.configure() }
+        project.whenEvaluated {
+            if (!invoked.getAndSet(true)) {
+                /*
+                Expected to fail, since the listener was not called.
+                Letting Gradle fail here will result in a more natural error message
+                */
+                named(name).configure(configure)
+            }
+        }
+    }
 }
 
 open class KotlinProjectExtension @Inject constructor(project: Project) : KotlinTopLevelExtension(project), KotlinSourceSetContainer {
@@ -134,30 +161,30 @@ abstract class KotlinSingleTargetExtension<TARGET : KotlinTarget>(project: Proje
     fun target(body: Action<TARGET>) = body.execute(target)
 }
 
-abstract class KotlinSingleJavaTargetExtension(project: Project) : KotlinSingleTargetExtension<KotlinWithJavaTarget<*>>(project)
+abstract class KotlinSingleJavaTargetExtension(project: Project) : KotlinSingleTargetExtension<KotlinWithJavaTarget<*, *>>(project)
 
 abstract class KotlinJvmProjectExtension(project: Project) : KotlinSingleJavaTargetExtension(project) {
-    override lateinit var target: KotlinWithJavaTarget<KotlinJvmOptions>
+    override lateinit var target: KotlinWithJavaTarget<KotlinJvmOptions, KotlinJvmCompilerOptions>
         internal set
 
-    open fun target(body: KotlinWithJavaTarget<KotlinJvmOptions>.() -> Unit) = target.run(body)
+    open fun target(body: KotlinWithJavaTarget<KotlinJvmOptions, KotlinJvmCompilerOptions>.() -> Unit) = target.run(body)
 }
 
 abstract class Kotlin2JsProjectExtension(project: Project) : KotlinSingleJavaTargetExtension(project) {
-    private lateinit var _target: KotlinWithJavaTarget<KotlinJsOptions>
+    private lateinit var _target: KotlinWithJavaTarget<KotlinJsOptions, KotlinJsCompilerOptions>
 
-    override val target: KotlinWithJavaTarget<KotlinJsOptions>
+    override val target: KotlinWithJavaTarget<KotlinJsOptions, KotlinJsCompilerOptions>
         get() {
             if (!::_target.isInitialized) throw IllegalStateException("Extension target is not initialized!")
 
             return _target
         }
 
-    internal fun setTarget(target: KotlinWithJavaTarget<KotlinJsOptions>) {
+    internal fun setTarget(target: KotlinWithJavaTarget<KotlinJsOptions, KotlinJsCompilerOptions>) {
         _target = target
     }
 
-    open fun target(body: KotlinWithJavaTarget<KotlinJsOptions>.() -> Unit) = target.run(body)
+    open fun target(body: KotlinWithJavaTarget<KotlinJsOptions, KotlinJsCompilerOptions>.() -> Unit) = target.run(body)
 }
 
 abstract class KotlinJsProjectExtension(project: Project) :
@@ -167,12 +194,21 @@ abstract class KotlinJsProjectExtension(project: Project) :
 
     lateinit var legacyPreset: KotlinJsSingleTargetPreset
 
+    private val targetSetObservers = mutableListOf<(KotlinJsTargetDsl?) -> Unit>()
+
     // target is public property
     // Users can write kotlin.target and it should work
     // So call of target should init default configuration
     @Deprecated("Use `target` instead", ReplaceWith("target"))
     var _target: KotlinJsTargetDsl? = null
-        private set
+        private set(value) {
+            field = value
+            targetSetObservers.forEach { it(value) }
+        }
+
+    fun registerTargetObserver(observer: (KotlinJsTargetDsl?) -> Unit) {
+        targetSetObservers.add(observer)
+    }
 
     companion object {
         internal fun reportJsCompilerMode(compilerType: KotlinJsCompilerType) {
@@ -182,6 +218,53 @@ abstract class KotlinJsProjectExtension(project: Project) :
                 KotlinJsCompilerType.BOTH -> KotlinBuildStatsService.getInstance()?.report(StringMetrics.JS_COMPILER_MODE, "both")
             }
         }
+
+        internal fun warnAboutDeprecatedCompiler(project: Project, compilerType: KotlinJsCompilerType?) {
+            if (PropertiesProvider(project).jsCompilerNoWarn) return
+            val logger = project.logger
+            when (compilerType) {
+                KotlinJsCompilerType.LEGACY -> logger.warn(LEGACY_DEPRECATED)
+                KotlinJsCompilerType.IR -> {}
+                KotlinJsCompilerType.BOTH -> logger.warn(BOTH_DEPRECATED)
+                null -> throw GradleException(DEFAULT_COMPILER_ERROR)
+            }
+        }
+
+        private val LEGACY_DEPRECATED =
+            """
+                |
+                |==========
+                |This project currently uses the Kotlin/JS Legacy compiler backend, which has been deprecated and will be removed in a future release.
+                |
+                |Please migrate the project to the new IR-based compiler (https://kotl.in/jsir).
+                |==========
+                |
+            """.trimMargin()
+
+        private val BOTH_DEPRECATED =
+            """
+                |
+                |==========
+                |This project currently uses Both mode, which requires the Kotlin/JS Legacy compiler backend.
+                |This backend has been deprecated and will be removed in a future release.
+                |
+                |Please migrate the project to the new IR-based compiler (https://kotl.in/jsir).
+                |==========
+                |
+            """.trimMargin()
+
+        private val DEFAULT_COMPILER_ERROR =
+            """
+                |
+                |==========
+                |This project currently uses the Kotlin/JS Legacy compiler backend, which has been deprecated and will be removed in a future release.
+                |Please migrate the project to the new IR-based compiler (https://kotl.in/jsir) by adding:
+                |- kotlin.js.compiler=ir to your gradle.properties file.
+                |- js(IR) { ... } to your build file.
+                |You can continue to use the deprecated legacy compiler in the current version of the toolchain by specifying it explicitly.
+                |==========
+                |
+            """.trimMargin()
     }
 
     @Deprecated("Use js() instead", ReplaceWith("js()"))
@@ -194,7 +277,7 @@ abstract class KotlinJsProjectExtension(project: Project) :
             return _target!!
         }
 
-    override lateinit var defaultJsCompilerType: KotlinJsCompilerType
+    override var compilerTypeFromProperties: KotlinJsCompilerType? = null
 
     @Suppress("DEPRECATION")
     private fun jsInternal(
@@ -209,19 +292,23 @@ abstract class KotlinJsProjectExtension(project: Project) :
         }
 
         if (_target == null) {
-            val compilerOrDefault = compiler ?: defaultJsCompilerType
+            val compilerOrFromProperties = compiler ?: compilerTypeFromProperties
+            val compilerOrDefault = compilerOrFromProperties ?: defaultJsCompilerType
             reportJsCompilerMode(compilerOrDefault)
+            warnAboutDeprecatedCompiler(project, compilerOrFromProperties)
             val target: KotlinJsTargetDsl = when (compilerOrDefault) {
                 KotlinJsCompilerType.LEGACY -> legacyPreset
                     .also {
                         it.irPreset = null
                     }
                     .createTarget("js")
+
                 KotlinJsCompilerType.IR -> irPreset
                     .also {
                         it.mixedMode = false
                     }
                     .createTarget("js")
+
                 KotlinJsCompilerType.BOTH -> legacyPreset
                     .also {
                         irPreset.mixedMode = true
@@ -294,10 +381,12 @@ abstract class KotlinJsProjectExtension(project: Project) :
 }
 
 abstract class KotlinCommonProjectExtension(project: Project) : KotlinSingleJavaTargetExtension(project) {
-    override lateinit var target: KotlinWithJavaTarget<KotlinMultiplatformCommonOptions>
+    override lateinit var target: KotlinWithJavaTarget<KotlinMultiplatformCommonOptions, KotlinMultiplatformCommonCompilerOptions>
         internal set
 
-    open fun target(body: KotlinWithJavaTarget<KotlinMultiplatformCommonOptions>.() -> Unit) = target.run(body)
+    open fun target(
+        body: KotlinWithJavaTarget<KotlinMultiplatformCommonOptions, KotlinMultiplatformCommonCompilerOptions>.() -> Unit
+    ) = target.run(body)
 }
 
 abstract class KotlinAndroidProjectExtension(project: Project) : KotlinSingleTargetExtension<KotlinAndroidTarget>(project) {

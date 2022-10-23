@@ -44,20 +44,21 @@ void yield() noexcept {
 
 THREAD_LOCAL_VARIABLE bool gSuspensionRequestedByCurrentThread = false;
 [[clang::no_destroy]] std::mutex gSuspensionMutex;
-[[clang::no_destroy]] std::condition_variable gSuspendsionCondVar;
+[[clang::no_destroy]] std::condition_variable gSuspensionCondVar;
 
 } // namespace
 
 std::atomic<bool> kotlin::mm::internal::gSuspensionRequested = false;
 
 NO_EXTERNAL_CALLS_CHECK void kotlin::mm::ThreadSuspensionData::suspendIfRequestedSlowPath() noexcept {
-    std::unique_lock lock(gSuspensionMutex);
     if (IsThreadSuspensionRequested()) {
+        threadData_.gc().OnSuspendForGC();
+        std::unique_lock lock(gSuspensionMutex);
         auto threadId = konan::currentThreadId();
         auto suspendStartMs = konan::getTimeMicros();
         RuntimeLogDebug({kTagGC, kTagMM}, "Suspending thread %d", threadId);
-        AutoReset scopedAssign(&suspended_, true);
-        gSuspendsionCondVar.wait(lock, []() { return !IsThreadSuspensionRequested(); });
+        AutoReset scopedAssignSuspended(&suspended_, true);
+        gSuspensionCondVar.wait(lock, []() { return !IsThreadSuspensionRequested(); });
         auto suspendEndMs = konan::getTimeMicros();
         RuntimeLogDebug({kTagGC, kTagMM}, "Resuming thread %d after %" PRIu64 " microseconds of suspension",
                         threadId, suspendEndMs - suspendStartMs);
@@ -80,7 +81,7 @@ NO_EXTERNAL_CALLS_CHECK bool kotlin::mm::RequestThreadsSuspension() noexcept {
 }
 
 void kotlin::mm::WaitForThreadsSuspension() noexcept {
-    // Spin wating for threads to suspend. Ignore Native threads.
+    // Spin waiting for threads to suspend. Ignore Native threads.
     while(!allThreads(isSuspendedOrNative)) {
         yield();
     }
@@ -106,5 +107,5 @@ void kotlin::mm::ResumeThreads() noexcept {
         internal::gSuspensionRequested = false;
     }
     gSuspensionRequestedByCurrentThread = false;
-    gSuspendsionCondVar.notify_all();
+    gSuspensionCondVar.notify_all();
 }

@@ -7,19 +7,12 @@ package org.jetbrains.kotlin.analysis.project.structure
 
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiElement
-import org.jetbrains.kotlin.platform.TargetPlatform
 
 public abstract class ProjectStructureProvider {
     /**
      * For a given [PsiElement] get a [KtModule] to which [PsiElement] belongs.
      */
     public abstract fun getKtModuleForKtElement(element: PsiElement): KtModule
-
-    /**
-     * Returns all dependent [KtBinaryModule]s in this project.
-     */
-    // TODO: We rather need a session or facade that maintains this information.
-    public abstract fun getKtBinaryModules(): Collection<KtBinaryModule>
 }
 
 /**
@@ -44,4 +37,4 @@ public inline fun <reified M : KtModule> PsiElement.getKtModuleOfType(project: P
  * @param project [Project] which contains current [PsiElement]. `PsiElement.project` may be a heavy operation as it includes PSI tree traversal. So, when a [Project] is  already available, it is better to pass it explicitly
  */
 public inline fun <reified M : KtModule> PsiElement.getKtModuleOfTypeSafe(project: Project = this.project): M? =
-    getKtModule(project) as M?
+    getKtModule(project) as? M

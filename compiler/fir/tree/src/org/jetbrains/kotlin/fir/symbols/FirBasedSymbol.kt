@@ -27,6 +27,8 @@ abstract class FirBasedSymbol<E : FirDeclaration> {
         _fir = e
     }
 
+    val isBound get() = _fir != null
+
     val origin: FirDeclarationOrigin
         get() = fir.origin
 
@@ -41,19 +43,22 @@ abstract class FirBasedSymbol<E : FirDeclaration> {
 
     val resolvedAnnotationsWithArguments: List<FirAnnotation>
         get() {
-            ensureResolved(FirResolvePhase.ARGUMENTS_OF_ANNOTATIONS)
+            // NB: annotation argument mapping (w/ vararg) are built/replaced during call completion, hence BODY_RESOLVE.
+            // TODO(KT-53371): optimize ARGUMENTS_OF_ANNOTATIONS to build annotation argument mapping too.
+            // TODO(KT-53519): Even with BODY_RESOLVE, argument mapping for annotations on [FirValueParameter] is not properly built.
+            lazyResolveToPhase(FirResolvePhase.BODY_RESOLVE)
             return fir.annotations
         }
 
     val resolvedAnnotationsWithClassIds: List<FirAnnotation>
         get() {
-            ensureResolved(FirResolvePhase.TYPES)
+            lazyResolveToPhase(FirResolvePhase.TYPES)
             return fir.annotations
         }
 
     val resolvedAnnotationClassIds: List<ClassId>
         get() {
-            ensureResolved(FirResolvePhase.TYPES)
+            lazyResolveToPhase(FirResolvePhase.TYPES)
             return fir.annotations.mapNotNull { (it.annotationTypeRef.coneType as? ConeClassLikeType)?.lookupTag?.classId }
         }
 }

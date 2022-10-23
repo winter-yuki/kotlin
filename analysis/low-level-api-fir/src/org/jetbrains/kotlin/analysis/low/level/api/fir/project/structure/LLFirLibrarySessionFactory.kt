@@ -20,34 +20,38 @@ import org.jetbrains.kotlin.fir.resolve.providers.FirProvider
 import org.jetbrains.kotlin.fir.resolve.providers.FirSymbolProvider
 import org.jetbrains.kotlin.fir.resolve.providers.symbolProvider
 import org.jetbrains.kotlin.fir.resolve.scopes.wrapScopeWithJvmMapped
-import org.jetbrains.kotlin.fir.resolve.transformers.FirPhaseCheckingPhaseManager
+import org.jetbrains.kotlin.fir.resolve.transformers.FirCompilerLazyDeclarationResolver
 import org.jetbrains.kotlin.fir.scopes.FirKotlinScopeProvider
 import org.jetbrains.kotlin.fir.session.registerCommonComponents
 import org.jetbrains.kotlin.fir.session.registerCommonJavaComponents
 import org.jetbrains.kotlin.fir.session.registerJavaSpecificResolveComponents
 import org.jetbrains.kotlin.fir.session.registerModuleData
-import org.jetbrains.kotlin.fir.symbols.FirPhaseManager
+import org.jetbrains.kotlin.fir.symbols.FirLazyDeclarationResolver
 import org.jetbrains.kotlin.resolve.jvm.modules.JavaModuleResolver
 
 @OptIn(PrivateSessionConstructor::class, SessionConfiguration::class)
-internal class LLFirLibrarySessionFactory(
+class LLFirLibrarySessionFactory(
     private val project: Project,
 ) {
 
-    fun getLibrarySession(ktBinaryModule: KtBinaryModule, sessionsCache: MutableMap<KtModule, LLFirSession>): LLFirLibrarySession {
-        return sessionsCache.getOrPut(ktBinaryModule) { createModuleLibrariesSession(ktBinaryModule) } as LLFirLibrarySession
+    internal fun getLibrarySession(ktBinaryModule: KtBinaryModule, sessionsCache: MutableMap<KtModule, LLFirSession>): LLFirLibrarySession {
+        return sessionsCache.getOrPut(ktBinaryModule) {
+            createModuleLibrariesSession(ktBinaryModule, sessionsCache)
+        } as LLFirLibrarySession
     }
 
     private fun createModuleLibrariesSession(
         ktLibraryModule: KtBinaryModule,
+        sessionsCache: MutableMap<KtModule, LLFirSession>,
     ): LLFirLibrarySession {
         val platform = ktLibraryModule.platform
         val builtinsSession = LLFirBuiltinsSessionFactory.getInstance(project).getBuiltinsSession(platform)
+        sessionsCache.putIfAbsent(builtinsSession.ktModule, builtinsSession)
         return LLFirLibrarySession(ktLibraryModule, project, builtinsSession.builtinTypes).apply session@{
             val moduleData = LLFirModuleData(ktLibraryModule).apply { bindSession(this@session) }
             registerModuleData(moduleData)
             registerIdeComponents(project)
-            register(FirPhaseManager::class, FirPhaseCheckingPhaseManager)
+            register(FirLazyDeclarationResolver::class, FirCompilerLazyDeclarationResolver)
             registerCommonComponents(LanguageVersionSettingsImpl.DEFAULT/*TODO*/)
             registerCommonJavaComponents(JavaModuleResolver.getInstance(project))
             registerJavaSpecificResolveComponents()

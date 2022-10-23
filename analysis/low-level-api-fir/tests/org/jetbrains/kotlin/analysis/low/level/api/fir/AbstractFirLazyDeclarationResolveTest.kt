@@ -13,9 +13,10 @@ import org.jetbrains.kotlin.fir.declarations.FirFile
 import org.jetbrains.kotlin.fir.declarations.FirResolvePhase
 import org.jetbrains.kotlin.fir.realPsi
 import org.jetbrains.kotlin.fir.renderer.FirDeclarationRendererWithAttributes
+import org.jetbrains.kotlin.fir.renderer.FirErrorExpressionExtendedRenderer
 import org.jetbrains.kotlin.fir.renderer.FirRenderer
 import org.jetbrains.kotlin.fir.renderer.FirResolvePhaseRenderer
-import org.jetbrains.kotlin.fir.symbols.ensureResolved
+import org.jetbrains.kotlin.fir.symbols.lazyResolveToPhase
 import org.jetbrains.kotlin.fir.visitors.FirVisitorVoid
 import org.jetbrains.kotlin.psi.KtDeclaration
 import org.jetbrains.kotlin.psi.KtFile
@@ -24,6 +25,7 @@ import org.jetbrains.kotlin.test.directives.ConfigurationDirectives
 import org.jetbrains.kotlin.test.services.TestModuleStructure
 import org.jetbrains.kotlin.test.services.TestServices
 import org.jetbrains.kotlin.test.services.assertions
+import org.jetbrains.kotlin.util.capitalizeDecapitalize.decapitalizeAsciiOnly
 import org.junit.jupiter.api.parallel.Execution
 import org.junit.jupiter.api.parallel.ExecutionMode
 
@@ -39,7 +41,7 @@ abstract class AbstractFirLazyDeclarationResolveTest : AbstractLowLevelApiSingle
             override fun visitElement(element: FirElement) {
                 if (result != null) return
                 val declaration = element.realPsi as? KtDeclaration
-                if (element is FirDeclaration && declaration != null && declaration.name == "resolveMe") {
+                if (element is FirDeclaration && declaration != null && declaration.name?.decapitalizeAsciiOnly() == "resolveMe") {
                     result = element
                     return
                 }
@@ -56,7 +58,8 @@ abstract class AbstractFirLazyDeclarationResolveTest : AbstractLowLevelApiSingle
         val renderer = FirRenderer(
             builder = resultBuilder,
             declarationRenderer = FirDeclarationRendererWithAttributes(),
-            resolvePhaseRenderer = FirResolvePhaseRenderer()
+            resolvePhaseRenderer = FirResolvePhaseRenderer(),
+            errorExpressionRenderer = FirErrorExpressionExtendedRenderer(),
         )
         resolveWithClearCaches(ktFile) { firResolveSession ->
             check(firResolveSession is LLFirSourceResolveSession)
@@ -65,7 +68,7 @@ abstract class AbstractFirLazyDeclarationResolveTest : AbstractLowLevelApiSingle
                 .findResolveMe()
             for (currentPhase in FirResolvePhase.values()) {
                 if (currentPhase == FirResolvePhase.SEALED_CLASS_INHERITORS) continue
-                declarationToResolve.ensureResolved(currentPhase)
+                declarationToResolve.lazyResolveToPhase(currentPhase)
                 val firFile = firResolveSession.getOrBuildFirFile(ktFile)
                 resultBuilder.append("\n${currentPhase.name}:\n")
                 renderer.renderElementAsString(firFile)
@@ -75,7 +78,7 @@ abstract class AbstractFirLazyDeclarationResolveTest : AbstractLowLevelApiSingle
         resolveWithClearCaches(ktFile) { firResolveSession ->
             check(firResolveSession is LLFirSourceResolveSession)
             val firFile = firResolveSession.getOrBuildFirFile(ktFile)
-            firFile.ensureResolved(FirResolvePhase.BODY_RESOLVE)
+            firFile.lazyResolveToPhase(FirResolvePhase.BODY_RESOLVE)
             resultBuilder.append("\nFILE RAW TO BODY:\n")
             renderer.renderElementAsString(firFile)
         }

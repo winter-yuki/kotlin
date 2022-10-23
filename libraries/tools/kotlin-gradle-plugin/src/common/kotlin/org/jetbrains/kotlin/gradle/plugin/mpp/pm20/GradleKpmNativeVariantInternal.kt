@@ -8,7 +8,7 @@ package org.jetbrains.kotlin.gradle.plugin.mpp.pm20
 import org.gradle.api.artifacts.Configuration
 import org.jetbrains.kotlin.gradle.dsl.KotlinCommonOptions
 import org.jetbrains.kotlin.gradle.plugin.mpp.*
-import org.jetbrains.kotlin.gradle.plugin.mpp.publishedConfigurationName
+import org.jetbrains.kotlin.gradle.plugin.sources.kpm.FragmentMappedKotlinSourceSet
 import org.jetbrains.kotlin.konan.target.KonanTarget
 
 abstract class GradleKpmNativeVariantInternal(
@@ -29,6 +29,7 @@ abstract class GradleKpmNativeVariantInternal(
     ),
     GradleKpmSingleMavenPublishedModuleHolder by GradleKpmDefaultSingleMavenPublishedModuleHolder(containingModule, fragmentName) {
 
+    @Deprecated("Please declare explicit dependency on kotlinx-cli. This option is scheduled to be removed in 1.9.0")
     override var enableEndorsedLibraries: Boolean = false
 
     override val gradleVariantNames: Set<String>
@@ -43,6 +44,8 @@ abstract class GradleKpmNativeVariantInternal(
 
 interface KotlinNativeCompilationData<T : KotlinCommonOptions> : KotlinCompilationData<T> {
     val konanTarget: KonanTarget
+
+    @Deprecated("Please declare explicit dependency on kotlinx-cli. This option is scheduled to be removed in 1.9.0")
     val enableEndorsedLibs: Boolean
 }
 
@@ -57,7 +60,9 @@ internal class KotlinMappedNativeCompilationFactory(
         return target.project.objects.newInstance(
             KotlinNativeCompilation::class.java,
             target.konanTarget,
-            VariantMappedCompilationDetails<KotlinCommonOptions>(variant, target)
+            VariantMappedCompilationDetails<KotlinCommonOptions>(
+                variant, target, getOrCreateDefaultSourceSet(name) as FragmentMappedKotlinSourceSet
+            )
         )
     }
 }

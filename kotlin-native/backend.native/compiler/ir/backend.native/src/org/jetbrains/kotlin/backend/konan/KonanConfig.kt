@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the LICENSE file.
+ * Copyright 2010-2022 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.backend.konan
@@ -17,21 +17,16 @@ import org.jetbrains.kotlin.descriptors.ModuleDescriptor
 import org.jetbrains.kotlin.konan.CURRENT
 import org.jetbrains.kotlin.konan.CompilerVersion
 import org.jetbrains.kotlin.konan.MetaVersion
-import org.jetbrains.kotlin.konan.TempFiles
 import org.jetbrains.kotlin.konan.file.File
 import org.jetbrains.kotlin.konan.library.KonanLibrary
 import org.jetbrains.kotlin.konan.properties.loadProperties
 import org.jetbrains.kotlin.konan.target.*
 import org.jetbrains.kotlin.konan.util.KonanHomeProvider
-import org.jetbrains.kotlin.library.KotlinLibrary
+import org.jetbrains.kotlin.konan.util.visibleName
 import org.jetbrains.kotlin.library.resolver.TopologicalLibraryOrder
-import org.jetbrains.kotlin.utils.addToStdlib.cast
+import org.jetbrains.kotlin.util.removeSuffixIfPresent
 
 class KonanConfig(val project: Project, val configuration: CompilerConfiguration) {
-
-    fun dispose() {
-        tempFiles.dispose()
-    }
 
     internal val distribution = run {
         val overridenProperties = mutableMapOf<String, String>().apply {
@@ -52,6 +47,7 @@ class KonanConfig(val project: Project, val configuration: CompilerConfiguration
     private val platformManager = PlatformManager(distribution)
     internal val targetManager = platformManager.targetManager(configuration.get(KonanConfigKeys.TARGET))
     internal val target = targetManager.target
+    val targetHasAddressDependency get() = target.hasAddressDependencyInMemoryModel()
     internal val phaseConfig = configuration.get(CLIConfigurationKeys.PHASE_CONFIG)!!
 
     // TODO: debug info generation mode and debug/release variant selection probably requires some refactoring.
@@ -148,7 +144,7 @@ class KonanConfig(val project: Project, val configuration: CompilerConfiguration
                 // TODO: When moving into proper deprecation cycle replace with WARNING.
                 configuration.report(
                         CompilerMessageSeverity.INFO,
-                        "`freezing` should not be enabled with the new MM. Freezing API is deprecated since 1.7.20. See https://github.com/JetBrains/kotlin/blob/master/kotlin-native/NEW_MM.md#freezing-deprecation for details"
+                        "`freezing` should not be enabled with the new MM. Freezing API is deprecated since 1.7.20. See https://kotlinlang.org/docs/native-migration-guide.html for details"
                 )
                 freezingMode
             }
@@ -169,6 +165,9 @@ class KonanConfig(val project: Project, val configuration: CompilerConfiguration
         configuration.get(BinaryOptions.gcSchedulerType) ?: defaultGCSchedulerType
     }
 
+    val gcMarkSingleThreaded: Boolean
+        get() = configuration.get(BinaryOptions.gcMarkSingleThreaded) == true
+
     val needVerifyIr: Boolean
         get() = configuration.get(KonanConfigKeys.VERIFY_IR) == true
 
@@ -178,6 +177,16 @@ class KonanConfig(val project: Project, val configuration: CompilerConfiguration
 
     val appStateTracking: AppStateTracking by lazy {
         configuration.get(BinaryOptions.appStateTracking) ?: AppStateTracking.DISABLED
+    }
+
+
+    val mimallocUseDefaultOptions: Boolean by lazy {
+        configuration.get(BinaryOptions.mimallocUseDefaultOptions) ?: false
+    }
+
+    val mimallocUseCompaction by lazy {
+        // Turned off by default, because it slows down allocation.
+        configuration.get(BinaryOptions.mimallocUseCompaction) ?: false
     }
 
     init {
@@ -220,7 +229,6 @@ class KonanConfig(val project: Project, val configuration: CompilerConfiguration
             konanKlibDir = File(distribution.klib)
     )
 
-
     val fullExportedNamePrefix: String
         get() = configuration.get(KonanConfigKeys.FULL_EXPORTED_NAME_PREFIX) ?: implicitModuleName
 
@@ -232,7 +240,7 @@ class KonanConfig(val project: Project, val configuration: CompilerConfiguration
 
     fun librariesWithDependencies(moduleDescriptor: ModuleDescriptor?): List<KonanLibrary> {
         if (moduleDescriptor == null) error("purgeUnneeded() only works correctly after resolve is over, and we have successfully marked package files as needed or not needed.")
-        return resolvedLibraries.filterRoots { (!it.isDefault && !this.purgeUserLibs) || it.isNeededForLink }.getFullList(TopologicalLibraryOrder).cast()
+        return resolvedLibraries.filterRoots { (!it.isDefault && !this.purgeUserLibs) || it.isNeededForLink }.getFullList(TopologicalLibraryOrder).map { it as KonanLibrary }
     }
 
     val shouldCoverSources = configuration.getBoolean(KonanConfigKeys.COVERAGE)
@@ -380,6 +388,7 @@ class KonanConfig(val project: Project, val configuration: CompilerConfiguration
             freezing != defaultFreezing -> "with ${freezing.name.replaceFirstChar { it.lowercase() }} freezing mode"
             runtimeAssertsMode != RuntimeAssertsMode.IGNORE -> "with runtime assertions"
             sanitizer != null -> "with sanitizers enabled"
+            runtimeLogs != null -> "with runtime logs"
             else -> null
         }
         CacheSupport(
@@ -394,24 +403,27 @@ class KonanConfig(val project: Project, val configuration: CompilerConfiguration
     internal val cachedLibraries: CachedLibraries
         get() = cacheSupport.cachedLibraries
 
-    internal val librariesToCache: Set<KotlinLibrary>
-        get() = cacheSupport.librariesToCache
+    internal val libraryToCache: PartialCacheInfo?
+        get() = cacheSupport.libraryToCache
 
-    val outputFiles =
-            OutputFiles(configuration.get(KonanConfigKeys.OUTPUT) ?: cacheSupport.tryGetImplicitOutput(),
-                    target, produce)
+    internal val producePerFileCache
+        get() = configuration.get(KonanConfigKeys.MAKE_PER_FILE_CACHE) == true
 
-    val tempFiles = TempFiles(outputFiles.outputName, configuration.get(KonanConfigKeys.TEMPORARY_FILES_DIR))
-
-    val outputFile get() = outputFiles.mainFile
+    val outputPath get() = configuration.get(KonanConfigKeys.OUTPUT)?.removeSuffixIfPresent(produce.suffix(target)) ?: produce.visibleName
 
     private val implicitModuleName: String
-        get() = File(outputFiles.outputName).name
+        get() = cacheSupport.libraryToCache?.let {
+            if (producePerFileCache)
+                CachedLibraries.getPerFileCachedLibraryName(it.klib)
+            else
+                CachedLibraries.getCachedLibraryName(it.klib)
+        }
+                ?: File(outputPath).name
 
-    val infoArgsOnly = configuration.kotlinSourceRoots.isEmpty()
+    val infoArgsOnly = (configuration.kotlinSourceRoots.isEmpty()
             && configuration[KonanConfigKeys.INCLUDED_LIBRARIES].isNullOrEmpty()
-            && librariesToCache.isEmpty()
             && configuration[KonanConfigKeys.EXPORTED_LIBRARIES].isNullOrEmpty()
+            && libraryToCache == null)
 
     /**
      * Do not compile binary when compiling framework.

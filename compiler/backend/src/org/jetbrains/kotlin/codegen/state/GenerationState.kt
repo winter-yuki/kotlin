@@ -322,6 +322,7 @@ class GenerationState private constructor(
     val unifiedNullChecks: Boolean =
         languageVersionSettings.apiVersion >= ApiVersion.KOTLIN_1_4 &&
                 !configuration.getBoolean(JVMConfigurationKeys.NO_UNIFIED_NULL_CHECKS)
+    val generateSmapCopyToAnnotation: Boolean = !configuration.getBoolean(JVMConfigurationKeys.NO_SOURCE_DEBUG_EXTENSION)
     val functionsWithInlineClassReturnTypesMangled: Boolean =
         languageVersionSettings.supportsFeature(LanguageFeature.MangleClassMembersReturningInlineClasses)
     val shouldValidateIr = configuration.getBoolean(JVMConfigurationKeys.VALIDATE_IR)
@@ -348,6 +349,8 @@ class GenerationState private constructor(
 
     val abiStability = configuration.get(JVMConfigurationKeys.ABI_STABILITY)
 
+    val noNewJavaAnnotationTargets = configuration.getBoolean(JVMConfigurationKeys.NO_NEW_JAVA_ANNOTATION_TARGETS)
+
     val globalSerializationBindings = JvmSerializationBindings()
     var mapInlineClass: (ClassDescriptor) -> Type = { descriptor -> typeMapper.mapType(descriptor.defaultType) }
 
@@ -356,6 +359,8 @@ class GenerationState private constructor(
             TypeApproximator(module.builtIns, languageVersionSettings)
         else
             null
+
+    val oldInnerClassesLogic = configuration.getBoolean(JVMConfigurationKeys.OLD_INNER_CLASSES_LOGIC)
 
     init {
         this.interceptedBuilderFactory = builderFactory

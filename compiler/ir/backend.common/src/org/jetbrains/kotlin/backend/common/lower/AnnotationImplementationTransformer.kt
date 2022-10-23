@@ -42,33 +42,44 @@ class AnnotationImplementationLowering(
     }
 }
 
-abstract class AnnotationImplementationTransformer(val context: BackendContext, val irFile: IrFile?) : IrElementTransformerVoidWithContext() {
+abstract class AnnotationImplementationTransformer(val context: BackendContext, val irFile: IrFile?) :
+    IrElementTransformerVoidWithContext() {
     internal val implementations: MutableMap<IrClass, IrClass> = mutableMapOf()
 
 
     override fun visitClassNew(declaration: IrClass): IrStatement {
-        declaration.takeIf { declaration.isAnnotationClass }?.constructors?.singleOrNull()?.apply {
-            // Compatibility hack. Now, frontend generates constructor body for annotations and makes them open
-            // but, if one gets annotation from pre-1.6.20 klib, it would have no constructor body and would be final,
-            // so we need to fix it
-            if (body == null) {
-                declaration.modality = Modality.OPEN
-                body = context.createIrBuilder(symbol)
-                    .irBlockBody(SYNTHETIC_OFFSET, SYNTHETIC_OFFSET) {
-                        +irDelegatingConstructorCall(context.irBuiltIns.anyClass.owner.constructors.single())
-                        +IrInstanceInitializerCallImpl(startOffset, endOffset, declaration.symbol, context.irBuiltIns.unitType)
-                    }
-            }
-        }
+        declaration.addConstructorBodyForCompatibility()
         return super.visitClassNew(declaration)
     }
 
-    abstract fun chooseConstructor(implClass: IrClass, expression: IrConstructorCall) : IrConstructor
+    protected fun IrClass.addConstructorBodyForCompatibility() {
+        if (!isAnnotationClass) return
+        val primaryConstructor = constructors.singleOrNull() ?: return
+
+        if (primaryConstructor.body != null) return
+        // Compatibility hack. Now, frontend generates constructor body for annotations and makes them open
+        // but, if one gets annotation from pre-1.6.20 klib, it would have no constructor body and would be final,
+        // so we need to fix it
+        modality = Modality.OPEN
+        primaryConstructor.body = context.createIrBuilder(symbol)
+            .irBlockBody(SYNTHETIC_OFFSET, SYNTHETIC_OFFSET) {
+                +irDelegatingConstructorCall(context.irBuiltIns.anyClass.owner.constructors.single())
+                +IrInstanceInitializerCallImpl(
+                    startOffset,
+                    endOffset,
+                    this@addConstructorBodyForCompatibility.symbol,
+                    context.irBuiltIns.unitType
+                )
+            }
+    }
+
+    abstract fun chooseConstructor(implClass: IrClass, expression: IrConstructorCall): IrConstructor
 
     override fun visitConstructorCall(expression: IrConstructorCall): IrExpression {
         val constructedClass = expression.type.classOrNull?.owner ?: return super.visitConstructorCall(expression)
         if (!constructedClass.isAnnotationClass) return super.visitConstructorCall(expression)
         if (constructedClass.typeParameters.isNotEmpty()) return super.visitConstructorCall(expression) // Not supported yet
+        require(expression.symbol.owner.isPrimary) { "Non-primary constructors of annotations are not supported" }
 
         val implClass = implementations.getOrPut(constructedClass) { createAnnotationImplementation(constructedClass) }
         val ctor = chooseConstructor(implClass, expression)
@@ -94,8 +105,10 @@ abstract class AnnotationImplementationTransformer(val context: BackendContext, 
         destination.symbol.owner.valueParameters.forEachIndexed { index, parameter ->
             val valueArg = argumentsByName[parameter.name]
             if (parameter.defaultValue == null && valueArg == null)
-                error("Usage of default value argument for this annotation is not yet possible.\n" +
-                       "Please specify value for '${source.type.classOrNull?.owner?.name}.${parameter.name}' explicitly")
+                error(
+                    "Usage of default value argument for this annotation is not yet possible.\n" +
+                            "Please specify value for '${source.type.classOrNull?.owner?.name}.${parameter.name}' explicitly"
+                )
             destination.putValueArgument(index, valueArg)
         }
     }
@@ -149,18 +162,22 @@ abstract class AnnotationImplementationTransformer(val context: BackendContext, 
 
     abstract fun getArrayContentEqualsSymbol(type: IrType): IrFunctionSymbol
 
+    open fun IrExpression.transformArrayEqualsArgument(type: IrType, irBuilder: IrBlockBodyBuilder): IrExpression = this
+
     fun generatedEquals(irBuilder: IrBlockBodyBuilder, type: IrType, arg1: IrExpression, arg2: IrExpression): IrExpression =
-        if (type.isArray() || type.isPrimitiveArray()) {
+        if (type.isArray() || type.isPrimitiveArray() || type.isUnsignedArray()) {
             val requiredSymbol = getArrayContentEqualsSymbol(type)
+            val lhs = arg1.transformArrayEqualsArgument(type, irBuilder)
+            val rhs = arg2.transformArrayEqualsArgument(type, irBuilder)
             irBuilder.irCall(
                 requiredSymbol
             ).apply {
                 if (requiredSymbol.owner.extensionReceiverParameter != null) {
-                    extensionReceiver = arg1
-                    putValueArgument(0, arg2)
+                    extensionReceiver = lhs
+                    putValueArgument(0, rhs)
                 } else {
-                    putValueArgument(0, arg1)
-                    putValueArgument(1, arg2)
+                    putValueArgument(0, lhs)
+                    putValueArgument(1, rhs)
                 }
             }
         } else
@@ -210,7 +227,7 @@ class AnnotationImplementationMemberGenerator(
     irClass: IrClass,
     val nameForToString: String,
     forbidDirectFieldAccess: Boolean,
-    val selectEquals: IrBlockBodyBuilder.(IrType, IrExpression, IrExpression) -> IrExpression,
+    val selectEquals: IrBlockBodyBuilder.(IrType, IrExpression, IrExpression) -> IrExpression
 ) : LoweringDataClassMemberGenerator(backendContext, irClass, ANNOTATION_IMPLEMENTATION, forbidDirectFieldAccess) {
 
     override fun IrClass.classNameForToString(): String = nameForToString
@@ -253,3 +270,4 @@ class AnnotationImplementationMemberGenerator(
         }
     }
 }
+

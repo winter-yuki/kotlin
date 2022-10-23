@@ -20,20 +20,17 @@ import org.jetbrains.kotlin.gradle.utils.setProperty
 import javax.inject.Inject
 
 abstract class KotlinAndroidTarget @Inject constructor(
-    override val targetName: String,
+    final override val targetName: String,
     project: Project
 ) : AbstractKotlinTarget(project) {
 
-    override var disambiguationClassifier: String? = null
-        internal set
+    final override val disambiguationClassifier: String = targetName
 
     override val platformType: KotlinPlatformType
         get() = KotlinPlatformType.androidJvm
 
-    internal val compilationFactory = KotlinJvmAndroidCompilationFactory(project, this)
-
     override val compilations: NamedDomainObjectContainer<out KotlinJvmAndroidCompilation> =
-        project.container(compilationFactory.itemClass, compilationFactory)
+        project.container(KotlinJvmAndroidCompilation::class.java)
 
     /** Names of the Android library variants that should be published from the target's project within the default publications which are
      * set up if the `maven-publish` Gradle plugin is applied.
@@ -67,7 +64,7 @@ abstract class KotlinAndroidTarget @Inject constructor(
     var publishLibraryVariantsGroupedByFlavor = false
 
     private fun checkPublishLibraryVariantsExist() {
-        fun AbstractAndroidProjectHandler.getLibraryVariantNames() =
+        fun AndroidProjectHandler.getLibraryVariantNames() =
             mutableSetOf<String>().apply {
                 project.forEachVariant {
                     if (getLibraryOutputTask(it) != null)
@@ -99,7 +96,7 @@ abstract class KotlinAndroidTarget @Inject constructor(
         return publishLibraryVariants?.contains(getVariantName(variant)) ?: true
     }
 
-    private fun AbstractAndroidProjectHandler.doCreateComponents(): Set<KotlinTargetComponent> {
+    private fun AndroidProjectHandler.doCreateComponents(): Set<KotlinTargetComponent> {
 
         val publishableVariants = mutableListOf<BaseVariant>()
             .apply { project.forEachVariant { add(it) } }
@@ -173,7 +170,7 @@ abstract class KotlinAndroidTarget @Inject constructor(
         }.toSet()
     }
 
-    private fun AbstractAndroidProjectHandler.createAndroidUsageContexts(
+    private fun AndroidProjectHandler.createAndroidUsageContexts(
         variant: BaseVariant,
         compilation: KotlinCompilation<*>,
         artifactClassifier: String?,

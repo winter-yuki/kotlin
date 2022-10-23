@@ -16,11 +16,10 @@ import org.jetbrains.kotlin.types.error.ErrorTypeKind
 import org.jetbrains.kotlin.types.error.ErrorUtils
 import org.jetbrains.kotlin.types.model.TypeConstructorMarker
 import org.jetbrains.kotlin.types.model.TypeVariableMarker
+import org.jetbrains.kotlin.types.model.TypeVariableTypeConstructorMarker
 import org.jetbrains.kotlin.types.model.safeSubstitute
 import org.jetbrains.kotlin.types.typeUtil.asTypeProjection
 import org.jetbrains.kotlin.utils.addIfNotNull
-import org.jetbrains.kotlin.utils.addToStdlib.cast
-import org.jetbrains.kotlin.utils.addToStdlib.safeAs
 
 class KotlinConstraintSystemCompleter(
     private val resultTypeResolver: ResultTypeResolver,
@@ -158,7 +157,7 @@ class KotlinConstraintSystemCompleter(
 
             // Stage 7: try to complete call with the builder inference if there are uninferred type variables
             val areThereAppearedProperConstraintsForSomeVariable = tryToCompleteWithBuilderInference(
-                completionMode, topLevelAtoms, topLevelType, postponedArguments, collectVariablesFromContext, analyze
+                completionMode, topLevelAtoms, topLevelType, postponedArguments, collectVariablesFromContext, diagnosticsHolder, analyze
             )
 
             if (areThereAppearedProperConstraintsForSomeVariable)
@@ -208,9 +207,10 @@ class KotlinConstraintSystemCompleter(
         topLevelType: UnwrappedType,
         postponedArguments: List<PostponedResolvedAtom>,
         collectVariablesFromContext: Boolean,
+        diagnosticsHolder: KotlinDiagnosticsHolder,
         analyze: (PostponedResolvedAtom) -> Unit
     ): Boolean {
-        if (completionMode == ConstraintSystemCompletionMode.PARTIAL) return false
+        if (completionMode != ConstraintSystemCompletionMode.FULL) return false
 
         val useBuilderInferenceOnlyIfNeeded = languageVersionSettings.supportsFeature(LanguageFeature.UseBuilderInferenceOnlyIfNeeded)
 
@@ -218,23 +218,54 @@ class KotlinConstraintSystemCompleter(
         if (!useBuilderInferenceOnlyIfNeeded) return false
 
         val lambdaArguments = postponedArguments.filterIsInstance<ResolvedLambdaAtom>().takeIf { it.isNotEmpty() } ?: return false
+
+        fun ResolvedLambdaAtom.notFixedInputTypeVariables(): List<TypeVariableTypeConstructorMarker> =
+            inputTypes.flatMap { it.extractTypeVariables() }.filter { it !in fixedTypeVariables }
+
         val useBuilderInferenceWithoutAnnotation =
             languageVersionSettings.supportsFeature(LanguageFeature.UseBuilderInferenceWithoutAnnotation)
 
+        val checkForDangerousBuilderInference =
+            !languageVersionSettings.supportsFeature(LanguageFeature.NoBuilderInferenceWithoutAnnotationRestriction)
+
+        // Let's call builder lambda (BL) a lambda that has non-zero not fixed input type variables in
+        // type arguments of it's input types
+        // ex: MutableList<T>.() -> Unit
+        // During type inference of call-site such lambda will be considered BL, if
+        // T not fixed yet
+        // Given we have two or more builder lambdas among postponed arguments, it could result in incorrect type inference due to
+        // incorrect constraint propagation into common system
+        // See KT-53740
+        // Constraint propagation into common system happens at
+        // org.jetbrains.kotlin.resolve.calls.components.PostponedArgumentsAnalyzer.applyResultsOfAnalyzedLambdaToCandidateSystem
+        val dangerousBuilderInferenceWithoutAnnotation =
+            lambdaArguments.size >= 2 && lambdaArguments.count { it.notFixedInputTypeVariables().isNotEmpty() } >= 2
+
         val builder = getBuilder()
         for (argument in lambdaArguments) {
-            if (!argument.atom.hasBuilderInferenceAnnotation && !useBuilderInferenceWithoutAnnotation)
-                continue
+            val reallyHasBuilderInferenceAnnotation = argument.atom.hasBuilderInferenceAnnotation
+
+            // no annotation and builder inference without annotation is disabled
+            if (!reallyHasBuilderInferenceAnnotation && !useBuilderInferenceWithoutAnnotation) continue
 
             // Imitate having builder inference annotation. TODO: Remove after getting rid of @BuilderInference
-            if (!argument.atom.hasBuilderInferenceAnnotation && useBuilderInferenceWithoutAnnotation) {
+            if (!reallyHasBuilderInferenceAnnotation) {
                 argument.atom.hasBuilderInferenceAnnotation = true
             }
 
-            val notFixedInputTypeVariables = argument.inputTypes
-                .flatMap { it.extractTypeVariables() }.filter { it !in fixedTypeVariables }
+            val notFixedInputTypeVariables = argument.notFixedInputTypeVariables()
 
+            // lambda is subject to builder inference past this point
             if (notFixedInputTypeVariables.isEmpty()) continue
+
+            // we have dangerous inference situation
+            // if lambda annotated with BuilderInference it's probably safe, due to type shape
+            // otherwise report multi-lambda builder inference restriction diagnostic
+            if (checkForDangerousBuilderInference && dangerousBuilderInferenceWithoutAnnotation && !reallyHasBuilderInferenceAnnotation) {
+                for (variable in notFixedInputTypeVariables) {
+                    diagnosticsHolder.addDiagnostic(MultiLambdaBuilderInferenceRestriction(argument.atom, variable.typeParameter))
+                }
+            }
 
             for (variable in notFixedInputTypeVariables) {
                 builder.markPostponedVariable(notFixedTypeVariables.getValue(variable).typeVariable)
@@ -258,8 +289,8 @@ class KotlinConstraintSystemCompleter(
         argument: PostponedAtomWithRevisableExpectedType,
         diagnosticsHolder: KotlinDiagnosticsHolder
     ): Boolean = with(c) {
-        val revisedExpectedType: UnwrappedType =
-            argument.revisedExpectedType?.takeIf { it.isFunctionOrKFunctionWithAnySuspendability() }?.cast() ?: return false
+        val revisedExpectedType: UnwrappedType = argument.revisedExpectedType
+            ?.takeIf { it.isFunctionOrKFunctionWithAnySuspendability() } as UnwrappedType? ?: return false
 
         when (argument) {
             is PostponedCallableReferenceAtom ->
@@ -455,7 +486,7 @@ class KotlinConstraintSystemCompleter(
     companion object {
         fun getOrderedNotAnalyzedPostponedArguments(topLevelAtoms: List<ResolvedAtom>): List<PostponedResolvedAtom> {
             fun ResolvedAtom.process(to: MutableList<PostponedResolvedAtom>) {
-                to.addIfNotNull(this.safeAs<PostponedResolvedAtom>()?.takeUnless { it.analyzed })
+                to.addIfNotNull((this as? PostponedResolvedAtom)?.takeUnless { it.analyzed })
 
                 if (analyzed) {
                     subResolvedAtoms?.forEach { it.process(to) }

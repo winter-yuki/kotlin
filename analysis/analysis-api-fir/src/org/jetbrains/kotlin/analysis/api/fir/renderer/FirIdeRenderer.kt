@@ -5,6 +5,7 @@
 
 package org.jetbrains.kotlin.analysis.api.fir.renderer
 
+import org.jetbrains.kotlin.KtFakeSourceElementKind
 import org.jetbrains.kotlin.analysis.api.components.KtDeclarationRendererOptions
 import org.jetbrains.kotlin.analysis.utils.printer.PrettyPrinter
 import org.jetbrains.kotlin.analysis.utils.printer.prettyPrint
@@ -93,8 +94,11 @@ internal class FirIdeRenderer private constructor(
         renderAnnotationsAndModifiers(propertyAccessor)
         append(if (propertyAccessor.isGetter) "get" else "set")
         if (propertyAccessor.isSetter) {
-            append("(value: ")
-            renderType(propertyAccessor.valueParameters.first().returnTypeRef)
+            append("(")
+            val valueParameter = propertyAccessor.valueParameters.first()
+            renderAnnotations(valueParameter)
+            append("value: ")
+            renderType(valueParameter.returnTypeRef)
             append(")")
         } else {
             append("()")
@@ -356,14 +360,7 @@ internal class FirIdeRenderer private constructor(
 private fun FirDeclaration.isDefaultEnumEntryMember(firClass: FirClass): Boolean {
     if (firClass.classKind != ClassKind.ENUM_CLASS) return false
     if (this is FirConstructor) return isPrimary && valueParameters.isEmpty()
-    if (this !is FirSimpleFunction) return false
-
-    if (name == StandardNames.ENUM_VALUES && valueParameters.isEmpty()) return true
-
-    if (name == StandardNames.ENUM_VALUE_OF) {
-        return valueParameters.singleOrNull()?.returnTypeRef?.isString == true
-    }
-    return false
+    return source?.kind == KtFakeSourceElementKind.EnumGeneratedDeclaration
 }
 
 private fun FirDeclaration.isDefaultPrimaryConstructor() =

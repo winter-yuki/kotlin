@@ -6,17 +6,27 @@
 @file:Suppress("PackageDirectoryMismatch") // Old package for compatibility
 package org.jetbrains.kotlin.gradle.plugin.mpp
 
-import org.gradle.api.Project
-import org.jetbrains.kotlin.gradle.targets.js.ir.KotlinJsIrCompilation
+import org.jetbrains.kotlin.gradle.targets.js.KotlinJsTarget
+import org.jetbrains.kotlin.gradle.utils.lowerCamelCaseName
 
 class KotlinJsCompilationFactory(
-    val project: Project,
-    val target: KotlinOnlyTarget<KotlinJsCompilation>,
-    val irTarget: KotlinOnlyTarget<KotlinJsIrCompilation>?
+    override val target: KotlinOnlyTarget<KotlinJsCompilation>,
 ) : KotlinCompilationFactory<KotlinJsCompilation> {
     override val itemClass: Class<KotlinJsCompilation>
         get() = KotlinJsCompilation::class.java
 
-    override fun create(name: String): KotlinJsCompilation =
-        target.project.objects.newInstance(KotlinJsCompilation::class.java, JsCompilationDetails(target, name))
+    override fun defaultSourceSetName(compilationName: String): String {
+        val classifier = if (target is KotlinJsTarget && target.irTarget != null)
+            target.disambiguationClassifierInPlatform
+        else target.disambiguationClassifier
+
+        return lowerCamelCaseName(
+            classifier,
+            compilationName
+        )
+    }
+
+    override fun create(name: String): KotlinJsCompilation = target.project.objects.newInstance(
+        KotlinJsCompilation::class.java, JsCompilationDetails(target, name, getOrCreateDefaultSourceSet(name))
+    )
 }

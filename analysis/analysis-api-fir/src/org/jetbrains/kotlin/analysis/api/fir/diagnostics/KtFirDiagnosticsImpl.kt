@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2021 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2022 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -335,6 +335,12 @@ internal class ResolutionToClassifierImpl(
     override val firDiagnostic: KtPsiDiagnostic,
     override val token: KtLifetimeToken,
 ) : KtFirDiagnostic.ResolutionToClassifier(), KtAbstractFirDiagnostic<PsiElement>
+
+internal class AmbiguousAlteredAssignImpl(
+    override val altererNames: List<String?>,
+    override val firDiagnostic: KtPsiDiagnostic,
+    override val token: KtLifetimeToken,
+) : KtFirDiagnostic.AmbiguousAlteredAssign(), KtAbstractFirDiagnostic<PsiElement>
 
 internal class SuperIsNotAnExpressionImpl(
     override val firDiagnostic: KtPsiDiagnostic,
@@ -821,6 +827,11 @@ internal class WrongExtensionFunctionTypeWarningImpl(
     override val token: KtLifetimeToken,
 ) : KtFirDiagnostic.WrongExtensionFunctionTypeWarning(), KtAbstractFirDiagnostic<KtAnnotationEntry>
 
+internal class AnnotationInWhereClauseErrorImpl(
+    override val firDiagnostic: KtPsiDiagnostic,
+    override val token: KtLifetimeToken,
+) : KtFirDiagnostic.AnnotationInWhereClauseError(), KtAbstractFirDiagnostic<KtAnnotationEntry>
+
 internal class OptInUsageImpl(
     override val optInMarkerFqName: FqName,
     override val message: String,
@@ -901,6 +912,12 @@ internal class OptInMarkerOnOverrideWarningImpl(
     override val firDiagnostic: KtPsiDiagnostic,
     override val token: KtLifetimeToken,
 ) : KtFirDiagnostic.OptInMarkerOnOverrideWarning(), KtAbstractFirDiagnostic<KtAnnotationEntry>
+
+internal class SubclassOptInInapplicableImpl(
+    override val target: String,
+    override val firDiagnostic: KtPsiDiagnostic,
+    override val token: KtLifetimeToken,
+) : KtFirDiagnostic.SubclassOptInInapplicable(), KtAbstractFirDiagnostic<KtAnnotationEntry>
 
 internal class ExposedTypealiasExpandedTypeImpl(
     override val elementVisibility: EffectiveVisibility,
@@ -1709,6 +1726,21 @@ internal class InferredTypeVariableIntoPossibleEmptyIntersectionImpl(
     override val firDiagnostic: KtPsiDiagnostic,
     override val token: KtLifetimeToken,
 ) : KtFirDiagnostic.InferredTypeVariableIntoPossibleEmptyIntersection(), KtAbstractFirDiagnostic<PsiElement>
+
+internal class IncorrectLeftComponentOfIntersectionImpl(
+    override val firDiagnostic: KtPsiDiagnostic,
+    override val token: KtLifetimeToken,
+) : KtFirDiagnostic.IncorrectLeftComponentOfIntersection(), KtAbstractFirDiagnostic<KtTypeReference>
+
+internal class IncorrectRightComponentOfIntersectionImpl(
+    override val firDiagnostic: KtPsiDiagnostic,
+    override val token: KtLifetimeToken,
+) : KtFirDiagnostic.IncorrectRightComponentOfIntersection(), KtAbstractFirDiagnostic<KtTypeReference>
+
+internal class NullableOnDefinitelyNotNullableImpl(
+    override val firDiagnostic: KtPsiDiagnostic,
+    override val token: KtLifetimeToken,
+) : KtFirDiagnostic.NullableOnDefinitelyNotNullable(), KtAbstractFirDiagnostic<KtTypeReference>
 
 internal class ExtensionInClassReferenceNotAllowedImpl(
     override val referencedDeclaration: KtCallableSymbol,
@@ -3229,6 +3261,12 @@ internal class RedundantInlineSuspendFunctionTypeImpl(
     override val token: KtLifetimeToken,
 ) : KtFirDiagnostic.RedundantInlineSuspendFunctionType(), KtAbstractFirDiagnostic<KtElement>
 
+internal class InefficientEqualsOverridingInInlineClassImpl(
+    override val className: String,
+    override val firDiagnostic: KtPsiDiagnostic,
+    override val token: KtLifetimeToken,
+) : KtFirDiagnostic.InefficientEqualsOverridingInInlineClass(), KtAbstractFirDiagnostic<KtNamedFunction>
+
 internal class CannotAllUnderImportFromSingletonImpl(
     override val objectName: Name,
     override val firDiagnostic: KtPsiDiagnostic,
@@ -3481,6 +3519,13 @@ internal class PositionedValueArgumentForJavaAnnotationImpl(
     override val firDiagnostic: KtPsiDiagnostic,
     override val token: KtLifetimeToken,
 ) : KtFirDiagnostic.PositionedValueArgumentForJavaAnnotation(), KtAbstractFirDiagnostic<KtExpression>
+
+internal class RedundantRepeatableAnnotationImpl(
+    override val kotlinRepeatable: FqName,
+    override val javaRepeatable: FqName,
+    override val firDiagnostic: KtPsiDiagnostic,
+    override val token: KtLifetimeToken,
+) : KtFirDiagnostic.RedundantRepeatableAnnotation(), KtAbstractFirDiagnostic<KtAnnotationEntry>
 
 internal class LocalJvmRecordImpl(
     override val firDiagnostic: KtPsiDiagnostic,

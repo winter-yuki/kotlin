@@ -16,7 +16,7 @@ import org.jetbrains.kotlin.gradle.plugin.PropertiesProvider
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinJsCompilation
 import org.jetbrains.kotlin.gradle.plugin.mpp.isMain
 import org.jetbrains.kotlin.gradle.plugin.mpp.isTest
-import org.jetbrains.kotlin.gradle.report.BuildMetricsReporterService
+import org.jetbrains.kotlin.gradle.report.BuildMetricsService
 import org.jetbrains.kotlin.gradle.targets.js.KotlinJsTarget
 import org.jetbrains.kotlin.gradle.targets.js.dsl.*
 import org.jetbrains.kotlin.gradle.targets.js.ir.executeTaskBaseName
@@ -32,6 +32,7 @@ import org.jetbrains.kotlin.gradle.targets.js.webpack.WebpackDevtool
 import org.jetbrains.kotlin.gradle.targets.js.webpack.WebpackMajorVersion.Companion.choose
 import org.jetbrains.kotlin.gradle.tasks.dependsOn
 import org.jetbrains.kotlin.gradle.tasks.registerTask
+import org.jetbrains.kotlin.gradle.utils.doNotTrackStateCompat
 import org.jetbrains.kotlin.gradle.utils.lowerCamelCaseName
 import java.io.File
 import javax.inject.Inject
@@ -175,7 +176,7 @@ abstract class KotlinBrowserJs @Inject constructor(target: KotlinJsTarget) :
                         }
                     )()
 
-                    task.outputs.upToDateWhen { false }
+                    task.doNotTrackStateCompat("Tracked by external webpack tool")
 
                     task.commonConfigure(
                         compilation = compilation,
@@ -237,8 +238,8 @@ abstract class KotlinBrowserJs @Inject constructor(target: KotlinJsTarget) :
                     task.description = "build webpack ${type.name.toLowerCase()} bundle"
                     task._destinationDirectory = distribution.directory
 
-                    BuildMetricsReporterService.registerIfAbsent(project)?.let {
-                        task.buildMetricsReporterService.value(it)
+                    BuildMetricsService.registerIfAbsent(project)?.let {
+                        task.buildMetricsService.value(it)
                     }
 
                     task.commonConfigure(
@@ -289,14 +290,16 @@ abstract class KotlinBrowserJs @Inject constructor(target: KotlinJsTarget) :
             KotlinJsBinaryMode.DEVELOPMENT -> devDceTaskProvider
         }
 
+        dependsOn(actualDceTaskProvider)
+
         entryProperty.set(
-            project.layout.file(
-                actualDceTaskProvider
-                    .map {
-                        it.destinationDirectory.file(compilation.compileKotlinTask.outputFileProperty.get().name)
-                    }
-                    .flatMap { it.map { it.asFile } }
-            )
+            actualDceTaskProvider.flatMap { dceTask ->
+                compilation.compileTaskProvider.flatMap { compileTask ->
+                    dceTask.destinationDirectory.file(
+                        compileTask.outputFileProperty.map { it.name }
+                    )
+                }
+            }
         )
 
         resolveFromModulesFirst = true

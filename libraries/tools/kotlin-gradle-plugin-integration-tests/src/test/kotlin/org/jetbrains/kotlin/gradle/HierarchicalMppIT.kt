@@ -20,6 +20,7 @@ import org.jetbrains.kotlin.gradle.testbase.*
 import org.jetbrains.kotlin.gradle.util.checkedReplace
 import org.jetbrains.kotlin.gradle.util.modify
 import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.condition.OS
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
 import java.nio.file.Path
@@ -115,7 +116,7 @@ class HierarchicalMppIT : KGPBaseTest() {
     fun testDependenciesInTests(gradleVersion: GradleVersion, @TempDir tempDir: Path) {
         publishThirdPartyLib(withGranularMetadata = true, gradleVersion = gradleVersion, localRepoDir = tempDir) {
             kotlinSourcesDir("jvmMain").copyRecursively(kotlinSourcesDir("linuxX64Main"))
-            buildGradleKts.appendText("kotlin.linuxX64()")
+            buildGradleKts.appendText("\nkotlin.linuxX64()")
         }
 
         nativeProject(
@@ -273,10 +274,33 @@ class HierarchicalMppIT : KGPBaseTest() {
         )
     }
 
+    @GradleTest
+    @DisplayName("Test that disambiguation attribute of Kotlin JVM Target is propagated to Java configurations")
+    fun testMultipleJvmTargetsWithJavaAndDisambiguationAttributeKt31468(gradleVersion: GradleVersion) {
+        project(
+            projectName = "kt-31468-multiple-jvm-targets-with-java",
+            gradleVersion = gradleVersion
+        ) {
+            build("assemble", "testClasses") {
+                assertTasksExecuted(
+                    ":dependsOnPlainJvm:compileKotlinJvm",
+                    ":dependsOnPlainJvm:compileJava",
+                    ":dependsOnJvmWithJava:compileKotlinJvm",
+                    ":dependsOnJvmWithJava:compileJava",
+
+                    ":dependsOnPlainJvm:compileTestKotlinJvm",
+                    ":dependsOnPlainJvm:compileTestJava",
+                    ":dependsOnJvmWithJava:compileTestKotlinJvm",
+                    ":dependsOnJvmWithJava:compileTestJava",
+                )
+            }
+        }
+    }
+
     private fun publishThirdPartyLib(
         projectName: String = "third-party-lib".withPrefix,
         withGranularMetadata: Boolean,
-        jsCompilerType: KotlinJsCompilerType = KotlinJsCompilerType.LEGACY,
+        jsCompilerType: KotlinJsCompilerType = KotlinJsCompilerType.IR,
         gradleVersion: GradleVersion,
         localRepoDir: Path,
         beforePublishing: TestProject.() -> Unit = { }
@@ -334,11 +358,11 @@ class HierarchicalMppIT : KGPBaseTest() {
                 "com/example/foo/my-lib-foo/1.0/my-lib-foo-1.0-sources.jar"
             )
         ).use { publishedSourcesJar ->
-            publishedSourcesJar.checkAllEntryNamesArePresent(
+            publishedSourcesJar.checkExactEntries(
+                "META-INF/MANIFEST.MF",
                 "commonMain/Foo.kt",
                 "jvmAndJsMain/FooJvmAndJs.kt",
                 "linuxAndJsMain/FooLinuxAndJs.kt",
-                "linuxX64Main/FooLinux.kt"
             )
         }
     }
@@ -384,11 +408,11 @@ class HierarchicalMppIT : KGPBaseTest() {
                 "com/example/bar/my-lib-bar/1.0/my-lib-bar-1.0-sources.jar"
             )
         ).use { publishedSourcesJar ->
-            publishedSourcesJar.checkAllEntryNamesArePresent(
+            publishedSourcesJar.checkExactEntries(
+                "META-INF/MANIFEST.MF",
                 "commonMain/Bar.kt",
                 "jvmAndJsMain/BarJvmAndJs.kt",
                 "linuxAndJsMain/BarLinuxAndJs.kt",
-                "linuxX64Main/BarLinux.kt"
             )
         }
 
@@ -547,6 +571,7 @@ class HierarchicalMppIT : KGPBaseTest() {
             sourceSetCInteropMetadataDirectory = mapOf(),
             hostSpecificSourceSets = emptySet(),
             sourceSetBinaryLayout = sourceSetModuleDependencies.mapValues { SourceSetMetadataLayout.KLIB },
+            sourceSetNames = setOf("commonMain", "jvmAndJsMain", "linuxAndJsMain"),
             isPublishedAsRoot = true
         )
     }
@@ -557,6 +582,26 @@ class HierarchicalMppIT : KGPBaseTest() {
         expectedEntryNames.forEach {
             assertTrue("expecting entry $it in entry names $entryNamesString") { it in entryNames }
         }
+    }
+
+    private fun ZipFile.checkExactEntries(vararg expectedEntryNames: String, ignoreDirectories: Boolean = true) {
+        val entryNamesSet = entries()
+            .asSequence()
+            .map { it.name }
+            .run { if (ignoreDirectories) filterNot { it.endsWith("/") } else this }
+            .sorted()
+            .joinToString("\n")
+        val expectedEntryNamesSet = expectedEntryNames.toList().sorted().joinToString("\n")
+        assertEquals(expectedEntryNamesSet, entryNamesSet)
+    }
+
+    private fun ZipFile.sourceSetDirectories(): List<String> {
+        return entries()
+            .asSequence()
+            .map { it.name.split("/").first() }
+            .toSet()
+            .minus("META-INF")
+            .toList()
     }
 
     private fun ZipFile.getProjectStructureMetadata(): KotlinProjectStructureMetadata {
@@ -589,6 +634,11 @@ class HierarchicalMppIT : KGPBaseTest() {
     @GradleTest
     @DisplayName("HMPP dependencies in js tests")
     fun testHmppDependenciesInJsTests(gradleVersion: GradleVersion, @TempDir tempDir: Path) {
+        // For some reason Gradle 6.* fails with message about using deprecated API which will fail in 7.0
+        // But for Gradle 7.* everything works, so seems false positive
+        if (gradleVersion.baseVersion.version.substringBefore(".").toInt() < 7) {
+            return
+        }
         publishThirdPartyLib(
             withGranularMetadata = true,
             gradleVersion = gradleVersion,
@@ -661,6 +711,81 @@ class HierarchicalMppIT : KGPBaseTest() {
         }
 
     @GradleTest
+    @OsCondition(enabledOnCI = [OS.LINUX, OS.MAC, OS.WINDOWS])
+    @DisplayName("Test sources publication of a multiplatform library")
+    fun testSourcesPublication(gradleVersion: GradleVersion, @TempDir tempDir: Path) {
+        project(
+            "mpp-sources-publication",
+            gradleVersion = gradleVersion,
+            localRepoDir = tempDir
+        ).run {
+            build("publish")
+
+            fun macOnly(code: () -> List<String>): List<String> = if (OS.MAC.isCurrentOs) code() else emptyList()
+
+            val rootModuleSources = listOf("test/lib/1.0/lib-1.0-sources.jar")
+            val jvmModuleSources = listOf("test/lib-jvm/1.0/lib-jvm-1.0-sources.jar")
+            val jvm2ModuleSources = listOf("test/lib-jvm2/1.0/lib-jvm2-1.0-sources.jar")
+            val linuxX64ModuleSources = listOf("test/lib-linuxx64/1.0/lib-linuxx64-1.0-sources.jar")
+            val linuxArm64ModuleSources = listOf("test/lib-linuxarm64/1.0/lib-linuxarm64-1.0-sources.jar")
+            val iosX64ModuleSources = macOnly { listOf("test/lib-iosx64/1.0/lib-iosx64-1.0-sources.jar") }
+            val iosArm64ModuleSources = macOnly { listOf("test/lib-iosarm64/1.0/lib-iosarm64-1.0-sources.jar") }
+            val allPublishedSources = rootModuleSources +
+                jvmModuleSources + jvm2ModuleSources +
+                linuxX64ModuleSources + linuxArm64ModuleSources +
+                iosX64ModuleSources + iosArm64ModuleSources
+
+            infix fun Pair<String, List<String>>.and(that: List<String>) = first to (second + that)
+
+            // Here mentioned only source sets that should be published
+            val expectedSourcePublicationLayout = listOf(
+                "commonMain" to rootModuleSources
+                        and jvmModuleSources and jvm2ModuleSources
+                        and iosX64ModuleSources and iosArm64ModuleSources
+                        and linuxArm64ModuleSources and linuxX64ModuleSources,
+                "linuxMain" to rootModuleSources and linuxArm64ModuleSources and linuxX64ModuleSources,
+                "jvmMain" to jvmModuleSources,
+                "jvm2Main" to jvm2ModuleSources,
+                // since commonJvmMain is compiled to JVM only, it doesn't appear it metadata variant,
+                // it should be published only to jvm variants
+                "commonJvmMain" to jvmModuleSources and jvm2ModuleSources,
+                // iosMain is a host-specific sourceset and even though it isn't present in common metadata artifact
+                // it should be published in common sources. more details: KT-54413
+                "iosMain" to rootModuleSources and iosX64ModuleSources and iosArm64ModuleSources,
+                "iosX64Main" to iosX64ModuleSources,
+                "iosArm64Main" to iosArm64ModuleSources,
+                "linuxX64Main" to linuxX64ModuleSources,
+                "linuxArm64Main" to linuxArm64ModuleSources,
+            )
+
+            val expectedSourcePublicationLayoutBySourcesFile: Map<String, List<String>> = expectedSourcePublicationLayout
+                .flatMap { (sourceSet, sources) -> sources.map { sourceSet to it } }
+                .groupBy(
+                    keySelector = { it.second },
+                    valueTransform = { it.first }
+                )
+
+            val actualSourcePublicationLayoutBySourcesFile: Map<String, List<String>> = allPublishedSources
+                .associateWith { jarPath ->
+                    tempDir
+                        .resolve(jarPath)
+                        .toFile()
+                        .let(::ZipFile)
+                        .use { it.sourceSetDirectories() }
+                }
+
+            fun Map<String, List<String>>.stringifyForBeautifulDiff() = entries
+                .sortedBy { it.key }
+                .joinToString("\n") { "${it.key} => ${it.value.sorted()}" }
+
+            assertEquals(
+                expectedSourcePublicationLayoutBySourcesFile.stringifyForBeautifulDiff(),
+                actualSourcePublicationLayoutBySourcesFile.stringifyForBeautifulDiff()
+            )
+        }
+    }
+
+    @GradleTest
     @DisplayName("KT-44845: all external dependencies is unresolved in IDE with kotlin.mpp.enableGranularSourceSetsMetadata=true")
     fun testMixedScopesFilesExistKt44845(gradleVersion: GradleVersion, @TempDir tempDir: Path) {
         publishThirdPartyLib(withGranularMetadata = true, gradleVersion = gradleVersion, localRepoDir = tempDir)
@@ -729,18 +854,14 @@ class HierarchicalMppIT : KGPBaseTest() {
             }
 
             val configCacheIncompatibleTasks = listOf(
-                ":generateProjectStructureMetadata",
-                ":transformCommonMainDependenciesMetadata",
-                ":cinteropFooLinuxX64",
-                ":compileKotlinLinuxX64",
-                ":linkDebugSharedLinuxX64",
+                ":lib:transformCommonMainDependenciesMetadata",
             )
 
             build("clean", "assemble", buildOptions = options) {
                 assertTasksExecuted(configCacheIncompatibleTasks)
                 configCacheIncompatibleTasks.forEach { task ->
                     assertOutputContains(
-                        """Task `:$task` of type `.+`: .+(at execution time is unsupported)|(not supported with the configuration cache)"""
+                        """Task `${task}` of type `.+`: .+(at execution time is unsupported|not supported with the configuration cache)"""
                             .toRegex()
                     )
                 }

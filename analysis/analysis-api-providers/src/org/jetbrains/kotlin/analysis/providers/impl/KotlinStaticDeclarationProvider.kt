@@ -1,20 +1,26 @@
 /*
- * Copyright 2010-2021 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2022 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.analysis.providers.impl
 
-import com.intellij.psi.PsiElement
+import com.intellij.openapi.project.Project
+import com.intellij.openapi.vfs.impl.jar.CoreJarFileSystem
+import com.intellij.psi.*
 import com.intellij.psi.search.GlobalSearchScope
+import com.intellij.util.indexing.FileContent
+import com.intellij.util.indexing.FileContentImpl
+import com.intellij.util.io.URLUtil
+import org.jetbrains.kotlin.analysis.decompiler.psi.KotlinBuiltInDecompiler
+import org.jetbrains.kotlin.analysis.decompiler.psi.KotlinDecompiledFileViewProvider
+import org.jetbrains.kotlin.analysis.decompiler.psi.file.KtDecompiledFile
 import org.jetbrains.kotlin.analysis.providers.KotlinDeclarationProvider
 import org.jetbrains.kotlin.analysis.providers.KotlinDeclarationProviderFactory
 import org.jetbrains.kotlin.fileClasses.javaFileFacadeFqName
-import org.jetbrains.kotlin.name.CallableId
-import org.jetbrains.kotlin.name.ClassId
-import org.jetbrains.kotlin.name.FqName
-import org.jetbrains.kotlin.name.Name
+import org.jetbrains.kotlin.name.*
 import org.jetbrains.kotlin.psi.*
+import org.jetbrains.kotlin.serialization.deserialization.builtins.BuiltInSerializerProtocol
 
 public class KotlinStaticDeclarationIndex {
     internal val facadeFileMap: MutableMap<FqName, MutableSet<KtFile>> = mutableMapOf()
@@ -51,13 +57,11 @@ public class KotlinStaticDeclarationProvider internal constructor(
             }
             ?: emptyList()
 
-
     override fun getTopLevelKotlinClassLikeDeclarationNamesInPackage(packageFqName: FqName): Set<Name> {
         val classifiers = index.classMap[packageFqName].orEmpty() + index.typeAliasMap[packageFqName].orEmpty()
         return classifiers.filter { it.inScope }
             .mapNotNullTo(mutableSetOf()) { it.nameAsName }
     }
-
 
     override fun getTopLevelCallableNamesInPackage(packageFqName: FqName): Set<Name> {
         val callables = index.topLevelPropertyMap[packageFqName].orEmpty() + index.topLevelFunctionMap[packageFqName].orEmpty()
@@ -66,8 +70,7 @@ public class KotlinStaticDeclarationProvider internal constructor(
             .mapNotNullTo(mutableSetOf()) { it.nameAsName }
     }
 
-
-    override fun getFacadeFilesInPackage(packageFqName: FqName): Collection<KtFile> =
+    override fun findFilesForFacadeByPackage(packageFqName: FqName): Collection<KtFile> =
         index.facadeFileMap[packageFqName]
             ?.filter { ktFile ->
                 ktFile.virtualFile in scope
@@ -76,7 +79,7 @@ public class KotlinStaticDeclarationProvider internal constructor(
 
     override fun findFilesForFacade(facadeFqName: FqName): Collection<KtFile> {
         if (facadeFqName.shortNameOrSpecial().isSpecial) return emptyList()
-        return getFacadeFilesInPackage(facadeFqName.parent()) //TODO Not work correctly for classes with JvmPackageName
+        return findFilesForFacadeByPackage(facadeFqName.parent()) //TODO Not work correctly for classes with JvmPackageName
             .filter { it.javaFileFacadeFqName == facadeFqName }
     }
 
@@ -94,70 +97,139 @@ public class KotlinStaticDeclarationProvider internal constructor(
             }
             ?: emptyList()
 
+    override fun getTopLevelCallableFiles(callableId: CallableId): Collection<KtFile> = buildSet {
+        getTopLevelProperties(callableId).mapTo(this) { it.containingKtFile }
+        getTopLevelFunctions(callableId).mapTo(this) { it.containingKtFile }
+    }
+
 }
 
 public class KotlinStaticDeclarationProviderFactory(
-    files: Collection<KtFile>
+    private val project: Project,
+    files: Collection<KtFile>,
+    private val jarFileSystem: CoreJarFileSystem = CoreJarFileSystem(),
 ) : KotlinDeclarationProviderFactory() {
 
     private val index = KotlinStaticDeclarationIndex()
 
-    private class KtDeclarationRecorder(private val index: KotlinStaticDeclarationIndex) : KtVisitorVoid() {
+    private val psiManager = PsiManager.getInstance(project)
+    private val builtInDecompiler = KotlinBuiltInDecompiler()
+
+    private fun loadBuiltIns(): Collection<KtDecompiledFile> {
+        val classLoader = this::class.java.classLoader
+        return buildList {
+            StandardClassIds.builtInsPackages.forEach { builtInPackageFqName ->
+                val resourcePath = BuiltInSerializerProtocol.getBuiltInsFilePath(builtInPackageFqName)
+                classLoader.getResource(resourcePath)?.let { resourceUrl ->
+                    // "file:///path/to/stdlib.jar!/builtin/package/.kotlin_builtins
+                    //   -> ("path/to/stdlib.jar", "builtin/package/.kotlin_builtins")
+                    URLUtil.splitJarUrl(resourceUrl.path)?.let {
+                        val jarPath = it.first
+                        val builtInFile = it.second
+                        val pathToQuery = jarPath + URLUtil.JAR_SEPARATOR + builtInFile
+                        jarFileSystem.findFileByPath(pathToQuery)?.let { vf ->
+                            val fileContent = FileContentImpl.createByFile(vf, project)
+                            createKtFileStub(fileContent)?.let { file -> add(file) }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun createKtFileStub(
+        fileContent: FileContent,
+    ): KtDecompiledFile? {
+        val fileViewProvider =
+            builtInDecompiler.createFileViewProvider(fileContent.file, psiManager, physical = true) as? KotlinDecompiledFileViewProvider
+                ?: return null
+        return builtInDecompiler.readFile(fileContent.content, fileContent.file)?.let { fileWithMetadata ->
+            KtDecompiledFile(fileViewProvider) {
+                builtInDecompiler.buildDecompiledText(fileWithMetadata)
+            }
+        }
+    }
+
+    private inner class KtDeclarationRecorder : KtVisitorVoid() {
 
         override fun visitElement(element: PsiElement) {
             element.acceptChildren(this)
         }
 
         override fun visitKtFile(file: KtFile) {
-            if (file.hasTopLevelCallables()) {
-                index.facadeFileMap.computeIfAbsent(file.packageFqName) {
-                    mutableSetOf()
-                }.add(file)
-            }
+            addToFacadeFileMap(file)
             super.visitKtFile(file)
         }
 
         override fun visitClassOrObject(classOrObject: KtClassOrObject) {
-            classOrObject.getClassId()?.let { classId ->
-                index.classMap.computeIfAbsent(classId.packageFqName) {
-                    mutableSetOf()
-                }.add(classOrObject)
-            }
+            addToClassMap(classOrObject)
             super.visitClassOrObject(classOrObject)
         }
 
         override fun visitTypeAlias(typeAlias: KtTypeAlias) {
-            typeAlias.getClassId()?.let { classId ->
-                index.typeAliasMap.computeIfAbsent(classId.packageFqName) {
-                    mutableSetOf()
-                }.add(typeAlias)
-            }
+            addToTypeAliasMap(typeAlias)
             super.visitTypeAlias(typeAlias)
         }
 
         override fun visitNamedFunction(function: KtNamedFunction) {
-            if (function.isTopLevel) {
-                val packageFqName = (function.parent as KtFile).packageFqName
-                index.topLevelFunctionMap.computeIfAbsent(packageFqName) {
-                    mutableSetOf()
-                }.add(function)
-            }
+            addToFunctionMap(function)
             super.visitNamedFunction(function)
         }
 
         override fun visitProperty(property: KtProperty) {
-            if (property.isTopLevel) {
-                val packageFqName = (property.parent as KtFile).packageFqName
-                index.topLevelPropertyMap.computeIfAbsent(packageFqName) {
-                    mutableSetOf()
-                }.add(property)
-            }
+            addToPropertyMap(property)
             super.visitProperty(property)
         }
     }
 
+    private fun addToFacadeFileMap(file: KtFile) {
+        if (!file.hasTopLevelCallables()) return
+        index.facadeFileMap.computeIfAbsent(file.packageFqName) {
+            mutableSetOf()
+        }.add(file)
+    }
+
+    private fun addToClassMap(classOrObject: KtClassOrObject) {
+        classOrObject.getClassId()?.let { classId ->
+            index.classMap.computeIfAbsent(classId.packageFqName) {
+                mutableSetOf()
+            }.add(classOrObject)
+        }
+    }
+
+    private fun addToTypeAliasMap(typeAlias: KtTypeAlias) {
+        typeAlias.getClassId()?.let { classId ->
+            index.typeAliasMap.computeIfAbsent(classId.packageFqName) {
+                mutableSetOf()
+            }.add(typeAlias)
+        }
+    }
+
+    private fun addToFunctionMap(function: KtNamedFunction) {
+        if (!function.isTopLevel) return
+        val packageFqName = (function.parent as KtFile).packageFqName
+        index.topLevelFunctionMap.computeIfAbsent(packageFqName) {
+            mutableSetOf()
+        }.add(function)
+    }
+
+    private fun addToPropertyMap(property: KtProperty) {
+        if (!property.isTopLevel) return
+        val packageFqName = (property.parent as KtFile).packageFqName
+        index.topLevelPropertyMap.computeIfAbsent(packageFqName) {
+            mutableSetOf()
+        }.add(property)
+    }
+
     init {
-        val recorder = KtDeclarationRecorder(index)
+        val recorder = KtDeclarationRecorder()
+
+        // Indexing built-ins
+        loadBuiltIns().forEach {
+            it.accept(recorder)
+        }
+
+        // Indexing user source files
         files.forEach {
             it.accept(recorder)
         }

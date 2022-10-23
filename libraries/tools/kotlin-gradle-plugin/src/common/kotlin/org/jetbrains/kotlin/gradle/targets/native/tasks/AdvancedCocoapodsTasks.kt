@@ -22,6 +22,7 @@ import org.jetbrains.kotlin.gradle.targets.native.cocoapods.MissingCocoapodsMess
 import org.jetbrains.kotlin.gradle.targets.native.cocoapods.MissingSpecReposMessage
 import org.jetbrains.kotlin.gradle.tasks.PodspecTask.Companion.retrievePods
 import org.jetbrains.kotlin.gradle.tasks.PodspecTask.Companion.retrieveSpecRepos
+import org.jetbrains.kotlin.gradle.utils.runCommand
 import org.jetbrains.kotlin.konan.target.Family
 import org.jetbrains.kotlin.konan.target.HostManager
 import java.io.File
@@ -89,14 +90,15 @@ open class PodInstallTask : CocoapodsTask() {
             val podInstallCommand = listOf("pod", "install")
 
             runCommand(podInstallCommand,
-                       project.logger,
+                       logger,
                        errorHandler = { returnCode, output, _ ->
                            CocoapodsErrorHandlingUtil.handlePodInstallError(
                                podInstallCommand.joinToString(" "),
                                returnCode,
                                output,
                                project,
-                               frameworkName.get())
+                               frameworkName.get()
+                           )
                        },
                        exceptionHandler = { e: IOException ->
                            CocoapodsErrorHandlingUtil.handle(e, podInstallCommand)
@@ -112,276 +114,6 @@ open class PodInstallTask : CocoapodsTask() {
             }
         }
     }
-}
-
-abstract class DownloadCocoapodsTask : CocoapodsTask() {
-    @get:Input
-    internal lateinit var podName: Provider<String>
-}
-
-open class PodDownloadUrlTask : DownloadCocoapodsTask() {
-    companion object {
-        private val permittedFileExtensions = listOf("tar.gz", "tar.bz2", "tar.xz", "tar", "tgz", "tbz", "txz", "zip", "gzip", "jar")
-
-        internal fun getFileExtension(fileName: String): String? {
-            val permittedFileNameFormat = Regex(
-                ".*(\\.)(${permittedFileExtensions.joinToString("|") { it.replace(".", "\\.") }})"
-            )
-            return permittedFileNameFormat.matchEntire(fileName)?.groups?.lastOrNull()?.value
-        }
-    }
-
-    @get:Nested
-    internal lateinit var podSource: Provider<Url>
-
-    @get:Internal
-    internal val urlDir = project.cocoapodsBuildDirs.externalSources("url")
-
-
-    @get:OutputDirectory
-    internal val podSourceDir = project.provider {
-        urlDir.resolve(podName.get())
-    }
-
-    @TaskAction
-    fun download() {
-        val podLocation = podSource.get()
-        val fileName = podLocation.url.toString().substringAfterLast("/")
-        val extension = getFileExtension(fileName)
-        require(extension != null) {
-            """
-                $fileName has an unsupported file extension 
-                Only the following extensions are supported: ${permittedFileExtensions.joinToString(", ")}
-            """.trimIndent()
-        }
-        val fileNameWithoutExtension = fileName.substringBeforeLast(".$extension")
-        val repo = setupRepo(podLocation)
-        val dependency = createDependency(fileNameWithoutExtension, extension)
-        val configuration = project.configurations.detachedConfiguration(dependency)
-        val artifact = configuration.singleFile
-        copyArtifactToUrlDir(artifact, extension, podLocation.flatten)
-        project.repositories.remove(repo)
-    }
-
-    private fun setupRepo(podUrl: CocoapodsDependency.PodLocation.Url): ArtifactRepository {
-        return project.repositories.ivy { repo ->
-            val repoUrl = podUrl.url.toString().substringBeforeLast("/")
-            repo.setUrl(repoUrl)
-            repo.patternLayout {
-                it.artifact("[artifact].[ext]")
-            }
-            repo.metadataSources {
-                it.artifact()
-            }
-            repo.isAllowInsecureProtocol = podUrl.isAllowInsecureProtocol
-        }
-    }
-
-    private fun createDependency(fileNameWithoutExtension: String, extension: String) = project.dependencies.create(
-        mapOf(
-            "name" to fileNameWithoutExtension,
-            "version" to "1.0",
-            "ext" to extension
-        )
-    )
-
-    private fun copyArtifactToUrlDir(artifact: File, extension: String, flatten: Boolean) {
-        val archiveTree = archiveTree(artifact.absolutePath, extension)
-        project.copy {
-            val destinationDir = podSourceDir.get()
-            it.into(destinationDir)
-            it.from(archiveTree)
-            if (extension == "jar") {
-                it.exclude("META-INF/")
-            }
-            if (!flatten) {
-                it.eachFile { file ->
-                    file.relativePath = RelativePath(true, *file.relativePath.segments.drop(1).toTypedArray())
-                }
-                it.includeEmptyDirs = false
-            }
-        }
-    }
-
-    private fun archiveTree(path: String, extension: String): FileTree {
-        return if (extension == "zip" || extension == "jar") {
-            project.zipTree(path)
-        } else {
-            project.tarTree(path)
-        }
-    }
-}
-
-open class PodDownloadGitTask : DownloadCocoapodsTask() {
-
-    @get:Nested
-    internal lateinit var podSource: Provider<Git>
-
-    @get:Internal
-    internal val gitDir = project.cocoapodsBuildDirs.externalSources("git")
-
-    @get:OutputDirectory
-    internal val repo = project.provider {
-        gitDir.resolve(podName.get())
-    }
-
-    @TaskAction
-    fun download() {
-        repo.get().deleteRecursively()
-        val git = podSource.get()
-        val branch = git.tag ?: git.branch
-        val commit = git.commit
-        val url = git.url
-        try {
-            when {
-                commit != null -> {
-                    retrieveCommit(url, commit)
-                }
-                branch != null -> {
-                    cloneShallow(url, branch)
-                }
-                else -> {
-                    cloneHead(git)
-                }
-            }
-        } catch (e: IllegalStateException) {
-            fallback(git)
-        }
-    }
-
-    private fun retrieveCommit(url: URI, commit: String) {
-        val logger = project.logger
-        val initCommand = listOf(
-            "git",
-            "init"
-        )
-        val repo = repo.get()
-        repo.mkdir()
-        runCommand(initCommand, logger) { directory(repo) }
-
-        val fetchCommand = listOf(
-            "git",
-            "fetch",
-            "--depth", "1",
-            "$url",
-            commit
-        )
-        runCommand(fetchCommand, logger) { directory(repo) }
-
-        val checkoutCommand = listOf(
-            "git",
-            "checkout",
-            "FETCH_HEAD"
-        )
-        runCommand(checkoutCommand, logger) { directory(repo) }
-    }
-
-    private fun cloneShallow(url: URI, branch: String) {
-        val shallowCloneCommand = listOf(
-            "git",
-            "clone",
-            "$url",
-            podName.get(),
-            "--branch", branch,
-            "--depth", "1"
-        )
-        runCommand(shallowCloneCommand, project.logger) { directory(gitDir) }
-    }
-
-    private fun cloneHead(podspecLocation: Git) {
-        val cloneHeadCommand = listOf(
-            "git",
-            "clone",
-            "${podspecLocation.url}",
-            podName.get(),
-            "--depth", "1"
-        )
-        runCommand(cloneHeadCommand, project.logger) { directory(gitDir) }
-    }
-
-    private fun fallback(podspecLocation: Git) {
-        // removing any traces of other commands
-        gitDir.resolve(podName.get()).deleteRecursively()
-        val cloneAllCommand = listOf(
-            "git",
-            "clone",
-            "${podspecLocation.url}",
-            podName.get()
-        )
-        runCommand(
-            cloneAllCommand,
-            project.logger,
-            errorHandler = { retCode, error, _ ->
-                CocoapodsErrorHandlingUtil.handlePodDownloadError(podName.get(), cloneAllCommand.joinToString(" "), retCode, error)
-            },
-            processConfiguration = {
-                directory(gitDir)
-            }
-        )
-    }
-}
-
-private fun runCommand(
-    command: List<String>,
-    logger: Logger,
-    errorHandler: ((retCode: Int, output: String, process: Process) -> String?)? = null,
-    exceptionHandler: ((ex: IOException) -> Unit)? = null,
-    processConfiguration: ProcessBuilder.() -> Unit = { }
-): String {
-    var process: Process? = null
-    try {
-        process = ProcessBuilder(command)
-            .apply {
-                this.processConfiguration()
-            }.start()
-    } catch (e: IOException) {
-        if (exceptionHandler != null) exceptionHandler(e) else throw e
-    }
-
-    if (process == null) {
-        throw IllegalStateException("Failed to run command ${command.joinToString(" ")}")
-    }
-
-    var inputText = ""
-    var errorText = ""
-
-    val inputThread = thread {
-        inputText = process.inputStream.use {
-            it.reader().readText()
-        }
-    }
-
-    val errorThread = thread {
-        errorText = process.errorStream.use {
-            it.reader().readText()
-        }
-    }
-
-    inputThread.join()
-    errorThread.join()
-
-    val retCode = process.waitFor()
-    logger.info(
-        """
-            |Information about "${command.joinToString(" ")}" call:
-            |
-            |${inputText}
-        """.trimMargin()
-    )
-
-    check(retCode == 0) {
-        errorHandler?.invoke(retCode, inputText.ifBlank { errorText }, process)
-            ?: """
-                |Executing of '${command.joinToString(" ")}' failed with code $retCode and message: 
-                |
-                |$inputText
-                |
-                |$errorText
-                |
-                """.trimMargin()
-    }
-
-    return inputText
 }
 
 /**
@@ -497,21 +229,7 @@ open class PodGenTask : CocoapodsTask() {
                     val source = it.source
 
                     if (source != null) {
-                        when (source) {
-                            is Path, is Url -> {
-                                val path = source.getLocalPath(project, it.name)
-                                append(", :path => '$path'")
-                            }
-
-                            is Git -> {
-                                append(", :git => '${source.url}'")
-                                when {
-                                    source.branch != null -> append(", :branch => '${source.branch}'")
-                                    source.tag != null -> append(", :tag => '${source.tag}'")
-                                    source.commit != null -> append(", :commit => '${source.commit}'")
-                                }
-                            }
-                        }
+                        append(", ${source.getPodSourcePath()}")
                     } else if (version != null) {
                         append(", '$version'")
                     }
@@ -519,6 +237,20 @@ open class PodGenTask : CocoapodsTask() {
                 }
             }.forEach { appendLine("\t$it") }
             appendLine("end\n")
+            //disable signing for all synthetic pods KT-54314
+            append(
+                """
+                post_install do |installer|
+                  installer.pods_project.targets.each do |target|
+                    target.build_configurations.each do |config|
+                      config.build_settings['EXPANDED_CODE_SIGN_IDENTITY'] = ""
+                      config.build_settings['CODE_SIGNING_REQUIRED'] = "NO"
+                      config.build_settings['CODE_SIGNING_ALLOWED'] = "NO"
+                    end
+                  end
+                end
+                """.trimIndent()
+            )
         }
 }
 

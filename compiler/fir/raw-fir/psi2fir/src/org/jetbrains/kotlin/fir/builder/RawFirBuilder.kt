@@ -9,6 +9,7 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.tree.IElementType
 import org.jetbrains.kotlin.*
 import org.jetbrains.kotlin.builtins.StandardNames.BACKING_FIELD
+import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.descriptors.Visibilities
@@ -179,7 +180,7 @@ open class RawFirBuilder(
         open fun convertValueParameter(
             valueParameter: KtParameter,
             defaultTypeRef: FirTypeRef? = null,
-            valueParameterDeclaration: ValueParameterDeclaration = ValueParameterDeclaration.OTHER,
+            valueParameterDeclaration: ValueParameterDeclaration,
             additionalAnnotations: List<FirAnnotation> = emptyList()
         ): FirValueParameter = valueParameter.toFirValueParameter(defaultTypeRef, valueParameterDeclaration, additionalAnnotations)
 
@@ -201,51 +202,59 @@ open class RawFirBuilder(
 
         // Here we accept lambda as receiver to prevent expression calculation in stub mode
         private fun (() -> KtExpression?).toFirExpression(errorReason: String): FirExpression =
-            with(this()) {
-                convertSafe() ?: buildErrorExpression(
-                    this?.toFirSourceElement(), ConeSimpleDiagnostic(errorReason, DiagnosticKind.ExpressionExpected),
-                )
-            }
+            this().toFirExpression(errorReason)
 
         private fun KtElement?.toFirExpression(
             errorReason: String,
             kind: DiagnosticKind = DiagnosticKind.ExpressionExpected
         ): FirExpression {
-            val result = this.convertSafe<FirExpression>()
+            if (this == null) {
+                return buildErrorExpression(source = null, ConeSimpleDiagnostic(errorReason, kind))
+            }
 
-            if (result != null) {
-                if (this == null) {
-                    return result
-                }
-
-                val callExpressionCallee = (this as? KtCallExpression)?.calleeExpression?.unwrapParenthesesLabelsAndAnnotations()
-
-                if (this is KtNameReferenceExpression ||
-                    this is KtConstantExpression ||
-                    (this is KtCallExpression && callExpressionCallee !is KtLambdaExpression) ||
-                    getQualifiedExpressionForSelector() == null
-                ) {
-                    return result
-                }
-
-                return buildErrorExpression {
-                    source = callExpressionCallee?.toFirSourceElement() ?: toFirSourceElement()
-                    diagnostic =
-                        ConeSimpleDiagnostic(
-                            "The expression cannot be a selector (occur after a dot)",
-                            if (callExpressionCallee == null) DiagnosticKind.IllegalSelector else DiagnosticKind.NoReceiverAllowed
-                        )
-                    expression = result
+            val result = when (val fir = convertElement(this)) {
+                is FirExpression -> fir
+                else -> {
+                    return buildErrorExpression {
+                        nonExpressionElement = fir
+                        diagnostic = ConeSimpleDiagnostic(errorReason, kind)
+                        source = toFirSourceElement()
+                    }
                 }
             }
 
-            return buildErrorExpression(
-                this?.toFirSourceElement(), ConeSimpleDiagnostic(errorReason, kind),
-            )
+
+            val callExpressionCallee = (this as? KtCallExpression)?.calleeExpression?.unwrapParenthesesLabelsAndAnnotations()
+
+            if (this is KtNameReferenceExpression ||
+                this is KtConstantExpression ||
+                (this is KtCallExpression && callExpressionCallee !is KtLambdaExpression) ||
+                getQualifiedExpressionForSelector() == null
+            ) {
+                return result
+            }
+
+            return buildErrorExpression {
+                source = callExpressionCallee?.toFirSourceElement() ?: toFirSourceElement()
+                diagnostic =
+                    ConeSimpleDiagnostic(
+                        "The expression cannot be a selector (occur after a dot)",
+                        if (callExpressionCallee == null) DiagnosticKind.IllegalSelector else DiagnosticKind.NoReceiverAllowed
+                    )
+                expression = result
+            }
         }
 
-        private inline fun KtExpression.toFirStatement(errorReasonLazy: () -> String): FirStatement =
-            convertSafe() ?: buildErrorExpression(this.toFirSourceElement(), ConeSimpleDiagnostic(errorReasonLazy(), DiagnosticKind.Syntax))
+        private inline fun KtExpression.toFirStatement(errorReasonLazy: () -> String): FirStatement {
+            return when (val fir = convertElement(this)) {
+                is FirStatement -> fir
+                else -> buildErrorExpression {
+                    nonExpressionElement = fir
+                    diagnostic = ConeSimpleDiagnostic(errorReasonLazy(), DiagnosticKind.Syntax)
+                    source = toFirSourceElement()
+                }
+            }
+        }
 
         private fun KtExpression.toFirStatement(): FirStatement =
             convert()
@@ -406,7 +415,7 @@ open class RawFirBuilder(
                         annotations += accessorAnnotationsFromProperty
                         this@RawFirBuilder.context.firFunctionTargets += accessorTarget
                         extractValueParametersTo(
-                            this, ValueParameterDeclaration.OTHER, propertyTypeRefToUse, parameterAnnotationsFromProperty
+                            this, ValueParameterDeclaration.SETTER, propertyTypeRefToUse, parameterAnnotationsFromProperty
                         )
                         if (!isGetter && valueParameters.isEmpty()) {
                             valueParameters += buildDefaultSetterValueParameter {
@@ -538,6 +547,7 @@ open class RawFirBuilder(
                 returnTypeRef = when {
                     typeReference != null -> typeReference.toFirOrErrorType()
                     defaultTypeRef != null -> defaultTypeRef
+                    valueParameterDeclaration.shouldExplicitParameterTypeBePresent -> createNoTypeForParameterTypeRef()
                     else -> null.toFirOrImplicitType()
                 }
                 this.name = name
@@ -568,7 +578,7 @@ open class RawFirBuilder(
 
         private fun KtParameter.toFirProperty(firParameter: FirValueParameter): FirProperty {
             require(hasValOrVar())
-            val type = typeReference.toFirOrErrorType()
+            val type = typeReference.convertSafe<FirTypeRef>() ?: createNoTypeForParameterTypeRef()
             val status = FirDeclarationStatusImpl(visibility, modality).apply {
                 isExpect = hasExpectModifier() || this@RawFirBuilder.context.containerIsExpect
                 isActual = hasActualModifier()
@@ -600,6 +610,15 @@ open class RawFirBuilder(
                 isVar = isMutable
                 symbol = FirPropertySymbol(callableIdForName(propertyName))
                 isLocal = false
+                backingField = FirDefaultPropertyBackingField(
+                    moduleData = baseModuleData,
+                    annotations = mutableListOf(),
+                    returnTypeRef = returnTypeRef.copyWithNewSourceKind(KtFakeSourceElementKind.DefaultAccessor),
+                    isVar = isVar,
+                    propertySymbol = symbol,
+                    status = status.copy(),
+                )
+
                 this.status = status
                 val defaultAccessorSource = propertySource.fakeElement(KtFakeSourceElementKind.DefaultAccessor)
                 getter = FirDefaultPropertyGetter(
@@ -692,8 +711,28 @@ open class RawFirBuilder(
                 val owner = parameter.getStrictParentOfType<KtTypeParameterListOwner>() ?: return@buildTypeParameter
                 for (typeConstraint in owner.typeConstraints) {
                     val subjectName = typeConstraint.subjectTypeParameterName?.getReferencedNameAsName()
+
                     if (subjectName == parameterName) {
                         bounds += typeConstraint.boundTypeReference.toFirOrErrorType()
+                    }
+
+                    for (entry in typeConstraint.annotationEntries) {
+                        annotations += buildErrorAnnotationCall {
+                            source = entry.toFirSourceElement()
+                            useSiteTarget = entry.useSiteTarget?.getAnnotationUseSiteTarget()
+                            annotationTypeRef = entry.typeReference.toFirOrErrorType()
+                            diagnostic = ConeSimpleDiagnostic(
+                                "Type parameter annotations are not allowed inside where clauses", DiagnosticKind.AnnotationNotAllowed,
+                            )
+                            val name = (annotationTypeRef as? FirUserTypeRef)?.qualifier?.last()?.name
+                                ?: Name.special("<no-annotation-name>")
+                            calleeReference = buildSimpleNamedReference {
+                                source = (entry.typeReference?.typeElement as? KtUserType)?.referenceExpression?.toFirSourceElement()
+                                this.name = name
+                            }
+                            entry.extractArgumentsTo(this)
+                            typeArguments.appendTypeArguments(entry.typeArguments)
+                        }
                     }
                 }
                 addDefaultBoundIfNecessary()
@@ -1166,6 +1205,10 @@ open class RawFirBuilder(
                                 baseModuleData, context.packageFqName, context.className,
                                 classIsExpect
                             )
+                            generateEntriesGetter(
+                                baseModuleData, context.packageFqName, context.className,
+                                classIsExpect
+                            )
                         }
 
                         initCompanionObjectSymbolAttr()
@@ -1310,7 +1353,7 @@ open class RawFirBuilder(
                     valueParameters += convertValueParameter(
                         valueParameter,
                         null,
-                        if (isAnonymousFunction) ValueParameterDeclaration.LAMBDA else ValueParameterDeclaration.OTHER
+                        if (isAnonymousFunction) ValueParameterDeclaration.LAMBDA else ValueParameterDeclaration.FUNCTION
                     )
                 }
                 val actualTypeParameters = if (this is FirSimpleFunctionBuilder)
@@ -1485,7 +1528,7 @@ open class RawFirBuilder(
                 this@RawFirBuilder.context.firFunctionTargets += target
                 extractAnnotationsTo(this)
                 typeParameters += constructorTypeParametersFromConstructedClass(ownerTypeParameters)
-                extractValueParametersTo(this, ValueParameterDeclaration.OTHER)
+                extractValueParametersTo(this, ValueParameterDeclaration.FUNCTION)
 
 
                 val (body, _) = buildFirBody()
@@ -1781,7 +1824,7 @@ open class RawFirBuilder(
                         // TODO: probably implicit type should not be here
                         returnTypeRef = unwrappedElement.returnTypeReference.toFirOrErrorType()
                         for (valueParameter in unwrappedElement.parameters) {
-                            valueParameters += valueParameter.convert<FirValueParameter>()
+                            valueParameters += convertValueParameter(valueParameter, valueParameterDeclaration = ValueParameterDeclaration.FUNCTIONAL_TYPE)
                         }
 
                         contextReceiverTypeRefs.addAll(
@@ -1854,9 +1897,6 @@ open class RawFirBuilder(
                 }
             }
         }
-
-        override fun visitParameter(parameter: KtParameter, data: Unit): FirElement =
-            convertValueParameter(parameter)
 
         override fun visitBlockExpression(expression: KtBlockExpression, data: Unit): FirElement {
             return configureBlockWithoutBuilding(expression).build()

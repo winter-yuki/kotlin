@@ -105,9 +105,12 @@ ALWAYS_INLINE inline GCSchedulerType getGCSchedulerType() noexcept {
 
 WorkerExceptionHandling workerExceptionHandling() noexcept;
 DestroyRuntimeMode destroyRuntimeMode() noexcept;
+bool gcMarkSingleThreaded() noexcept;
 bool suspendFunctionsFromAnyThreadFromObjCEnabled() noexcept;
 AppStateTracking appStateTracking() noexcept;
 int getSourceInfo(void* addr, SourceInfo *result, int result_size) noexcept;
+bool mimallocUseDefaultOptions() noexcept;
+bool mimallocUseCompaction() noexcept;
 
 #ifdef KONAN_ANDROID
 bool printToAndroidLogcat() noexcept;

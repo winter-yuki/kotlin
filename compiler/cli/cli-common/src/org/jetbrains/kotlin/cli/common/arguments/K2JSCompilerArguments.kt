@@ -16,11 +16,32 @@ class K2JSCompilerArguments : CommonCompilerArguments() {
         @JvmStatic private val serialVersionUID = 0L
     }
 
-    @GradleOption(DefaultValues.StringNullDefault::class)
+    @GradleOption(
+        value = DefaultValues.StringNullDefault::class,
+        gradleInputType = GradleInputTypes.INTERNAL // handled by task 'outputFileProperty'
+    )
+    @GradleDeprecatedOption(
+        message = "Only for legacy backend. For IR backend please use task.destinationDirectory and moduleName",
+        level = DeprecationLevel.WARNING,
+        removeAfter = "1.9.0"
+    )
     @Argument(value = "-output", valueDescription = "<filepath>", description = "Destination *.js file for the compilation result")
     var outputFile: String? by NullableStringFreezableVar(null)
 
-    @GradleOption(DefaultValues.BooleanTrueDefault::class)
+    @Argument(value = "-ir-output-dir", valueDescription = "<directory>", description = "Destination for generated files")
+    var outputDir: String? by NullableStringFreezableVar(null)
+
+    @GradleOption(
+        value = DefaultValues.StringNullDefault::class,
+        gradleInputType = GradleInputTypes.INPUT
+    )
+    @Argument(value = "-ir-output-name", description = "Base name of generated files")
+    var moduleName: String? by NullableStringFreezableVar(null)
+
+    @GradleOption(
+        value = DefaultValues.BooleanTrueDefault::class,
+        gradleInputType = GradleInputTypes.INPUT
+    )
     @Argument(value = "-no-stdlib", description = "Don't automatically include the default Kotlin/JS stdlib into compilation dependencies")
     var noStdlib: Boolean by FreezableVar(false)
 
@@ -38,11 +59,17 @@ class K2JSCompilerArguments : CommonCompilerArguments() {
     )
     var repositries: String? by NullableStringFreezableVar(null)
 
-    @GradleOption(DefaultValues.BooleanFalseDefault::class)
+    @GradleOption(
+        value = DefaultValues.BooleanFalseDefault::class,
+        gradleInputType = GradleInputTypes.INPUT
+    )
     @Argument(value = "-source-map", description = "Generate source map")
     var sourceMap: Boolean by FreezableVar(false)
 
-    @GradleOption(DefaultValues.StringNullDefault::class)
+    @GradleOption(
+        value = DefaultValues.StringNullDefault::class,
+        gradleInputType = GradleInputTypes.INPUT
+    )
     @Argument(value = "-source-map-prefix", description = "Add the specified prefix to paths in the source map")
     var sourceMapPrefix: String? by NullableStringFreezableVar(null)
 
@@ -58,7 +85,10 @@ class K2JSCompilerArguments : CommonCompilerArguments() {
      * SourceMapEmbedSources should be null by default, since it has effect only when source maps are enabled.
      * When sourceMapEmbedSources are not null and source maps is disabled warning is reported.
      */
-    @GradleOption(DefaultValues.JsSourceMapContentModes::class)
+    @GradleOption(
+        value = DefaultValues.JsSourceMapContentModes::class,
+        gradleInputType = GradleInputTypes.INPUT
+    )
     @Argument(
             value = "-source-map-embed-sources",
             valueDescription = "{always|never|inlining}",
@@ -66,23 +96,53 @@ class K2JSCompilerArguments : CommonCompilerArguments() {
     )
     var sourceMapEmbedSources: String? by NullableStringFreezableVar(null)
 
-    @GradleOption(DefaultValues.BooleanTrueDefault::class)
+    @GradleOption(
+        value = DefaultValues.JsSourceMapNamesPolicies::class,
+        gradleInputType = GradleInputTypes.INPUT
+    )
+    @Argument(
+        value = "-source-map-names-policy",
+        valueDescription = "{no|simple-names|fully-qualified-names}",
+        description = "How to map generated names to original names (IR backend only)"
+    )
+    var sourceMapNamesPolicy: String? by NullableStringFreezableVar(null)
+
+    @GradleOption(
+        value = DefaultValues.BooleanTrueDefault::class,
+        gradleInputType = GradleInputTypes.INPUT
+    )
     @Argument(value = "-meta-info", description = "Generate .meta.js and .kjsm files with metadata. Use to create a library")
     var metaInfo: Boolean by FreezableVar(false)
 
-    @GradleOption(DefaultValues.JsEcmaVersions::class)
+    @GradleOption(
+        value = DefaultValues.JsEcmaVersions::class,
+        gradleInputType = GradleInputTypes.INPUT
+    )
     @Argument(value = "-target", valueDescription = "{ v5 }", description = "Generate JS files for specific ECMA version")
     var target: String? by NullableStringFreezableVar(null)
 
-    @GradleOption(DefaultValues.JsModuleKinds::class)
+    @Argument(
+        value = "-Xir-keep",
+        description = "Comma-separated list of fully-qualified names to not be eliminated by DCE (if it can be reached), " +
+                "and for which to keep non-minified names."
+    )
+    var irKeep: String? by NullableStringFreezableVar(null)
+
+    @GradleOption(
+        value = DefaultValues.JsModuleKinds::class,
+        gradleInputType = GradleInputTypes.INPUT
+    )
     @Argument(
             value = "-module-kind",
-            valueDescription = "{plain|amd|commonjs|umd}",
+            valueDescription = "{plain|amd|commonjs|umd|es}",
             description = "Kind of the JS module generated by the compiler"
     )
     var moduleKind: String? by NullableStringFreezableVar(K2JsArgumentConstants.MODULE_PLAIN)
 
-    @GradleOption(DefaultValues.JsMain::class)
+    @GradleOption(
+        value = DefaultValues.JsMain::class,
+        gradleInputType = GradleInputTypes.INPUT
+    )
     @Argument(
         value = "-main",
         valueDescription = "{$CALL|$NO_CALL}",
@@ -207,11 +267,29 @@ class K2JSCompilerArguments : CommonCompilerArguments() {
     )
     var generateDts: Boolean by FreezableVar(false)
 
-    @GradleOption(DefaultValues.BooleanTrueDefault::class)
+    @Argument(
+        value = "-Xgenerate-polyfills",
+        description = "Generate polyfills for features from the ES6+ standards."
+    )
+    var generatePolyfills: Boolean by FreezableVar(true)
+
+    @Argument(
+        value = "-Xstrict-implicit-export-types",
+        description = "Generate strict types for implicitly exported entities inside d.ts files. Available in IR backend only."
+    )
+    var strictImplicitExportType: Boolean by FreezableVar(false)
+
+    @GradleOption(
+        value = DefaultValues.BooleanTrueDefault::class,
+        gradleInputType = GradleInputTypes.INPUT
+    )
     @Argument(value = "-Xtyped-arrays", description = "Translate primitive arrays to JS typed arrays")
     var typedArrays: Boolean by FreezableVar(true)
 
-    @GradleOption(DefaultValues.BooleanFalseDefault::class)
+    @GradleOption(
+        value = DefaultValues.BooleanFalseDefault::class,
+        gradleInputType = GradleInputTypes.INPUT
+    )
     @Argument(value = "-Xfriend-modules-disabled", description = "Disable internal declaration export")
     var friendModulesDisabled: Boolean by FreezableVar(false)
 
@@ -257,6 +335,18 @@ class K2JSCompilerArguments : CommonCompilerArguments() {
 
     @Argument(value = "-Xwasm-enable-asserts", description = "Turn on asserts")
     var wasmEnableAsserts: Boolean by FreezableVar(false)
+
+    @Argument(
+        value = "-Xuse-deprecated-legacy-compiler",
+        description = "Use deprecated legacy compiler without error"
+    )
+    var useDeprecatedLegacyCompiler: Boolean by FreezableVar(false)
+
+    @Argument(
+        value = "-Xlegacy-deprecated-no-warn",
+        description = "Disable warnings of deprecation of legacy compiler"
+    )
+    var legacyDeprecatedNoWarn: Boolean by FreezableVar(false)
 
     override fun configureAnalysisFlags(collector: MessageCollector, languageVersion: LanguageVersion): MutableMap<AnalysisFlag<*>, Any> {
         return super.configureAnalysisFlags(collector, languageVersion).also {

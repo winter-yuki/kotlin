@@ -7,8 +7,6 @@ package org.jetbrains.kotlin.konan.blackboxtest.support.util
 
 import org.jetbrains.kotlin.konan.blackboxtest.support.TestName
 import org.jetbrains.kotlin.test.services.JUnit5Assertions.fail
-import org.jetbrains.kotlin.utils.addToStdlib.cast
-import org.jetbrains.kotlin.utils.addToStdlib.safeAs
 
 /**
  * Extracts [TestName]s from the test listing produced immediately during the compilation (turned on with
@@ -34,7 +32,9 @@ internal object DumpedTestListing {
                     emptyLineEncountered = true
                     null
                 }
+
                 emptyLineEncountered -> parseError("Unexpected empty line")
+
                 else -> {
                     val (packageAndClass, functionName) = line.trim()
                         .split(':')
@@ -48,7 +48,7 @@ internal object DumpedTestListing {
                     }
                 }
             }
-        }
+        }.sorted()
     }
 }
 
@@ -108,7 +108,7 @@ internal object GTestListing {
     }
 
     private inline val ParseState.testSuite: ParseState.NewTestSuite
-        get() = safeAs<ParseState.NewTestSuite>() ?: cast<ParseState.NewTest>().testSuite
+        get() = this as? ParseState.NewTestSuite ?: (this as ParseState.NewTest).testSuite
 
     // The very first line of stdlib test output may contain seed of Random. Such line should be ignored.
     private const val STDLIB_TESTS_IGNORED_LINE_PREFIX = "Seed: "

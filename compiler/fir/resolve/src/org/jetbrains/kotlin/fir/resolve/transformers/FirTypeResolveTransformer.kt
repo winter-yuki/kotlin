@@ -120,20 +120,30 @@ open class FirTypeResolveTransformer(
             property.transformTypeParameters(this, data)
                 .transformReturnTypeRef(this, data)
                 .transformReceiverTypeRef(this, data)
+                .transformContextReceivers(this, data)
                 .transformGetter(this, data)
                 .transformSetter(this, data)
                 .transformBackingField(this, data)
                 .transformAnnotations(this, data)
             if (property.isFromVararg == true) {
                 property.transformTypeToArrayType()
-                property.getter?.transformReturnTypeRef(StoreType, property.returnTypeRef)
-                property.setter?.valueParameters?.map { it.transformReturnTypeRef(StoreType, property.returnTypeRef) }
+                property.backingField?.transformTypeToArrayType()
+                setAccessorTypesByPropertyType(property)
+            }
+
+            if (property.returnTypeRef is FirResolvedTypeRef && property.delegate != null) {
+                setAccessorTypesByPropertyType(property)
             }
 
             unboundCyclesInTypeParametersSupertypes(property)
 
             property
         }
+    }
+
+    private fun setAccessorTypesByPropertyType(property: FirProperty) {
+        property.getter?.transformReturnTypeRef(StoreType, property.returnTypeRef)
+        property.setter?.valueParameters?.map { it.transformReturnTypeRef(StoreType, property.returnTypeRef) }
     }
 
     override fun transformField(field: FirField, data: Any?): FirField {

@@ -25,7 +25,6 @@ import org.jetbrains.kotlin.codegen.inline.ReifiedTypeInliner.OperationKind.SAFE
 import org.jetbrains.kotlin.codegen.intrinsics.TypeIntrinsics
 import org.jetbrains.kotlin.codegen.pseudoInsns.fakeAlwaysFalseIfeq
 import org.jetbrains.kotlin.codegen.pseudoInsns.fixStackAndJump
-import org.jetbrains.kotlin.codegen.signature.BothSignatureWriter
 import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.config.languageVersionSettings
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
@@ -57,7 +56,6 @@ import org.jetbrains.kotlin.types.computeExpandedTypeForInlineClass
 import org.jetbrains.kotlin.types.model.TypeParameterMarker
 import org.jetbrains.kotlin.utils.addToStdlib.firstIsInstanceOrNull
 import org.jetbrains.kotlin.utils.addToStdlib.safeAs
-import org.jetbrains.kotlin.utils.keysToMap
 import org.jetbrains.org.objectweb.asm.Label
 import org.jetbrains.org.objectweb.asm.Opcodes
 import org.jetbrains.org.objectweb.asm.Type
@@ -150,8 +148,8 @@ class ExpressionCodegen(
         get() = generateSequence(irFunction) { context.enclosingMethodOverride[it] }.last()
 
     val context = classCodegen.context
-    val typeMapper = context.typeMapper
-    val methodSignatureMapper = context.methodSignatureMapper
+    val typeMapper = classCodegen.typeMapper
+    val methodSignatureMapper = classCodegen.methodSignatureMapper
 
     val state = context.state
 
@@ -295,6 +293,7 @@ class ExpressionCodegen(
             (irFunction is IrConstructor && irFunction.parentAsClass.isAnonymousObject) ||
             // TODO: Implement this as a lowering, so that we can more easily exclude generated methods.
             irFunction.origin == JvmLoweredDeclarationOrigin.INLINE_CLASS_GENERATED_IMPL_METHOD ||
+            irFunction.origin == JvmLoweredDeclarationOrigin.MULTI_FIELD_VALUE_CLASS_GENERATED_IMPL_METHOD ||
             // Although these are accessible from Java, the functions they bridge to already have the assertions.
             irFunction.origin == IrDeclarationOrigin.BRIDGE_SPECIAL ||
             irFunction.origin == JvmLoweredDeclarationOrigin.SUPER_INTERFACE_METHOD_BRIDGE ||
@@ -1390,21 +1389,22 @@ class ExpressionCodegen(
         return MaterialValue(this@ExpressionCodegen, JAVA_STRING_TYPE, context.irBuiltIns.stringType)
     }
 
-    override fun visitGetClass(expression: IrGetClass, data: BlockInfo) =
-        generateClassLiteralReference(expression, true, data)
+    override fun visitGetClass(expression: IrGetClass, data: BlockInfo): PromisedValue =
+        generateClassLiteralReference(expression, wrapIntoKClass = true, wrapPrimitives = false, data = data)
 
-    override fun visitClassReference(expression: IrClassReference, data: BlockInfo) =
-        generateClassLiteralReference(expression, true, data)
+    override fun visitClassReference(expression: IrClassReference, data: BlockInfo): PromisedValue =
+        generateClassLiteralReference(expression, wrapIntoKClass = true, wrapPrimitives = false, data = data)
 
     fun generateClassLiteralReference(
         classReference: IrExpression,
         wrapIntoKClass: Boolean,
+        wrapPrimitives: Boolean,
         data: BlockInfo
-    ): PromisedValue {
+    ): MaterialValue {
         when (classReference) {
             is IrGetClass -> {
                 // TODO transform one sort of access into the other?
-                JavaClassProperty.invokeWith(classReference.argument.accept(this, data))
+                JavaClassProperty.invokeWith(classReference.argument.accept(this, data), wrapPrimitives)
             }
             is IrClassReference -> {
                 val classType = classReference.classType
@@ -1416,7 +1416,7 @@ class ExpressionCodegen(
                     }
                 }
 
-                generateClassInstance(mv, classType, typeMapper)
+                generateClassInstance(mv, classType, typeMapper, wrapPrimitives)
             }
             else -> {
                 throw AssertionError("not an IrGetClass or IrClassReference: ${classReference.dump()}")
@@ -1452,33 +1452,15 @@ class ExpressionCodegen(
             if (element.typeArgumentsCount == 0) {
                 //avoid ambiguity with type constructor type parameters
                 emptyMap()
-            } else typeArgumentContainer.typeParameters.keysToMap {
-                element.getTypeArgumentOrDefault(it)
+            } else typeArgumentContainer.typeParameters.associate {
+                it.symbol to element.getTypeArgumentOrDefault(it)
             }
 
-        val mappings = TypeParameterMappings<IrType>()
-        for ((key, type) in typeArguments.entries) {
-            val reificationArgument = typeMapper.typeSystem.extractReificationArgument(type)
-            if (reificationArgument == null) {
-                // type is not generic
-                val signatureWriter = BothSignatureWriter(BothSignatureWriter.Mode.TYPE)
-                val asmType = typeMapper.mapTypeParameter(type, signatureWriter)
-
-                mappings.addParameterMappingToType(
-                    key.name.identifier, type, asmType, signatureWriter.toString(), key.isReified
-                )
-            } else {
-                mappings.addParameterMappingForFurtherReification(
-                    key.name.identifier, type, reificationArgument.second, key.isReified
-                )
-            }
-        }
-
+        val mappings = TypeParameterMappings(typeMapper.typeSystem, typeArguments, allReified = false, typeMapper::mapTypeParameter)
         val sourceCompiler = IrSourceCompilerForInline(state, element, callee, this, data)
-
         val reifiedTypeInliner = ReifiedTypeInliner(
             mappings,
-            IrInlineIntrinsicsSupport(context, typeMapper, element, irFunction.fileParent),
+            IrInlineIntrinsicsSupport(classCodegen, element, irFunction.fileParent),
             context.typeSystem,
             state.languageVersionSettings,
             state.unifiedNullChecks,
@@ -1521,9 +1503,9 @@ class ExpressionCodegen(
         get() = this.classifierOrNull?.safeAs<IrTypeParameterSymbol>()?.owner?.isReified == true
 
     companion object {
-        internal fun generateClassInstance(v: InstructionAdapter, classType: IrType, typeMapper: IrTypeMapper) {
+        internal fun generateClassInstance(v: InstructionAdapter, classType: IrType, typeMapper: IrTypeMapper, wrapPrimitives: Boolean) {
             val asmType = typeMapper.mapType(classType)
-            if (classType.getClass()?.isSingleFieldValueClass == true || !isPrimitive(asmType)) {
+            if (wrapPrimitives || classType.getClass()?.isSingleFieldValueClass == true || !isPrimitive(asmType)) {
                 v.aconst(typeMapper.boxType(classType))
             } else {
                 v.getstatic(boxType(asmType).internalName, "TYPE", "Ljava/lang/Class;")

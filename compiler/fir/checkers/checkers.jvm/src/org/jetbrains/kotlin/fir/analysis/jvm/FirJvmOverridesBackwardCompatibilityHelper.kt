@@ -9,7 +9,7 @@ import org.jetbrains.kotlin.builtins.jvm.JavaToKotlinClassMap
 import org.jetbrains.kotlin.fir.analysis.FirOverridesBackwardCompatibilityHelper
 import org.jetbrains.kotlin.fir.analysis.checkers.context.CheckerContext
 import org.jetbrains.kotlin.fir.analysis.checkers.unsubstitutedScope
-import org.jetbrains.kotlin.fir.containingClass
+import org.jetbrains.kotlin.fir.containingClassLookupTag
 import org.jetbrains.kotlin.fir.declarations.FirProperty
 import org.jetbrains.kotlin.fir.declarations.FirResolvePhase
 import org.jetbrains.kotlin.fir.declarations.FirSimpleFunction
@@ -23,7 +23,7 @@ import org.jetbrains.kotlin.fir.resolve.toFirRegularClassSymbol
 import org.jetbrains.kotlin.fir.scopes.getDirectOverriddenFunctions
 import org.jetbrains.kotlin.fir.scopes.getDirectOverriddenProperties
 import org.jetbrains.kotlin.fir.symbols.SymbolInternals
-import org.jetbrains.kotlin.fir.symbols.ensureResolved
+import org.jetbrains.kotlin.fir.symbols.lazyResolveToPhase
 import org.jetbrains.kotlin.fir.symbols.impl.FirCallableSymbol
 import org.jetbrains.kotlin.fir.types.ConeClassLikeType
 import org.jetbrains.kotlin.fir.types.classId
@@ -63,7 +63,7 @@ object FirJvmOverridesBackwardCompatibilityHelper : FirOverridesBackwardCompatib
         visitedSymbols += symbol
 
         val originalMemberSymbol = symbol.originalOrSelf()
-        originalMemberSymbol.ensureResolved(FirResolvePhase.BODY_RESOLVE)
+        originalMemberSymbol.lazyResolveToPhase(FirResolvePhase.BODY_RESOLVE)
         @OptIn(SymbolInternals::class)
         val originalMember = originalMemberSymbol.fir
         if (originalMember.annotations.any { it.annotationTypeRef.coneTypeSafe<ConeClassLikeType>()?.classId == platformDependentAnnotation }) {
@@ -71,14 +71,14 @@ object FirJvmOverridesBackwardCompatibilityHelper : FirOverridesBackwardCompatib
         }
 
         if (!originalMember.isJavaOrEnhancement) return false
-        val containingClassName = originalMember.containingClass()?.classId?.asSingleFqName()?.toUnsafe() ?: return false
+        val containingClassName = originalMember.containingClassLookupTag()?.classId?.asSingleFqName()?.toUnsafe() ?: return false
         // If the super class is mapped to a Kotlin built-in class, then we don't require `override` keyword.
         if (JavaToKotlinClassMap.mapKotlinToJava(containingClassName) != null) {
             return true
         }
 
         if (!originalMember.isAbstract) {
-            val containingClass = originalMember.containingClass()?.toFirRegularClassSymbol(context.session)
+            val containingClass = originalMember.containingClassLookupTag()?.toFirRegularClassSymbol(context.session)
             if (containingClass?.isInterface == false) {
                 return false
             }

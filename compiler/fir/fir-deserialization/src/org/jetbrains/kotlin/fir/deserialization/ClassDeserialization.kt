@@ -8,6 +8,7 @@ package org.jetbrains.kotlin.fir.deserialization
 import org.jetbrains.kotlin.builtins.jvm.JvmBuiltInsSignatures
 import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.fir.*
+import org.jetbrains.kotlin.fir.caches.firCachesFactory
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.declarations.builder.*
 import org.jetbrains.kotlin.fir.declarations.comparators.FirMemberDeclarationComparator
@@ -190,6 +191,7 @@ fun deserializeClassToSymbol(
                 classId.relativeClassName
             )
             generateValueOfFunction(moduleData, classId.packageFqName, classId.relativeClassName)
+            generateEntriesGetter(moduleData, classId.packageFqName, classId.relativeClassName)
         }
 
         addCloneForArrayIfNeeded(classId, context.dispatchReceiver)
@@ -225,7 +227,7 @@ fun deserializeClassToSymbol(
 
         it.sourceElement = containerSource
 
-        it.replaceDeprecation(it.getDeprecationInfos(session.languageVersionSettings.apiVersion))
+        it.replaceDeprecationsProvider(it.getDeprecationsProvider(session.firCachesFactory))
 
         classProto.getExtensionOrNull(JvmProtoBuf.classModuleName)?.let { idx ->
             it.moduleName = nameResolver.getString(idx)

@@ -5,9 +5,10 @@
 
 package org.jetbrains.kotlin.fir.symbols.impl
 
+import org.jetbrains.kotlin.config.ApiVersion
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
-import org.jetbrains.kotlin.fir.symbols.ensureResolved
+import org.jetbrains.kotlin.fir.symbols.lazyResolveToPhase
 import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.name.CallableId
 import org.jetbrains.kotlin.name.Name
@@ -33,13 +34,13 @@ abstract class FirCallableSymbol<D : FirCallableDeclaration> : FirBasedSymbol<D>
 
     val resolvedContextReceivers: List<FirContextReceiver>
         get() {
-            ensureResolved(FirResolvePhase.TYPES)
+            lazyResolveToPhase(FirResolvePhase.TYPES)
             return fir.contextReceivers
         }
 
     val resolvedStatus: FirResolvedDeclarationStatus
         get() {
-            ensureResolved(FirResolvePhase.STATUS)
+            lazyResolveToPhase(FirResolvePhase.STATUS)
             return fir.status as FirResolvedDeclarationStatus
         }
 
@@ -58,17 +59,16 @@ abstract class FirCallableSymbol<D : FirCallableDeclaration> : FirBasedSymbol<D>
     val name: Name
         get() = callableId.callableName
 
-    val deprecation: DeprecationsPerUseSite?
-        get() {
-            ensureResolved(FirResolvePhase.STATUS)
-            return fir.deprecation
-        }
+    fun getDeprecation(apiVersion: ApiVersion): DeprecationsPerUseSite? {
+        lazyResolveToPhase(FirResolvePhase.STATUS)
+        return fir.deprecationsProvider.getDeprecationsInfo(apiVersion)
+    }
 
     private fun ensureType(typeRef: FirTypeRef?) {
         when (typeRef) {
             null, is FirResolvedTypeRef -> {}
-            is FirImplicitTypeRef -> ensureResolved(FirResolvePhase.IMPLICIT_TYPES_BODY_RESOLVE)
-            else -> ensureResolved(FirResolvePhase.TYPES)
+            is FirImplicitTypeRef -> lazyResolveToPhase(FirResolvePhase.IMPLICIT_TYPES_BODY_RESOLVE)
+            else -> lazyResolveToPhase(FirResolvePhase.TYPES)
         }
     }
 

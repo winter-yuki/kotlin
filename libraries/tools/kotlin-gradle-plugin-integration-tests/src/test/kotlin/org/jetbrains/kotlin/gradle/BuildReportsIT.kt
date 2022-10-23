@@ -5,12 +5,14 @@
 
 package org.jetbrains.kotlin.gradle
 
+import org.gradle.api.logging.LogLevel
 import org.gradle.util.GradleVersion
 import org.jetbrains.kotlin.gradle.internal.build.metrics.GradleBuildMetricsData
 import org.jetbrains.kotlin.gradle.report.BuildReportType
 import org.jetbrains.kotlin.gradle.testbase.*
 import org.junit.jupiter.api.DisplayName
 import java.io.ObjectInputStream
+import kotlin.io.path.*
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -92,6 +94,33 @@ class BuildReportsIT : KGPBaseTest() {
         }
     }
 
+    @DisplayName("validation")
+    @GradleTest
+    fun testSingleBuildMetricsFileValidation(gradleVersion: GradleVersion) {
+        project("simpleProject", gradleVersion) {
+            buildAndFail(
+                "compileKotlin", "-Pkotlin.build.report.output=SINGLE_FILE",
+            ) {
+                assertOutputContains("Can't configure single file report: 'kotlin.build.report.single_file' property is mandatory")
+            }
+        }
+    }
+
+    @DisplayName("deprecated property")
+    @GradleTest
+    fun testDeprecatedAndNewSingleBuildMetricsFile(gradleVersion: GradleVersion) {
+        project("simpleProject", gradleVersion) {
+            val newMetricsPath = projectPath.resolve("metrics.bin")
+            val deprecatedMetricsPath = projectPath.resolve("deprecated_metrics.bin")
+            build(
+                "compileKotlin", "-Pkotlin.build.report.single_file=${newMetricsPath.pathString}",
+                "-Pkotlin.internal.single.build.metrics.file=${deprecatedMetricsPath.pathString}"
+            )
+            assertTrue { deprecatedMetricsPath.exists() }
+            assertTrue { newMetricsPath.notExists() }
+        }
+    }
+
     @DisplayName("smoke")
     @GradleTest
     fun testSingleBuildMetricsFileSmoke(gradleVersion: GradleVersion) {
@@ -99,7 +128,8 @@ class BuildReportsIT : KGPBaseTest() {
             val metricsFile = projectPath.resolve("metrics.bin").toFile()
             build(
                 "compileKotlin",
-                "-Pkotlin.internal.single.build.metrics.file=${metricsFile.absolutePath}"
+                "-Pkotlin.build.report.output=SINGLE_FILE",
+                "-Pkotlin.build.report.single_file=${metricsFile.absolutePath}"
             )
 
             assertTrue { metricsFile.exists() }
@@ -109,4 +139,75 @@ class BuildReportsIT : KGPBaseTest() {
             }
         }
     }
+
+    @DisplayName("custom value limit")
+    @GradleTest
+    fun testCustomValueLimitForBuildScan(gradleVersion: GradleVersion) {
+        project("simpleProject", gradleVersion, buildOptions = defaultBuildOptions.copy(logLevel = LogLevel.DEBUG)) {
+            build(
+                "compileKotlin",
+                "-Pkotlin.build.report.output=BUILD_SCAN",
+                "-Pkotlin.build.report.build_scan.custom_values_limit=0",
+                "--scan"
+            ) {
+                assertOutputContains("Can't add any more custom values into build scan")
+            }
+        }
+    }
+
+    @DisplayName("build scan listener lazy initialisation")
+    @GradleTest
+    fun testBuildScanListenerLazyInitialisation(gradleVersion: GradleVersion) {
+        project("simpleProject", gradleVersion, buildOptions = defaultBuildOptions.copy(logLevel = LogLevel.DEBUG)) {
+            build(
+                "compileKotlin",
+                "-Pkotlin.build.report.output=BUILD_SCAN",
+                "-Pkotlin.build.report.build_scan.custom_values_limit=0",
+            ) {
+                assertOutputDoesNotContain("Can't add any more custom values into build scan")
+            }
+        }
+    }
+
+    @DisplayName("Error file is created")
+    @GradleTest
+    fun testErrorsFileSmokeTest(gradleVersion: GradleVersion) {
+        project("simpleProject", gradleVersion) {
+
+            val lookupsTab = projectPath.resolve("build/kotlin/compileKotlin/cacheable/caches-jvm/lookups/lookups.tab")
+            buildGradle.appendText("""
+                tasks.named("compileKotlin") {
+                    doLast {
+                        new File("${lookupsTab.toUri().path}").write("Invalid contents")
+                    }
+                }
+            """.trimIndent())
+            build("compileKotlin") {
+                assertTrue { projectPath.resolve(".gradle/build_errors").listDirectoryEntries().isEmpty() }
+            }
+            val kotlinFile = kotlinSourcesDir().resolve("helloWorld.kt")
+            kotlinFile.modify { it.replace("ArrayList","skjfghsjk") }
+            buildAndFail("compileKotlin") {
+                val buildErrorDir = projectPath.resolve(".gradle/build_errors").toFile()
+                val files = buildErrorDir.listFiles()
+                assertTrue { files?.first()?.exists() ?: false }
+            }
+        }
+    }
+
+    @DisplayName("Error file should not contain compilation exceptions")
+    @GradleTest
+    fun testErrorsFileWithCompilationError(gradleVersion: GradleVersion) {
+        project("simpleProject", gradleVersion) {
+            build("compileKotlin") {
+                assertTrue { projectPath.resolve(".gradle/build_errors").listDirectoryEntries().isEmpty() }
+            }
+            val kotlinFile = kotlinSourcesDir().resolve("helloWorld.kt")
+            kotlinFile.modify { it.replace("ArrayList","skjfghsjk") }
+            buildAndFail("compileKotlin") {
+                assertTrue { projectPath.resolve(".gradle/build_errors").listDirectoryEntries().isEmpty() }
+            }
+        }
+    }
+
 }

@@ -10,8 +10,8 @@ dependencies {
     api(project(":kotlin-util-io"))
 
     testImplementation(commonDependency("junit:junit"))
-    testCompileOnly(project(":kotlin-reflect-api"))
-    testImplementation(project(":kotlin-reflect"))
+    testImplementation(kotlinStdlib())
+    testImplementation(commonDependency("org.jetbrains.kotlin:kotlin-reflect")) { isTransitive = false }
 }
 
 sourceSets {

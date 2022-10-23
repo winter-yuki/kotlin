@@ -9,7 +9,6 @@ import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.plugins.BasePlugin
 import org.gradle.api.tasks.TaskProvider
-import org.jetbrains.kotlin.gradle.plugin.BuildEventsListenerRegistryHolder
 import org.jetbrains.kotlin.gradle.targets.js.MultiplePluginDeclarationDetector
 import org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsRootPlugin
 import org.jetbrains.kotlin.gradle.targets.js.npm.RequiresNpmDependencies
@@ -73,28 +72,11 @@ open class YarnPlugin : Plugin<Project> {
             it.dependsOn(packageJsonUmbrella)
         }
 
-        val service = project.gradle.sharedServices
-            .registerIfAbsent("kotlin-store-yarn-lock-mismatch-reporter", YarnLockMismatchReportService::class.java) {
-                it.parameters.inputFile.set(nodeJs.rootPackageDir.resolve("yarn.lock"))
-                it.parameters.outputFile.set(yarnRootExtension.lockFileDirectory.resolve(yarnRootExtension.lockFileName))
-                it.parameters.shouldFailOnClose.set(
-                    provider { yarnRootExtension.requireConfigured().yarnLockMismatchReport == YarnLockMismatchReport.FAIL_AFTER_BUILD }
-                )
-                it.parameters.reportNewYarnLock.set(
-                    provider { yarnRootExtension.requireConfigured().reportNewYarnLock }
-                )
-            }
-
-        BuildEventsListenerRegistryHolder.getInstance(project).listenerRegistry
-            .onTaskCompletion(service)
-
         val storeYarnLock = tasks.register(STORE_YARN_LOCK_NAME, YarnLockStoreTask::class.java) { task ->
             task.dependsOn(kotlinNpmInstall)
             task.inputFile.set(nodeJs.rootPackageDir.resolve("yarn.lock"))
             task.outputDirectory.set(yarnRootExtension.lockFileDirectory)
             task.fileName.set(yarnRootExtension.lockFileName)
-
-            task.yarnLockMismatchReportService.set(service)
 
             task.yarnLockMismatchReport = provider { yarnRootExtension.requireConfigured().yarnLockMismatchReport }
             task.reportNewYarnLock = provider { yarnRootExtension.requireConfigured().reportNewYarnLock }

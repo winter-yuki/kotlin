@@ -10,11 +10,7 @@ buildscript {
     kotlinBootstrapFrom(BootstrapOption.SpaceBootstrap(kotlinBuildProperties.kotlinBootstrapVersion!!, cacheRedirectorEnabled))
 
     repositories {
-        if (cacheRedirectorEnabled) {
-            maven("https://cache-redirector.jetbrains.com/maven.pkg.jetbrains.space/kotlin/p/kotlin/kotlin-dependencies")
-        } else {
-            maven("https://maven.pkg.jetbrains.space/kotlin/p/kotlin/kotlin-dependencies")
-        }
+        maven("https://maven.pkg.jetbrains.space/kotlin/p/kotlin/kotlin-dependencies")
 
         project.bootstrapKotlinRepo?.let {
             maven(url = it)
@@ -98,6 +94,7 @@ extra["customDepsOrg"] = "kotlin.build"
 
 repositories {
     mavenCentral()
+    maven("https://maven.google.com/")
     maven("https://packages.jetbrains.team/maven/p/ij/intellij-dependencies")
     maven("https://maven.pkg.jetbrains.space/kotlin/p/kotlin/kotlin-dependencies")
     gradlePluginPortal()
@@ -167,12 +164,12 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-gradle-plugin:${project.bootstrapKotlinVersion}")
     implementation("org.jetbrains.kotlin:kotlin-build-gradle-plugin:${kotlinBuildProperties.buildGradlePluginVersion}")
     implementation("com.gradle.publish:plugin-publish-plugin:1.0.0")
-    implementation("org.jetbrains.dokka:dokka-gradle-plugin:1.6.10")
+    implementation("org.jetbrains.dokka:dokka-gradle-plugin:1.7.0")
 
     implementation("net.rubygrapefruit:native-platform:${property("versions.native-platform")}")
     implementation("net.rubygrapefruit:native-platform-windows-amd64:${property("versions.native-platform")}")
     implementation("net.rubygrapefruit:native-platform-windows-i386:${property("versions.native-platform")}")
-    implementation("com.jakewharton.dex:dex-method-list:3.0.0")
+    implementation("com.jakewharton.dex:dex-member-list:4.1.1")
 
     implementation("gradle.plugin.com.github.johnrengelman:shadow:${rootProject.extra["versions.shadow"]}")
     implementation("net.sf.proguard:proguard-gradle:6.2.2")
@@ -181,7 +178,7 @@ dependencies {
     implementation("gradle.plugin.org.jetbrains.gradle.plugin.idea-ext:gradle-idea-ext:1.0.1")
 
     implementation("org.gradle:test-retry-gradle-plugin:1.2.0")
-    compileOnly("com.gradle.enterprise:test-distribution-gradle-plugin:2.2.3")
+    compileOnly("com.gradle:gradle-enterprise-gradle-plugin:3.11.2")
 
     compileOnly(gradleApi())
 
@@ -237,10 +234,6 @@ tasks.named("compileGroovy", GroovyCompile::class.java) {
 
 allprojects {
     tasks.register("checkBuild")
-
-    afterEvaluate {
-        apply(from = "$rootDir/../gradle/cacheRedirector.gradle.kts")
-    }
 }
 
 gradlePlugin {

@@ -30,7 +30,7 @@ class FirSyntheticProperty(
     override val getter: FirSyntheticPropertyAccessor,
     override val setter: FirSyntheticPropertyAccessor? = null,
     override val backingField: FirBackingField? = null,
-    override val deprecation: DeprecationsPerUseSite? = null
+    override val deprecationsProvider: DeprecationsProvider = UnresolvedDeprecationProvider
 ) : FirProperty() {
     init {
         symbol.bind(this)
@@ -138,43 +138,51 @@ class FirSyntheticProperty(
         throw AssertionError("Transformation of synthetic property isn't supported")
     }
 
+    override fun <D> transformContextReceivers(transformer: FirTransformer<D>, data: D): FirProperty {
+        throw AssertionError("Transformation of synthetic property isn't supported")
+    }
+
     override fun replaceResolvePhase(newResolvePhase: FirResolvePhase) {
         resolvePhase = newResolvePhase
     }
 
     override fun replaceReturnTypeRef(newReturnTypeRef: FirTypeRef) {
-        throw AssertionError("Mutation of synthetic property isn't supported")
+        notSupported()
     }
 
     override fun replaceReceiverTypeRef(newReceiverTypeRef: FirTypeRef?) {
-        throw AssertionError("Mutation of synthetic property isn't supported")
+        notSupported()
     }
 
-    override fun replaceDeprecation(newDeprecation: DeprecationsPerUseSite?) {
-        throw AssertionError("Mutation of synthetic property isn't supported")
+    override fun replaceDeprecationsProvider(newDeprecationsProvider: DeprecationsProvider) {
+        notSupported()
     }
 
     override fun replaceControlFlowGraphReference(newControlFlowGraphReference: FirControlFlowGraphReference?) {
-        throw AssertionError("Mutation of synthetic property isn't supported")
+        notSupported()
     }
 
     override fun replaceInitializer(newInitializer: FirExpression?) {
-        throw AssertionError("Mutation of synthetic property isn't supported")
+        notSupported()
     }
 
     override fun replaceBodyResolveState(newBodyResolveState: FirPropertyBodyResolveState) {
-        throw AssertionError("Mutation of synthetic property isn't supported")
+        notSupported()
     }
 
     override fun replaceGetter(newGetter: FirPropertyAccessor?) {
-        throw AssertionError("Mutation of synthetic property isn't supported")
+        notSupported()
     }
 
     override fun replaceSetter(newSetter: FirPropertyAccessor?) {
-        throw AssertionError("Mutation of synthetic property isn't supported")
+        notSupported()
     }
 
     override fun replaceContextReceivers(newContextReceivers: List<FirContextReceiver>) {
-        throw AssertionError("Mutation of synthetic property isn't supported")
+        notSupported()
+    }
+
+    private fun notSupported(): Nothing {
+        throw AssertionError("Transformation of synthetic property isn't supported")
     }
 }

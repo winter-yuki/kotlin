@@ -382,6 +382,31 @@ __attribute__((swift_name("CoroutinesKt")))
 + (void)invoke1Block:(id<KtKotlinSuspendFunction1>)block argument:(id _Nullable)argument completionHandler:(void (^)(id _Nullable_result, NSError * _Nullable))completionHandler __attribute__((swift_name("invoke1(block:argument:completionHandler:)")));
 + (id<KtKotlinKSuspendFunction0>)getKSuspendCallableReference0 __attribute__((swift_name("getKSuspendCallableReference0()")));
 + (id<KtKotlinKSuspendFunction1>)getKSuspendCallableReference1 __attribute__((swift_name("getKSuspendCallableReference1()")));
+
+/**
+ * @note This method converts all Kotlin exceptions to errors.
+*/
++ (id _Nullable)startCoroutineUninterceptedOrReturnFn:(id<KtKotlinSuspendFunction0>)fn resultHolder:(KtResultHolder<id> *)resultHolder error:(NSError * _Nullable * _Nullable)error __attribute__((swift_name("startCoroutineUninterceptedOrReturn(fn:resultHolder:)"))) __attribute__((swift_error(nonnull_error)));
+
+/**
+ * @note This method converts all Kotlin exceptions to errors.
+*/
++ (id _Nullable)startCoroutineUninterceptedOrReturnFn:(id<KtKotlinSuspendFunction1>)fn receiver:(id _Nullable)receiver resultHolder:(KtResultHolder<id> *)resultHolder error:(NSError * _Nullable * _Nullable)error __attribute__((swift_name("startCoroutineUninterceptedOrReturn(fn:receiver:resultHolder:)"))) __attribute__((swift_error(nonnull_error)));
+
+/**
+ * @note This method converts all Kotlin exceptions to errors.
+*/
++ (id _Nullable)startCoroutineUninterceptedOrReturnFn:(id<KtKotlinSuspendFunction2>)fn receiver:(id _Nullable)receiver param:(id _Nullable)param resultHolder:(KtResultHolder<id> *)resultHolder error:(NSError * _Nullable * _Nullable)error __attribute__((swift_name("startCoroutineUninterceptedOrReturn(fn:receiver:param:resultHolder:)"))) __attribute__((swift_error(nonnull_error)));
+
+/**
+ * @note This method converts all Kotlin exceptions to errors.
+*/
++ (BOOL)createCoroutineUninterceptedAndResumeFn:(id<KtKotlinSuspendFunction0>)fn resultHolder:(KtResultHolder<id> *)resultHolder error:(NSError * _Nullable * _Nullable)error __attribute__((swift_name("createCoroutineUninterceptedAndResume(fn:resultHolder:)")));
+
+/**
+ * @note This method converts all Kotlin exceptions to errors.
+*/
++ (BOOL)createCoroutineUninterceptedAndResumeFn:(id<KtKotlinSuspendFunction1>)fn receiver:(id _Nullable)receiver resultHolder:(KtResultHolder<id> *)resultHolder error:(NSError * _Nullable * _Nullable)error __attribute__((swift_name("createCoroutineUninterceptedAndResume(fn:receiver:resultHolder:)")));
 + (void)gc __attribute__((swift_name("gc()")));
 @end
 
@@ -990,6 +1015,25 @@ __attribute__((swift_name("Bar")))
 @end
 
 __attribute__((objc_subclassing_restricted))
+__attribute__((swift_name("KT54119KotlinKey")))
+@interface KtKT54119KotlinKey : KtBase
+- (instancetype)init __attribute__((swift_name("init()"))) __attribute__((objc_designated_initializer));
++ (instancetype)new __attribute__((availability(swift, unavailable, message="use object initializers instead")));
+@end
+
+__attribute__((objc_subclassing_restricted))
+__attribute__((swift_name("Kt54119Kt")))
+@interface KtKt54119Kt : KtBase
++ (BOOL)callContainsSet:(NSSet<id> *)set __attribute__((swift_name("callContains(set:)")));
++ (id _Nullable)callGetElementSet:(NSSet<id> *)set __attribute__((swift_name("callGetElement(set:)")));
++ (BOOL)callContainsKeyMap:(NSDictionary<id, id> *)map __attribute__((swift_name("callContainsKey(map:)")));
++ (BOOL)callContainsValueMap:(NSDictionary<id, id> *)map __attribute__((swift_name("callContainsValue(map:)")));
++ (id _Nullable)callGetMap:(NSDictionary<id, id> *)map __attribute__((swift_name("callGet(map:)")));
++ (int32_t)callGetOrThrowConcurrentModificationMap:(NSDictionary<id, id> *)map __attribute__((swift_name("callGetOrThrowConcurrentModification(map:)")));
++ (BOOL)callContainsEntryMap:(NSDictionary<id, id> *)map __attribute__((swift_name("callContainsEntry(map:)")));
+@end
+
+__attribute__((objc_subclassing_restricted))
 __attribute__((swift_name("LibraryKt")))
 @interface KtLibraryKt : KtBase
 + (NSString *)readDataFromLibraryClassInput:(KtA *)input __attribute__((swift_name("readDataFromLibraryClass(input:)")));
@@ -1351,6 +1395,40 @@ __attribute__((swift_name("OverrideMethodsOfAnyKt")))
  * @note This method converts all Kotlin exceptions to errors.
 */
 + (BOOL)testObj:(id)obj other:(id)other swift:(BOOL)swift error:(NSError * _Nullable * _Nullable)error __attribute__((swift_name("test(obj:other:swift:)")));
+@end
+
+__attribute__((swift_name("RefinedClassA")))
+@interface KtRefinedClassA : KtBase
+- (instancetype)init __attribute__((swift_name("init()"))) __attribute__((objc_designated_initializer));
++ (instancetype)new __attribute__((availability(swift, unavailable, message="use object initializers instead")));
+- (NSString *)fooRefined __attribute__((swift_private));
+@end
+
+__attribute__((objc_subclassing_restricted))
+__attribute__((swift_name("RefinedClassB")))
+@interface KtRefinedClassB : KtRefinedClassA
+- (instancetype)init __attribute__((swift_name("init()"))) __attribute__((objc_designated_initializer));
++ (instancetype)new __attribute__((availability(swift, unavailable, message="use object initializers instead")));
+- (NSString *)fooRefined __attribute__((swift_private));
+@end
+
+__attribute__((objc_subclassing_restricted))
+__attribute__((swift_name("RefinedKt")))
+@interface KtRefinedKt : KtBase
++ (NSString *)fooRefined __attribute__((swift_private));
+
+/**
+ * @note annotations
+ *   refined.MyShouldRefineInSwift
+*/
++ (NSString *)myFooRefined __attribute__((swift_private));
+@property (class, readonly) NSString *barRefined __attribute__((swift_private));
+
+/**
+ * @note annotations
+ *   refined.MyShouldRefineInSwift
+*/
+@property (class, readonly) NSString *myBarRefined __attribute__((swift_private));
 @end
 
 __attribute__((swift_name("Person")))

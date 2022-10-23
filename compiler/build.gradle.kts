@@ -1,5 +1,3 @@
-import java.io.File
-
 plugins {
     kotlin("jvm")
     id("jps-compatible")
@@ -30,14 +28,16 @@ dependencies {
     testApi(project(":compiler:ir.tree")) // used for deepCopyWithSymbols call that is removed by proguard from the compiler TODO: make it more straightforward
     testApi(project(":kotlin-scripting-compiler"))
     testApi(project(":kotlin-script-util"))
-    testCompileOnly(project(":kotlin-reflect-api"))
 
     otherCompilerModules.forEach {
         testCompileOnly(project(it))
     }
 
-    testImplementation(project(":kotlin-reflect"))
+    testImplementation(commonDependency("org.jetbrains.kotlin:kotlin-reflect")) { isTransitive = false }
     testImplementation(toolsJar())
+    testImplementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml:2.12.7")
+    testImplementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.12.7")
+    testImplementation("com.fasterxml.woodstox:woodstox-core:6.2.4")
 
     antLauncherJar(commonDependency("org.apache.ant", "ant"))
     antLauncherJar(toolsJar())
@@ -53,7 +53,10 @@ sourceSets {
     }
 }
 
-projectTest(parallel = true) {
+projectTest(
+    parallel = true,
+    defineJDKEnvVariables = listOf(JdkMajorVersion.JDK_1_8, JdkMajorVersion.JDK_11_0, JdkMajorVersion.JDK_17_0)
+) {
     dependsOn(":dist")
 
     workingDir = rootDir

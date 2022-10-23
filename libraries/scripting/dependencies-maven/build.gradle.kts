@@ -3,7 +3,7 @@ plugins {
     id("jps-compatible")
 }
 
-project.updateJvmTarget("1.6")
+project.updateJvmTarget("1.8")
 
 dependencies {
     implementation(kotlinStdlib())
@@ -19,7 +19,7 @@ dependencies {
     testImplementation(projectTests(":kotlin-scripting-dependencies"))
     testImplementation(commonDependency("junit"))
     testRuntimeOnly("org.slf4j:slf4j-nop:1.7.36")
-    testImplementation(kotlin("reflect"))
+    testImplementation(commonDependency("org.jetbrains.kotlin:kotlin-reflect")) { isTransitive = false }
     testImplementation(commonDependency("org.jetbrains.kotlinx", "kotlinx-coroutines-core"))
 }
 

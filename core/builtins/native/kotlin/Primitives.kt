@@ -161,48 +161,48 @@ public class Byte private constructor() : Number(), Comparable<Byte> {
     public operator fun div(other: Double): Double
 
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
-     * 
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
     @SinceKotlin("1.1")
     @kotlin.internal.IntrinsicConstEvaluation
     public operator fun rem(other: Byte): Int
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
-     * 
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
     @SinceKotlin("1.1")
     @kotlin.internal.IntrinsicConstEvaluation
     public operator fun rem(other: Short): Int
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
-     * 
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
     @SinceKotlin("1.1")
     @kotlin.internal.IntrinsicConstEvaluation
     public operator fun rem(other: Int): Int
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
-     * 
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
     @SinceKotlin("1.1")
     @kotlin.internal.IntrinsicConstEvaluation
     public operator fun rem(other: Long): Long
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
-     * 
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
     @SinceKotlin("1.1")
     @kotlin.internal.IntrinsicConstEvaluation
     public operator fun rem(other: Float): Float
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
-     * 
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
     @SinceKotlin("1.1")
@@ -238,6 +238,42 @@ public class Byte private constructor() : Number(), Comparable<Byte> {
     public operator fun rangeTo(other: Int): IntRange
      /** Creates a range from this value to the specified [other] value. */
     public operator fun rangeTo(other: Long): LongRange
+
+    /**
+     * Creates a range from this value up to but excluding the specified [other] value.
+     *
+     * If the [other] value is less than or equal to `this` value, then the returned range is empty.
+     */
+    @SinceKotlin("1.7")
+    @ExperimentalStdlibApi
+    public operator fun rangeUntil(other: Byte): IntRange
+
+    /**
+     * Creates a range from this value up to but excluding the specified [other] value.
+     *
+     * If the [other] value is less than or equal to `this` value, then the returned range is empty.
+     */
+    @SinceKotlin("1.7")
+    @ExperimentalStdlibApi
+    public operator fun rangeUntil(other: Short): IntRange
+
+    /**
+     * Creates a range from this value up to but excluding the specified [other] value.
+     *
+     * If the [other] value is less than or equal to `this` value, then the returned range is empty.
+     */
+    @SinceKotlin("1.7")
+    @ExperimentalStdlibApi
+    public operator fun rangeUntil(other: Int): IntRange
+
+    /**
+     * Creates a range from this value up to but excluding the specified [other] value.
+     *
+     * If the [other] value is less than or equal to `this` value, then the returned range is empty.
+     */
+    @SinceKotlin("1.7")
+    @ExperimentalStdlibApi
+    public operator fun rangeUntil(other: Long): LongRange
 
     /** Returns this value. */
     @kotlin.internal.IntrinsicConstEvaluation
@@ -460,48 +496,48 @@ public class Short private constructor() : Number(), Comparable<Short> {
     public operator fun div(other: Double): Double
 
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
-     * 
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
     @SinceKotlin("1.1")
     @kotlin.internal.IntrinsicConstEvaluation
     public operator fun rem(other: Byte): Int
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
-     * 
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
     @SinceKotlin("1.1")
     @kotlin.internal.IntrinsicConstEvaluation
     public operator fun rem(other: Short): Int
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
-     * 
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
     @SinceKotlin("1.1")
     @kotlin.internal.IntrinsicConstEvaluation
     public operator fun rem(other: Int): Int
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
-     * 
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
     @SinceKotlin("1.1")
     @kotlin.internal.IntrinsicConstEvaluation
     public operator fun rem(other: Long): Long
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
-     * 
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
     @SinceKotlin("1.1")
     @kotlin.internal.IntrinsicConstEvaluation
     public operator fun rem(other: Float): Float
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
-     * 
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
     @SinceKotlin("1.1")
@@ -537,6 +573,42 @@ public class Short private constructor() : Number(), Comparable<Short> {
     public operator fun rangeTo(other: Int): IntRange
      /** Creates a range from this value to the specified [other] value. */
     public operator fun rangeTo(other: Long): LongRange
+
+    /**
+     * Creates a range from this value up to but excluding the specified [other] value.
+     *
+     * If the [other] value is less than or equal to `this` value, then the returned range is empty.
+     */
+    @SinceKotlin("1.7")
+    @ExperimentalStdlibApi
+    public operator fun rangeUntil(other: Byte): IntRange
+
+    /**
+     * Creates a range from this value up to but excluding the specified [other] value.
+     *
+     * If the [other] value is less than or equal to `this` value, then the returned range is empty.
+     */
+    @SinceKotlin("1.7")
+    @ExperimentalStdlibApi
+    public operator fun rangeUntil(other: Short): IntRange
+
+    /**
+     * Creates a range from this value up to but excluding the specified [other] value.
+     *
+     * If the [other] value is less than or equal to `this` value, then the returned range is empty.
+     */
+    @SinceKotlin("1.7")
+    @ExperimentalStdlibApi
+    public operator fun rangeUntil(other: Int): IntRange
+
+    /**
+     * Creates a range from this value up to but excluding the specified [other] value.
+     *
+     * If the [other] value is less than or equal to `this` value, then the returned range is empty.
+     */
+    @SinceKotlin("1.7")
+    @ExperimentalStdlibApi
+    public operator fun rangeUntil(other: Long): LongRange
 
     /**
      * Converts this [Short] value to [Byte].
@@ -757,48 +829,48 @@ public class Int private constructor() : Number(), Comparable<Int> {
     public operator fun div(other: Double): Double
 
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
-     * 
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
     @SinceKotlin("1.1")
     @kotlin.internal.IntrinsicConstEvaluation
     public operator fun rem(other: Byte): Int
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
-     * 
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
     @SinceKotlin("1.1")
     @kotlin.internal.IntrinsicConstEvaluation
     public operator fun rem(other: Short): Int
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
-     * 
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
     @SinceKotlin("1.1")
     @kotlin.internal.IntrinsicConstEvaluation
     public operator fun rem(other: Int): Int
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
-     * 
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
     @SinceKotlin("1.1")
     @kotlin.internal.IntrinsicConstEvaluation
     public operator fun rem(other: Long): Long
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
-     * 
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
     @SinceKotlin("1.1")
     @kotlin.internal.IntrinsicConstEvaluation
     public operator fun rem(other: Float): Float
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
-     * 
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
     @SinceKotlin("1.1")
@@ -834,6 +906,42 @@ public class Int private constructor() : Number(), Comparable<Int> {
     public operator fun rangeTo(other: Int): IntRange
      /** Creates a range from this value to the specified [other] value. */
     public operator fun rangeTo(other: Long): LongRange
+
+    /**
+     * Creates a range from this value up to but excluding the specified [other] value.
+     *
+     * If the [other] value is less than or equal to `this` value, then the returned range is empty.
+     */
+    @SinceKotlin("1.7")
+    @ExperimentalStdlibApi
+    public operator fun rangeUntil(other: Byte): IntRange
+
+    /**
+     * Creates a range from this value up to but excluding the specified [other] value.
+     *
+     * If the [other] value is less than or equal to `this` value, then the returned range is empty.
+     */
+    @SinceKotlin("1.7")
+    @ExperimentalStdlibApi
+    public operator fun rangeUntil(other: Short): IntRange
+
+    /**
+     * Creates a range from this value up to but excluding the specified [other] value.
+     *
+     * If the [other] value is less than or equal to `this` value, then the returned range is empty.
+     */
+    @SinceKotlin("1.7")
+    @ExperimentalStdlibApi
+    public operator fun rangeUntil(other: Int): IntRange
+
+    /**
+     * Creates a range from this value up to but excluding the specified [other] value.
+     *
+     * If the [other] value is less than or equal to `this` value, then the returned range is empty.
+     */
+    @SinceKotlin("1.7")
+    @ExperimentalStdlibApi
+    public operator fun rangeUntil(other: Long): LongRange
 
     /**
      * Shifts this value left by the [bitCount] number of bits.
@@ -1096,48 +1204,48 @@ public class Long private constructor() : Number(), Comparable<Long> {
     public operator fun div(other: Double): Double
 
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
-     * 
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
     @SinceKotlin("1.1")
     @kotlin.internal.IntrinsicConstEvaluation
     public operator fun rem(other: Byte): Long
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
-     * 
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
     @SinceKotlin("1.1")
     @kotlin.internal.IntrinsicConstEvaluation
     public operator fun rem(other: Short): Long
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
-     * 
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
     @SinceKotlin("1.1")
     @kotlin.internal.IntrinsicConstEvaluation
     public operator fun rem(other: Int): Long
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
-     * 
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
     @SinceKotlin("1.1")
     @kotlin.internal.IntrinsicConstEvaluation
     public operator fun rem(other: Long): Long
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
-     * 
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
     @SinceKotlin("1.1")
     @kotlin.internal.IntrinsicConstEvaluation
     public operator fun rem(other: Float): Float
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
-     * 
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
     @SinceKotlin("1.1")
@@ -1173,6 +1281,42 @@ public class Long private constructor() : Number(), Comparable<Long> {
     public operator fun rangeTo(other: Int): LongRange
      /** Creates a range from this value to the specified [other] value. */
     public operator fun rangeTo(other: Long): LongRange
+
+    /**
+     * Creates a range from this value up to but excluding the specified [other] value.
+     *
+     * If the [other] value is less than or equal to `this` value, then the returned range is empty.
+     */
+    @SinceKotlin("1.7")
+    @ExperimentalStdlibApi
+    public operator fun rangeUntil(other: Byte): LongRange
+
+    /**
+     * Creates a range from this value up to but excluding the specified [other] value.
+     *
+     * If the [other] value is less than or equal to `this` value, then the returned range is empty.
+     */
+    @SinceKotlin("1.7")
+    @ExperimentalStdlibApi
+    public operator fun rangeUntil(other: Short): LongRange
+
+    /**
+     * Creates a range from this value up to but excluding the specified [other] value.
+     *
+     * If the [other] value is less than or equal to `this` value, then the returned range is empty.
+     */
+    @SinceKotlin("1.7")
+    @ExperimentalStdlibApi
+    public operator fun rangeUntil(other: Int): LongRange
+
+    /**
+     * Creates a range from this value up to but excluding the specified [other] value.
+     *
+     * If the [other] value is less than or equal to `this` value, then the returned range is empty.
+     */
+    @SinceKotlin("1.7")
+    @ExperimentalStdlibApi
+    public operator fun rangeUntil(other: Long): LongRange
 
     /**
      * Shifts this value left by the [bitCount] number of bits.
@@ -1454,48 +1598,48 @@ public class Float private constructor() : Number(), Comparable<Float> {
     public operator fun div(other: Double): Double
 
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
-     * 
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
     @SinceKotlin("1.1")
     @kotlin.internal.IntrinsicConstEvaluation
     public operator fun rem(other: Byte): Float
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
-     * 
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
     @SinceKotlin("1.1")
     @kotlin.internal.IntrinsicConstEvaluation
     public operator fun rem(other: Short): Float
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
-     * 
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
     @SinceKotlin("1.1")
     @kotlin.internal.IntrinsicConstEvaluation
     public operator fun rem(other: Int): Float
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
-     * 
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
     @SinceKotlin("1.1")
     @kotlin.internal.IntrinsicConstEvaluation
     public operator fun rem(other: Long): Float
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
-     * 
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
     @SinceKotlin("1.1")
     @kotlin.internal.IntrinsicConstEvaluation
     public operator fun rem(other: Float): Float
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
-     * 
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
     @SinceKotlin("1.1")
@@ -1756,48 +1900,48 @@ public class Double private constructor() : Number(), Comparable<Double> {
     public operator fun div(other: Double): Double
 
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
-     * 
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
     @SinceKotlin("1.1")
     @kotlin.internal.IntrinsicConstEvaluation
     public operator fun rem(other: Byte): Double
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
-     * 
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
     @SinceKotlin("1.1")
     @kotlin.internal.IntrinsicConstEvaluation
     public operator fun rem(other: Short): Double
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
-     * 
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
     @SinceKotlin("1.1")
     @kotlin.internal.IntrinsicConstEvaluation
     public operator fun rem(other: Int): Double
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
-     * 
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
     @SinceKotlin("1.1")
     @kotlin.internal.IntrinsicConstEvaluation
     public operator fun rem(other: Long): Double
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
-     * 
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
     @SinceKotlin("1.1")
     @kotlin.internal.IntrinsicConstEvaluation
     public operator fun rem(other: Float): Double
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
-     * 
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
     @SinceKotlin("1.1")

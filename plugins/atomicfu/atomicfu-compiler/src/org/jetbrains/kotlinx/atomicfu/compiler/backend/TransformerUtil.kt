@@ -264,6 +264,7 @@ internal fun IrCall.getCorrespondingProperty(): IrProperty =
     symbol.owner.correspondingPropertySymbol?.owner
         ?: error("Atomic property accessor ${this.render()} expected to have non-null correspondingPropertySymbol")
 
+@OptIn(FirIncompatiblePluginAPI::class)
 internal fun IrPluginContext.referencePackageFunction(
     packageName: String,
     name: String,
@@ -274,6 +275,7 @@ internal fun IrPluginContext.referencePackageFunction(
         error("Exception while looking for the function `$name` in package `$packageName`: ${e.message}")
     }
 
+@OptIn(FirIncompatiblePluginAPI::class)
 internal fun IrPluginContext.referenceFunction(classSymbol: IrClassSymbol, functionName: String): IrSimpleFunctionSymbol {
     val functionId = FqName("$KOTLIN.${classSymbol.owner.name}.$functionName")
     return try {
@@ -283,11 +285,13 @@ internal fun IrPluginContext.referenceFunction(classSymbol: IrClassSymbol, funct
     }
 }
 
+@OptIn(FirIncompatiblePluginAPI::class)
 private fun IrPluginContext.referenceArrayClass(irType: IrSimpleType): IrClassSymbol {
     val jsArrayName = irType.getArrayClassFqName()
     return referenceClass(jsArrayName) ?: error("Array class $jsArrayName was not found in the context")
 }
 
+@OptIn(FirIncompatiblePluginAPI::class)
 internal fun IrPluginContext.getArrayConstructorSymbol(
     irType: IrSimpleType,
     predicate: (IrConstructorSymbol) -> Boolean = { true }
@@ -327,7 +331,11 @@ internal fun IrPluginContext.addDefaultGetter(property: IrProperty, parentClass:
         visibility = property.visibility
         returnType = field.type
     }.apply {
-        dispatchReceiverParameter = (parentClass as? IrClass)?.thisReceiver?.deepCopyWithSymbols(this)
+        dispatchReceiverParameter = if (parentClass is IrClass && parentClass.kind == ClassKind.OBJECT) {
+            null
+        } else {
+            (parentClass as? IrClass)?.thisReceiver?.deepCopyWithSymbols(this)
+        }
         body = factory.createBlockBody(
             UNDEFINED_OFFSET, UNDEFINED_OFFSET, listOf(
                 IrReturnImpl(

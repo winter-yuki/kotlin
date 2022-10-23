@@ -21,4 +21,4 @@ inline fun foo() = {
 // EXPECTATIONS JS_IR
 // test.kt:4 box
 // test1.kt:6 box$lambda
-// test1.kt:6 box$lambda
+// test.kt:5 box

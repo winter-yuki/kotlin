@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2021 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2022 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -154,7 +154,7 @@ public class Long internal constructor(
     public inline operator fun div(other: Double): Double = toDouble() / other
 
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
      *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
@@ -162,7 +162,7 @@ public class Long internal constructor(
     public inline operator fun rem(other: Byte): Long = rem(other.toLong())
 
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
      *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
@@ -170,7 +170,7 @@ public class Long internal constructor(
     public inline operator fun rem(other: Short): Long = rem(other.toLong())
 
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
      *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
@@ -178,7 +178,7 @@ public class Long internal constructor(
     public inline operator fun rem(other: Int): Long = rem(other.toLong())
 
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
      *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
@@ -186,7 +186,7 @@ public class Long internal constructor(
     public operator fun rem(other: Long): Long = modulo(other)
 
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
      *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
@@ -194,7 +194,7 @@ public class Long internal constructor(
     public inline operator fun rem(other: Float): Float = toFloat() % other
 
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
      *
      * The result is either zero or has the same sign as the _dividend_ and has the absolute value less than the absolute value of the divisor.
      */
@@ -232,6 +232,42 @@ public class Long internal constructor(
 
     /** Creates a range from this value to the specified [other] value. */
     public operator fun rangeTo(other: Long): LongRange = LongRange(this, other)
+
+    /**
+     * Creates a range from this value up to but excluding the specified [other] value.
+     *
+     * If the [other] value is less than or equal to `this` value, then the returned range is empty.
+     */
+    @SinceKotlin("1.7")
+    @ExperimentalStdlibApi
+    public operator fun rangeUntil(other: Byte): LongRange = this until other
+
+    /**
+     * Creates a range from this value up to but excluding the specified [other] value.
+     *
+     * If the [other] value is less than or equal to `this` value, then the returned range is empty.
+     */
+    @SinceKotlin("1.7")
+    @ExperimentalStdlibApi
+    public operator fun rangeUntil(other: Short): LongRange = this until other
+
+    /**
+     * Creates a range from this value up to but excluding the specified [other] value.
+     *
+     * If the [other] value is less than or equal to `this` value, then the returned range is empty.
+     */
+    @SinceKotlin("1.7")
+    @ExperimentalStdlibApi
+    public operator fun rangeUntil(other: Int): LongRange = this until other
+
+    /**
+     * Creates a range from this value up to but excluding the specified [other] value.
+     *
+     * If the [other] value is less than or equal to `this` value, then the returned range is empty.
+     */
+    @SinceKotlin("1.7")
+    @ExperimentalStdlibApi
+    public operator fun rangeUntil(other: Long): LongRange = this until other
 
     /**
      * Shifts this value left by the [bitCount] number of bits.

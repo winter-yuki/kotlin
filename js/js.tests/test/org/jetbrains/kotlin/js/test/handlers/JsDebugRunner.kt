@@ -4,6 +4,7 @@
  */
 package org.jetbrains.kotlin.js.test.handlers
 
+import kotlinx.coroutines.withTimeout
 import org.jetbrains.kotlin.KtPsiSourceFileLinesMapping
 import org.jetbrains.kotlin.ir.backend.js.transformers.irToJs.TranslationMode
 import org.jetbrains.kotlin.js.parser.sourcemaps.*
@@ -104,6 +105,8 @@ class JsDebugRunner(testServices: TestServices) : AbstractJsArtifactsCollector(t
                     debugger.stepInto()
                     waitForResumeEvent()
                 }
+                debugger.resume()
+                waitForResumeEvent()
             }
         }
         checkSteppingTestResult(
@@ -119,10 +122,14 @@ class JsDebugRunner(testServices: TestServices) : AbstractJsArtifactsCollector(t
         topMostCallFrame: Debugger.CallFrame,
         loggedItems: MutableList<SteppingTestLoggedData>
     ) {
-        sourceMap.getSourceLineForGeneratedLocation(topMostCallFrame.location)?.let { (sourceFile, sourceLine) ->
+        val originalFunctionName = topMostCallFrame.functionLocation?.let {
+            sourceMap.getSourceLineForGeneratedLocation(it)?.name
+        }
+        sourceMap.getSourceLineForGeneratedLocation(topMostCallFrame.location)?.let { (_, sourceFile, sourceLine, _, _) ->
+            if (sourceFile == null || sourceLine < 0) return@let
             val testFileName = testFileNameFromMappedLocation(sourceFile, sourceLine) ?: return
             val expectation =
-                formatAsSteppingTestExpectation(testFileName, sourceLine + 1, topMostCallFrame.functionName, false)
+                formatAsSteppingTestExpectation(testFileName, sourceLine + 1, originalFunctionName ?: topMostCallFrame.functionName, false)
             loggedItems.add(SteppingTestLoggedData(sourceLine + 1, false, expectation))
         }
     }
@@ -173,20 +180,23 @@ class JsDebugRunner(testServices: TestServices) : AbstractJsArtifactsCollector(t
      * Maps [location] in the generated JavaScript file to the corresponding location in a source file.
      * @return The source file path (as specified in the source map) and the line number in that source file.
      */
-    private fun SourceMap.getSourceLineForGeneratedLocation(location: Debugger.Location): Pair<String, Int>? {
-
-        fun SourceMapSegment.sourceFileAndLine() = sourceFileName!! to sourceLineNumber
+    private fun SourceMap.getSourceLineForGeneratedLocation(location: Debugger.Location): SourceMapSegment? {
 
         val group = groups.getOrNull(location.lineNumber)?.takeIf { it.segments.isNotEmpty() } ?: return null
-        val columnNumber = location.columnNumber ?: return group.segments[0].sourceFileAndLine()
-        val segment = if (columnNumber <= group.segments[0].generatedColumnNumber) {
+        val columnNumber = location.columnNumber ?: return group.segments[0]
+        return if (columnNumber <= group.segments[0].generatedColumnNumber) {
             group.segments[0]
         } else {
-            group.segments.find {
-                columnNumber > it.generatedColumnNumber
+            val candidateIndex = group.segments.indexOfFirst {
+                columnNumber <= it.generatedColumnNumber
             }
+            if (candidateIndex < 0)
+                null
+            else if (candidateIndex == 0 || group.segments[candidateIndex].generatedColumnNumber == columnNumber)
+                group.segments[candidateIndex]
+            else
+                group.segments[candidateIndex - 1]
         }
-        return segment?.sourceFileAndLine()
     }
 
     /**
@@ -210,7 +220,8 @@ class JsDebugRunner(testServices: TestServices) : AbstractJsArtifactsCollector(t
  */
 private class NodeJsDebuggerFacade(jsFilePath: String) {
 
-    private val inspector = NodeJsInspectorClient("js/js.translator/testData/runIrTestInNode.js", listOf(jsFilePath))
+    private val inspector =
+        NodeJsInspectorClient("js/js.tests/test/org/jetbrains/kotlin/js/test/debugger/stepping_test_executor.js", listOf(jsFilePath))
 
     private val scriptUrls = mutableMapOf<Runtime.ScriptId, String>()
 
@@ -222,12 +233,15 @@ private class NodeJsDebuggerFacade(jsFilePath: String) {
                 is Debugger.Event.ScriptParsed -> {
                     scriptUrls[event.scriptId] = event.url
                 }
+
                 is Debugger.Event.Paused -> {
                     pausedEvent = event
                 }
+
                 is Debugger.Event.Resumed -> {
                     pausedEvent = null
                 }
+
                 else -> {}
             }
         }
@@ -242,7 +256,9 @@ private class NodeJsDebuggerFacade(jsFilePath: String) {
         runtime.runIfWaitingForDebugger()
         waitForPauseEvent { it.reason == Debugger.PauseReason.BREAK_ON_START }
 
-        body()
+        withTimeout(30000) {
+            body()
+        }
     }
 
     fun scriptUrlByScriptId(scriptId: Runtime.ScriptId) = scriptUrls[scriptId] ?: error("unknown scriptId")

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2021 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2022 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -289,6 +289,11 @@ sealed class KtFirDiagnostic<PSI : PsiElement> : KtDiagnosticWithPsi<PSI> {
     abstract class ResolutionToClassifier : KtFirDiagnostic<PsiElement>() {
         override val diagnosticClass get() = ResolutionToClassifier::class
         abstract val classSymbol: KtClassLikeSymbol
+    }
+
+    abstract class AmbiguousAlteredAssign : KtFirDiagnostic<PsiElement>() {
+        override val diagnosticClass get() = AmbiguousAlteredAssign::class
+        abstract val altererNames: List<String?>
     }
 
     abstract class SuperIsNotAnExpression : KtFirDiagnostic<PsiElement>() {
@@ -684,6 +689,10 @@ sealed class KtFirDiagnostic<PSI : PsiElement> : KtDiagnosticWithPsi<PSI> {
         override val diagnosticClass get() = WrongExtensionFunctionTypeWarning::class
     }
 
+    abstract class AnnotationInWhereClauseError : KtFirDiagnostic<KtAnnotationEntry>() {
+        override val diagnosticClass get() = AnnotationInWhereClauseError::class
+    }
+
     abstract class OptInUsage : KtFirDiagnostic<PsiElement>() {
         override val diagnosticClass get() = OptInUsage::class
         abstract val optInMarkerFqName: FqName
@@ -749,6 +758,11 @@ sealed class KtFirDiagnostic<PSI : PsiElement> : KtDiagnosticWithPsi<PSI> {
 
     abstract class OptInMarkerOnOverrideWarning : KtFirDiagnostic<KtAnnotationEntry>() {
         override val diagnosticClass get() = OptInMarkerOnOverrideWarning::class
+    }
+
+    abstract class SubclassOptInInapplicable : KtFirDiagnostic<KtAnnotationEntry>() {
+        override val diagnosticClass get() = SubclassOptInInapplicable::class
+        abstract val target: String
     }
 
     abstract class ExposedTypealiasExpandedType : KtFirDiagnostic<KtNamedDeclaration>() {
@@ -1423,6 +1437,18 @@ sealed class KtFirDiagnostic<PSI : PsiElement> : KtDiagnosticWithPsi<PSI> {
         abstract val incompatibleTypes: List<KtType>
         abstract val description: String
         abstract val causingTypes: String
+    }
+
+    abstract class IncorrectLeftComponentOfIntersection : KtFirDiagnostic<KtTypeReference>() {
+        override val diagnosticClass get() = IncorrectLeftComponentOfIntersection::class
+    }
+
+    abstract class IncorrectRightComponentOfIntersection : KtFirDiagnostic<KtTypeReference>() {
+        override val diagnosticClass get() = IncorrectRightComponentOfIntersection::class
+    }
+
+    abstract class NullableOnDefinitelyNotNullable : KtFirDiagnostic<KtTypeReference>() {
+        override val diagnosticClass get() = NullableOnDefinitelyNotNullable::class
     }
 
     abstract class ExtensionInClassReferenceNotAllowed : KtFirDiagnostic<KtExpression>() {
@@ -2678,6 +2704,11 @@ sealed class KtFirDiagnostic<PSI : PsiElement> : KtDiagnosticWithPsi<PSI> {
         override val diagnosticClass get() = RedundantInlineSuspendFunctionType::class
     }
 
+    abstract class InefficientEqualsOverridingInInlineClass : KtFirDiagnostic<KtNamedFunction>() {
+        override val diagnosticClass get() = InefficientEqualsOverridingInInlineClass::class
+        abstract val className: String
+    }
+
     abstract class CannotAllUnderImportFromSingleton : KtFirDiagnostic<KtImportDirective>() {
         override val diagnosticClass get() = CannotAllUnderImportFromSingleton::class
         abstract val objectName: Name
@@ -2880,6 +2911,12 @@ sealed class KtFirDiagnostic<PSI : PsiElement> : KtDiagnosticWithPsi<PSI> {
 
     abstract class PositionedValueArgumentForJavaAnnotation : KtFirDiagnostic<KtExpression>() {
         override val diagnosticClass get() = PositionedValueArgumentForJavaAnnotation::class
+    }
+
+    abstract class RedundantRepeatableAnnotation : KtFirDiagnostic<KtAnnotationEntry>() {
+        override val diagnosticClass get() = RedundantRepeatableAnnotation::class
+        abstract val kotlinRepeatable: FqName
+        abstract val javaRepeatable: FqName
     }
 
     abstract class LocalJvmRecord : KtFirDiagnostic<PsiElement>() {

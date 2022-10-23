@@ -144,7 +144,11 @@ private fun Project.registerVariantImplementations() {
     factories[MavenPluginConfigurator.MavenPluginConfiguratorVariantFactory::class] =
         MavenPluginConfiguratorG6.Gradle6MavenPluginConfiguratorVariantFactory()
     factories[JavaSourceSetsAccessor.JavaSourceSetsAccessorVariantFactory::class] =
-        JavaSourceSetsAccessorG6.JavaSourceSetAccessorVariantFactoryG70()
+        JavaSourceSetsAccessorG6.JavaSourceSetAccessorVariantFactoryG6()
     factories[BasePluginConfiguration.BasePluginConfigurationVariantFactory::class] =
         BasePluginConfigurationG6.BasePluginConfigurationVariantFactoryG6()
+    factories[IdeaSyncDetector.IdeaSyncDetectorVariantFactory::class] =
+        IdeaSyncDetectorG6.IdeaSyncDetectorVariantFactoryG6()
+    factories[ConfigurationTimePropertiesAccessor.ConfigurationTimePropertiesAccessorVariantFactory::class] =
+        ConfigurationTimePropertiesAccessorG6.ConfigurationTimePropertiesAccessorVariantFactoryG6()
 }

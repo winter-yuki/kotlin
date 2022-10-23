@@ -96,6 +96,13 @@ object ImplementationConfigurator : AbstractFirTreeImplementationConfigurator() 
             }
         }
 
+        impl(errorAnnotationCall) {
+            commonAnnotationConfig()
+            default("argumentMapping") {
+                needAcceptAndTransform = false
+            }
+        }
+
         impl(arrayOfCall)
 
         impl(callableReferenceAccess)
@@ -152,7 +159,7 @@ object ImplementationConfigurator : AbstractFirTreeImplementationConfigurator() 
 
         impl(errorLoop) {
             default("block", "FirEmptyExpressionBlock()")
-            default("condition", "FirErrorExpressionImpl(source, mutableListOf(), ConeStubDiagnostic(diagnostic), null)")
+            default("condition", "FirErrorExpressionImpl(source, mutableListOf(), ConeStubDiagnostic(diagnostic), null, null)")
             useTypes(emptyExpressionBlock, coneStubDiagnosticType)
         }
 
@@ -188,12 +195,6 @@ object ImplementationConfigurator : AbstractFirTreeImplementationConfigurator() 
         impl(propertyAccessExpression) {
             publicImplementation()
         }
-
-        noImpl(expressionWithSmartcast)
-        noImpl(expressionWithSmartcastToNothing)
-
-        noImpl(whenSubjectExpressionWithSmartcast)
-        noImpl(whenSubjectExpressionWithSmartcastToNothing)
 
         impl(getClassCall) {
             default("argument") {
@@ -357,6 +358,13 @@ object ImplementationConfigurator : AbstractFirTreeImplementationConfigurator() 
         impl(wrappedDelegateExpression) {
             default("typeRef") {
                 delegate = "expression"
+            }
+        }
+
+        impl(smartCastExpression) {
+            default("isStable") {
+                value = "smartcastStability == SmartcastStability.STABLE_VALUE"
+                withGetter = true
             }
         }
 
@@ -562,7 +570,8 @@ object ImplementationConfigurator : AbstractFirTreeImplementationConfigurator() 
             "FirIntegerLiteralOperatorCallImpl",
             "FirContextReceiverImpl",
             "FirClassReferenceExpressionImpl",
-            "FirGetClassCallImpl"
+            "FirGetClassCallImpl",
+            "FirSmartCastExpressionImpl"
         )
         configureFieldInAllImplementations(
             field = "typeRef",

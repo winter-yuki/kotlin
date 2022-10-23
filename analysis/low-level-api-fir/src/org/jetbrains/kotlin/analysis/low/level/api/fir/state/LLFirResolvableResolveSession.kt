@@ -16,12 +16,12 @@ import org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.LLFirResolvableM
 import org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.LLFirSession
 import org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.LLFirSessionProvider
 import org.jetbrains.kotlin.analysis.low.level.api.fir.util.FirDeclarationForCompiledElementSearcher
+import org.jetbrains.kotlin.analysis.low.level.api.fir.util.errorWithFirSpecificEntries
 import org.jetbrains.kotlin.analysis.low.level.api.fir.util.findSourceNonLocalFirDeclaration
 import org.jetbrains.kotlin.analysis.low.level.api.fir.util.originalDeclaration
 import org.jetbrains.kotlin.analysis.project.structure.KtModule
 import org.jetbrains.kotlin.analysis.project.structure.getKtModule
 import org.jetbrains.kotlin.analysis.utils.errors.requireIsInstance
-import org.jetbrains.kotlin.analysis.utils.errors.withPsiAttachment
 import org.jetbrains.kotlin.analysis.utils.printer.getElementTextInContext
 import org.jetbrains.kotlin.fir.FirElement
 import org.jetbrains.kotlin.fir.FirSession
@@ -35,8 +35,8 @@ import org.jetbrains.kotlin.fir.resolve.providers.firProvider
 import org.jetbrains.kotlin.fir.resolve.providers.symbolProvider
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
 import org.jetbrains.kotlin.psi.*
-import org.jetbrains.kotlin.utils.errorWithAttachment
-import org.jetbrains.kotlin.utils.withAttachmentDetailed
+import org.jetbrains.kotlin.analysis.utils.errors.buildErrorWithAttachment
+import org.jetbrains.kotlin.analysis.utils.errors.*
 
 internal abstract class LLFirResolvableResolveSession(
     private val sessionProvider: LLFirSessionProvider,
@@ -85,7 +85,7 @@ internal abstract class LLFirResolvableResolveSession(
         }
 
         val ktModule = ktDeclaration.getKtModule(project)
-        val firSession = sessionProvider.getSession(ktModule) as LLFirLibrarySession
+        val firSession = sessionProvider.getSession(ktModule)
         val searcher = FirDeclarationForCompiledElementSearcher(firSession.symbolProvider)
         val firDeclaration = searcher.findNonLocalDeclaration(ktDeclaration)
         return firDeclaration.symbol
@@ -103,9 +103,9 @@ internal abstract class LLFirResolvableResolveSession(
             "Declaration should be resolvable module, instead it had ${module::class}"
         }
         val nonLocalNamedDeclaration = ktDeclaration.getNonLocalContainingOrThisDeclaration()
-            ?: errorWithAttachment("Declaration should have non-local container") {
-                withPsiAttachment("ktDeclaration", ktDeclaration)
-                withAttachmentDetailed("module", module) { it.moduleDescription }
+            ?: buildErrorWithAttachment("Declaration should have non-local container") {
+                withPsiEntry("ktDeclaration", ktDeclaration)
+                withEntry("module", module) { it.moduleDescription }
             }
 
         if (ktDeclaration == nonLocalNamedDeclaration) {
@@ -126,7 +126,11 @@ internal abstract class LLFirResolvableResolveSession(
             is FirDeclaration -> fir
             is FirAnonymousFunctionExpression -> fir.anonymousFunction
             is FirAnonymousObjectExpression -> fir.anonymousObject
-            else -> error("FirDeclaration was not found for\n${ktDeclaration.getElementTextInContext()}")
+            else -> errorWithFirSpecificEntries(
+                "FirDeclaration was not found for ${ktDeclaration::class}, fir is ${fir?.let { it::class }}",
+                fir = fir,
+                psi = ktDeclaration,
+            )
         }
         return firDeclaration.symbol
     }
@@ -136,7 +140,7 @@ internal abstract class LLFirResolvableResolveSession(
         val llFirResolvableModuleSession = declaration.llFirModuleData.session as? LLFirResolvableModuleSession ?: return
 
         val moduleComponents = llFirResolvableModuleSession.moduleComponents
-        moduleComponents.lazyFirDeclarationsResolver.lazyResolveDeclaration(
+        moduleComponents.firModuleLazyDeclarationResolver.lazyResolveDeclaration(
             firDeclarationToResolve = declaration,
             scopeSession = moduleComponents.scopeSessionProvider.getScopeSession(),
             toPhase = toPhase,

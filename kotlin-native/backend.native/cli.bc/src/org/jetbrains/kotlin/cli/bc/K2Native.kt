@@ -28,7 +28,6 @@ import org.jetbrains.kotlin.konan.CURRENT
 import org.jetbrains.kotlin.konan.CompilerVersion
 import org.jetbrains.kotlin.konan.file.File
 import org.jetbrains.kotlin.konan.target.CompilerOutputKind
-import org.jetbrains.kotlin.library.uniqueName
 import org.jetbrains.kotlin.metadata.deserialization.BinaryVersion
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.util.profile
@@ -68,7 +67,7 @@ class K2Native : CLICompiler<K2NativeCompilerArguments>() {
             messageCollector.report(ERROR, "K2 does not support Native target right now")
             return ExitCode.COMPILATION_ERROR
         }
-        configuration.put(CLIConfigurationKeys.PHASE_CONFIG, createPhaseConfig(toplevelPhase, arguments, messageCollector))
+        configuration.put(CLIConfigurationKeys.PHASE_CONFIG, createPhaseConfig(toplevelPhaseErased, arguments, messageCollector))
 
         val enoughArguments = arguments.freeArgs.isNotEmpty() || arguments.isUsefulWithoutFreeArgs
         if (!enoughArguments) {
@@ -90,13 +89,7 @@ class K2Native : CLICompiler<K2NativeCompilerArguments>() {
         configuration.put(CLIConfigurationKeys.RENDER_DIAGNOSTIC_INTERNAL_NAME, arguments.renderInternalDiagnosticNames)
 
         try {
-            val konanConfig = KonanConfig(project, configuration)
-            try {
-                ensureModuleName(konanConfig, environment)
-                runTopLevelPhases(konanConfig, environment)
-            } finally {
-                konanConfig.dispose()
-            }
+            KonanDriver(project, environment, configuration).run()
         } catch (e: Throwable) {
             if (e is KonanCompilationException || e is CompilationErrorException)
                 return ExitCode.COMPILATION_ERROR
@@ -117,22 +110,10 @@ class K2Native : CLICompiler<K2NativeCompilerArguments>() {
 
     val K2NativeCompilerArguments.isUsefulWithoutFreeArgs: Boolean
         get() = listTargets || listPhases || checkDependencies || !includes.isNullOrEmpty() ||
-                !librariesToCache.isNullOrEmpty() || libraryToAddToCache != null || !exportedLibraries.isNullOrEmpty()
+                libraryToAddToCache != null || !exportedLibraries.isNullOrEmpty()
 
     fun Array<String>?.toNonNullList(): List<String> {
         return this?.asList<String>() ?: listOf<String>()
-    }
-
-    private fun ensureModuleName(config: KonanConfig, environment: KotlinCoreEnvironment) {
-        if (environment.getSourceFiles().isEmpty()) {
-            val libraries = config.resolvedLibraries.getFullList()
-            val moduleName = config.moduleId
-            if (libraries.any { it.uniqueName == moduleName }) {
-                val kexeModuleName = "${moduleName}_kexe"
-                config.configuration.put(KonanConfigKeys.MODULE_NAME, kexeModuleName)
-                assert(libraries.none { it.uniqueName == kexeModuleName })
-            }
-        }
     }
 
     // It is executed before doExecute().
@@ -228,9 +209,6 @@ class K2Native : CLICompiler<K2NativeCompilerArguments>() {
                 put(EXPORT_KDOC, arguments.exportKDoc)
 
                 put(PRINT_IR, arguments.printIr)
-                put(PRINT_IR_WITH_DESCRIPTORS, arguments.printIrWithDescriptors)
-                put(PRINT_DESCRIPTORS, arguments.printDescriptors)
-                put(PRINT_LOCATIONS, arguments.printLocations)
                 put(PRINT_BITCODE, arguments.printBitCode)
                 put(CHECK_EXTERNAL_CALLS, arguments.checkExternalCalls)
                 put(PRINT_FILES, arguments.printFiles)
@@ -241,12 +219,6 @@ class K2Native : CLICompiler<K2NativeCompilerArguments>() {
                     put(VERIFY_COMPILER, arguments.verifyCompiler == "true")
                 put(VERIFY_IR, arguments.verifyIr)
                 put(VERIFY_BITCODE, arguments.verifyBitCode)
-
-                put(ENABLED_PHASES,
-                        arguments.enablePhases.toNonNullList())
-                put(DISABLED_PHASES,
-                        arguments.disablePhases.toNonNullList())
-                put(LIST_PHASES, arguments.listPhases)
 
                 put(ENABLE_ASSERTIONS, arguments.enableAssertions)
 
@@ -297,7 +269,6 @@ class K2Native : CLICompiler<K2NativeCompilerArguments>() {
                 put(OBJC_GENERICS, !arguments.noObjcGenerics)
                 put(DEBUG_PREFIX_MAP, parseDebugPrefixMap(arguments, configuration))
 
-                put(LIBRARIES_TO_CACHE, parseLibrariesToCache(arguments, configuration, outputKind))
                 val libraryToAddToCache = parseLibraryToAddToCache(arguments, configuration, outputKind)
                 if (libraryToAddToCache != null && !arguments.outputName.isNullOrEmpty())
                     configuration.report(ERROR, "${K2NativeCompilerArguments.ADD_CACHE} already implicitly sets output file name")
@@ -305,6 +276,9 @@ class K2Native : CLICompiler<K2NativeCompilerArguments>() {
                 libraryToAddToCache?.let { put(LIBRARY_TO_ADD_TO_CACHE, it) }
                 put(CACHE_DIRECTORIES, cacheDirectories)
                 put(CACHED_LIBRARIES, parseCachedLibraries(arguments, configuration))
+                val filesToCache = arguments.filesToCache
+                filesToCache?.let { put(FILES_TO_CACHE, it.toList()) }
+                put(MAKE_PER_FILE_CACHE, arguments.makePerFileCache)
 
                 parseShortModuleName(arguments, configuration, outputKind)?.let {
                     put(SHORT_MODULE_NAME, it)
@@ -387,6 +361,7 @@ class K2Native : CLICompiler<K2NativeCompilerArguments>() {
                 arguments.testDumpOutputPath?.let { put(TEST_DUMP_OUTPUT_PATH, it) }
                 put(PARTIAL_LINKAGE, arguments.partialLinkage)
                 put(OMIT_FRAMEWORK_BINARY, arguments.omitFrameworkBinary)
+                putIfNotNull(FORCE_COMPILER_DRIVER, arguments.forceCompilerDriver)
             }
         }
     }
@@ -520,27 +495,6 @@ private fun parseCachedLibraries(
         libraryAndCache[0] to libraryAndCache[1]
     }
 }.toMap()
-
-private fun parseLibrariesToCache(
-        arguments: K2NativeCompilerArguments,
-        configuration: CompilerConfiguration,
-        outputKind: CompilerOutputKind
-): List<String> {
-    val input = arguments.librariesToCache?.asList().orEmpty()
-
-    return if (input.isNotEmpty() && !outputKind.isCache) {
-        configuration.report(ERROR, "${K2NativeCompilerArguments.MAKE_CACHE} can't be used when not producing cache")
-        emptyList()
-    } else if (input.isNotEmpty() && !arguments.libraryToAddToCache.isNullOrEmpty()) {
-        configuration.report(
-                ERROR,
-                "supplied both ${K2NativeCompilerArguments.MAKE_CACHE} and ${K2NativeCompilerArguments.ADD_CACHE} options"
-        )
-        emptyList()
-    } else {
-        input
-    }
-}
 
 private fun parseLibraryToAddToCache(
         arguments: K2NativeCompilerArguments,

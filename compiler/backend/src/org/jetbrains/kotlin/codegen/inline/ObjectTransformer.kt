@@ -83,6 +83,13 @@ class WhenMappingTransformer(
                     methodNodes.add(this)
                 }
             }
+
+            override fun visitInnerClass(name: String?, outerName: String?, innerName: String?, access: Int) {
+                // Drop the attribute as the recreated class is not an inner class of the original outer class.
+                // In principle, we could also generate a new attribute with outerName set to the caller-side class,
+                // but that would require modification of both the inner (recreated) and the outer (caller-side) classes.
+                // The latter would require a lot of work without any clear benefits.
+            }
         }, ClassReader.SKIP_FRAMES)
 
         assert(methodNodes.size == 1) {
@@ -97,7 +104,7 @@ class WhenMappingTransformer(
             transformedClinit.signature, transformedClinit.exceptions.toTypedArray()
         )
         transformedClinit.accept(result)
-        classBuilder.done()
+        classBuilder.done(state.generateSmapCopyToAnnotation)
 
         return transformationResult
     }

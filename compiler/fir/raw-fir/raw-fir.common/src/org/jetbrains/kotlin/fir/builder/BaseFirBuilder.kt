@@ -28,8 +28,10 @@ import org.jetbrains.kotlin.fir.references.builder.*
 import org.jetbrains.kotlin.fir.references.impl.FirSimpleNamedReference
 import org.jetbrains.kotlin.fir.symbols.impl.*
 import org.jetbrains.kotlin.fir.types.ConeClassLikeType
+import org.jetbrains.kotlin.fir.types.FirErrorTypeRef
 import org.jetbrains.kotlin.fir.types.FirResolvedTypeRef
 import org.jetbrains.kotlin.fir.types.FirTypeRef
+import org.jetbrains.kotlin.fir.types.builder.buildErrorTypeRef
 import org.jetbrains.kotlin.fir.types.builder.buildResolvedTypeRef
 import org.jetbrains.kotlin.fir.types.impl.ConeClassLikeTypeImpl
 import org.jetbrains.kotlin.fir.types.impl.ConeTypeParameterTypeImpl
@@ -800,7 +802,7 @@ abstract class BaseFirBuilder<T>(val baseSession: FirSession, val context: Conte
 
             val arrayVariable = generateTemporaryVariable(
                 baseModuleData,
-                array?.toFirSourceElement(),
+                array?.toFirSourceElement(KtFakeSourceElementKind.ArrayAccessNameReference),
                 name = SpecialNames.ARRAY,
                 initializer = arrayReceiver,
             ).also { statements += it }
@@ -1280,10 +1282,19 @@ abstract class BaseFirBuilder<T>(val baseSession: FirSession, val context: Conte
         symbol = FirErrorPropertySymbol(diagnostic)
     }
 
-    enum class ValueParameterDeclaration {
-        OTHER,
-        LAMBDA,
-        CATCH,
-        PRIMARY_CONSTRUCTOR,
+    protected fun createNoTypeForParameterTypeRef(): FirErrorTypeRef {
+        return buildErrorTypeRef {
+            diagnostic = ConeSimpleDiagnostic("No type for parameter", DiagnosticKind.ValueParameterWithNoTypeAnnotation)
+        }
+    }
+
+    enum class ValueParameterDeclaration(val shouldExplicitParameterTypeBePresent: Boolean) {
+        FUNCTION(shouldExplicitParameterTypeBePresent = true),
+        CATCH(shouldExplicitParameterTypeBePresent = true),
+        PRIMARY_CONSTRUCTOR(shouldExplicitParameterTypeBePresent = true),
+        FUNCTIONAL_TYPE(shouldExplicitParameterTypeBePresent = true),
+        SETTER(shouldExplicitParameterTypeBePresent = false),
+        LAMBDA(shouldExplicitParameterTypeBePresent = false),
+        FOR_LOOP(shouldExplicitParameterTypeBePresent = false),
     }
 }

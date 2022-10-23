@@ -106,8 +106,8 @@ interface NewTypeSubstitutor : TypeSubstitutorMarker {
 
             val innerType = capturedType.lowerType ?: capturedType.constructor.projection.type.unwrap()
             val substitutedInnerType = substitute(innerType, keepAnnotation, runCapturedChecks = false)
-            val (projectionSupertype, boundSupertypes) =
-                capturedType.constructor.transformSupertypes { substitute(it, keepAnnotation, runCapturedChecks = false) ?: it }
+            val substitutedSuperTypes =
+                capturedType.constructor.supertypes.map { substitute(it, keepAnnotation, runCapturedChecks = false) ?: it }
 
             if (substitutedInnerType != null) {
                 return if (substitutedInnerType.isCaptured()) substitutedInnerType else {
@@ -116,8 +116,9 @@ interface NewTypeSubstitutor : TypeSubstitutorMarker {
                         NewCapturedTypeConstructor(
                             TypeProjectionImpl(typeConstructor.projection.projectionKind, substitutedInnerType),
                             typeParameter = typeConstructor.typeParameter
-                        ).also { it.initializeSupertypes(projectionSupertype, boundSupertypes) },
-                        lowerType = if (capturedType.lowerType != null) substitutedInnerType else null
+                        ).also { it.initializeSupertypes(substitutedSuperTypes) },
+                        lowerType = if (capturedType.lowerType != null) substitutedInnerType else null,
+                        isMarkedNullable = type.isMarkedNullable
                     )
                 }
             }

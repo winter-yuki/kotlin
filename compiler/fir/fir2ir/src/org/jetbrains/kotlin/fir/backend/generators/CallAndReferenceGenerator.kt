@@ -11,19 +11,17 @@ import org.jetbrains.kotlin.fir.*
 import org.jetbrains.kotlin.fir.backend.*
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.declarations.utils.isCompanion
-import org.jetbrains.kotlin.fir.dispatchReceiverClassOrNull
 import org.jetbrains.kotlin.fir.expressions.*
 import org.jetbrains.kotlin.fir.expressions.builder.buildAnnotationCall
 import org.jetbrains.kotlin.fir.expressions.impl.FirNoReceiverExpression
-import org.jetbrains.kotlin.fir.languageVersionSettings
 import org.jetbrains.kotlin.fir.references.FirDelegateFieldReference
 import org.jetbrains.kotlin.fir.references.FirReference
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
 import org.jetbrains.kotlin.fir.references.FirSuperReference
 import org.jetbrains.kotlin.fir.references.builder.buildResolvedNamedReference
 import org.jetbrains.kotlin.fir.references.impl.FirReferencePlaceholderForResolvedAnnotations
-import org.jetbrains.kotlin.fir.render
 import org.jetbrains.kotlin.fir.resolve.calls.FirSyntheticFunctionSymbol
+import org.jetbrains.kotlin.fir.resolve.dfa.unwrapSmartcastExpression
 import org.jetbrains.kotlin.fir.resolve.fullyExpandedType
 import org.jetbrains.kotlin.fir.resolve.substitution.ConeSubstitutor
 import org.jetbrains.kotlin.fir.resolve.substitution.ConeSubstitutorByMap
@@ -48,7 +46,6 @@ import org.jetbrains.kotlin.psi2ir.generators.isUnchanging
 import org.jetbrains.kotlin.resolve.calls.NewCommonSuperTypeCalculator.commonSuperType
 import org.jetbrains.kotlin.util.OperatorNameConventions
 import org.jetbrains.kotlin.utils.addToStdlib.firstIsInstanceOrNull
-import org.jetbrains.kotlin.utils.addToStdlib.safeAs
 
 class CallAndReferenceGenerator(
     private val components: Fir2IrComponents,
@@ -88,7 +85,8 @@ class CallAndReferenceGenerator(
             callableReferenceAccess.dispatchReceiver,
             conversionScope,
             explicitReceiver = callableReferenceAccess.explicitReceiver,
-            isDelegate = isDelegate
+            isDelegate = isDelegate,
+            isReference = true
         )
         // val x by y ->
         //   val `x$delegate` = y
@@ -260,8 +258,9 @@ class CallAndReferenceGenerator(
     // However, FE 1.0 does it, and currently we have no better way to provide these receivers.
     // See KT-49507 and KT-48954 as good examples for cases we try to handle here
     private fun FirExpression.superQualifierSymbolForField(fieldSymbol: IrFieldSymbol): IrClassSymbol? {
-        if (this !is FirQualifiedAccess) return null
-        if (calleeReference is FirSuperReference) return superQualifierSymbol()
+        val unwrapped = this.unwrapSmartcastExpression()
+        if (unwrapped !is FirQualifiedAccess) return null
+        if (unwrapped.calleeReference is FirSuperReference) return superQualifierSymbol()
         if (fieldSymbol.owner.correspondingPropertySymbol != null) return null
         val originalContainingClass = fieldSymbol.owner.parentClassOrNull ?: return null
         val ownContainingClass = typeRef.toIrType().classifierOrNull?.owner as? IrClass ?: return null
@@ -827,8 +826,7 @@ class CallAndReferenceGenerator(
                 val (valueParameters, argumentMapping, substitutor) = extractArgumentsMapping(call)
                 if (argumentMapping != null && (annotationMode || argumentMapping.isNotEmpty())) {
                     if (valueParameters != null) {
-                        val dynamicCallVarargArgument = argumentMapping.keys.firstOrNull()
-                            ?.safeAs<FirVarargArgumentsExpression>()
+                        val dynamicCallVarargArgument = argumentMapping.keys.firstOrNull() as? FirVarargArgumentsExpression
                             ?: error("Dynamic call must have a single vararg argument")
                         for (argument in dynamicCallVarargArgument.arguments) {
                             val irArgument = convertArgument(argument, null, substitutor, annotationMode)

@@ -21,7 +21,7 @@ import org.jetbrains.kotlin.fir.resolve.ScopeSession
 import org.jetbrains.kotlin.fir.resolve.toSymbol
 import org.jetbrains.kotlin.fir.scopes.ProcessorAction
 import org.jetbrains.kotlin.fir.scopes.unsubstitutedScope
-import org.jetbrains.kotlin.fir.symbols.ensureResolved
+import org.jetbrains.kotlin.fir.symbols.lazyResolveToPhase
 import org.jetbrains.kotlin.fir.toEffectiveVisibility
 import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.name.StandardClassIds
@@ -93,8 +93,13 @@ class FirStatusResolver(
 
         return buildList {
             scope.processPropertiesByName(property.name) {}
-            scope.processDirectOverriddenPropertiesWithBaseScope(property.symbol) { symbol, _ ->
-                this += symbol.fir
+            scope.processDirectOverriddenPropertiesWithBaseScope(property.symbol) { overriddenSymbol, _ ->
+                if (session.visibilityChecker.isVisibleForOverriding(
+                        candidateInDerivedClass = property, candidateInBaseClass = overriddenSymbol.fir
+                    )
+                ) {
+                    this += overriddenSymbol.fir
+                }
                 ProcessorAction.NEXT
             }
         }
@@ -108,7 +113,7 @@ class FirStatusResolver(
     ): FirResolvedDeclarationStatus {
         val statuses = overriddenStatuses ?: getOverriddenProperties(property, containingClass)
             .map {
-                it.ensureResolved(FirResolvePhase.STATUS)
+                it.lazyResolveToPhase(FirResolvePhase.STATUS)
                 it.status as FirResolvedDeclarationStatus
             }
 
@@ -129,7 +134,12 @@ class FirStatusResolver(
             val symbol = function.symbol
             scope.processFunctionsByName(function.name) {}
             scope.processDirectOverriddenFunctionsWithBaseScope(symbol) { overriddenSymbol, _ ->
-                this += overriddenSymbol.fir
+                if (session.visibilityChecker.isVisibleForOverriding(
+                        candidateInDerivedClass = function, candidateInBaseClass = overriddenSymbol.fir
+                    )
+                ) {
+                    this += overriddenSymbol.fir
+                }
                 ProcessorAction.NEXT
             }
         }.mapNotNull {
@@ -215,15 +225,18 @@ class FirStatusResolver(
                 isLocal -> Visibilities.Local
                 else -> resolveVisibility(declaration, containingClass, containingProperty, overriddenStatuses)
             }
+
             Visibilities.Private -> when {
                 declaration is FirPropertyAccessor -> if (containingProperty?.visibility == Visibilities.PrivateToThis) {
                     Visibilities.PrivateToThis
                 } else {
                     Visibilities.Private
                 }
+
                 isPrivateToThis(declaration, containingClass) -> Visibilities.PrivateToThis
                 else -> Visibilities.Private
             }
+
             else -> status.visibility
         }
 
@@ -375,14 +388,12 @@ class FirStatusResolver(
                     containingClass == null -> Modality.FINAL
                     containingClass.classKind == ClassKind.INTERFACE -> {
                         when {
-                            declaration.visibility == Visibilities.Private ->
-                                Modality.FINAL
-                            !declaration.hasOwnBodyOrAccessorBody() ->
-                                Modality.ABSTRACT
-                            else ->
-                                Modality.OPEN
+                            declaration.visibility == Visibilities.Private -> Modality.FINAL
+                            !declaration.hasOwnBodyOrAccessorBody() -> Modality.ABSTRACT
+                            else -> Modality.OPEN
                         }
                     }
+
                     else -> {
                         if (declaration.isOverride &&
                             (containingClass.modality != Modality.FINAL || containingClass.classKind == ClassKind.ENUM_CLASS)
@@ -394,6 +405,7 @@ class FirStatusResolver(
                     }
                 }
             }
+
             else -> Modality.FINAL
         }
 

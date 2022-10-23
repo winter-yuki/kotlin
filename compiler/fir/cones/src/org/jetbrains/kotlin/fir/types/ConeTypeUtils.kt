@@ -28,6 +28,7 @@ fun ConeKotlinType.forEachType(action: (ConeKotlinType) -> Unit) {
             lowerBound.forEachType(action)
             upperBound.forEachType(action)
         }
+
         is ConeDefinitelyNotNullType -> original.forEachType(action)
         is ConeIntersectionType -> intersectedTypes.forEach { it.forEachType(action) }
         is ConeSelfType -> original.forEachType(action)
@@ -127,13 +128,13 @@ fun ConeKotlinType.renderForDebugging(): String {
 
 fun ConeKotlinType.renderReadable(): String {
     val builder = StringBuilder()
-    ConeTypeRenderer(builder, idRenderer = ConeIdShortRenderer()).render(this)
+    ConeTypeRendererWithJavaFlexibleTypes(builder) { ConeIdShortRenderer() }.render(this)
     return builder.toString()
 }
 
 fun ConeKotlinType.renderReadableWithFqNames(): String {
     val builder = StringBuilder()
-    ConeTypeRenderer(builder, idRenderer = ConeIdRendererForDebugging()).render(this)
+    ConeTypeRendererWithJavaFlexibleTypes(builder) { ConeIdRendererForDebugging() }.render(this)
     return builder.toString()
 }
 

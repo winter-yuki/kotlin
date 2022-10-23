@@ -12,6 +12,7 @@ import org.jetbrains.kotlin.*
 import org.jetbrains.kotlin.ElementTypeUtils.isExpression
 import org.jetbrains.kotlin.KtNodeTypes.*
 import org.jetbrains.kotlin.builtins.StandardNames
+import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.descriptors.Visibilities
@@ -29,6 +30,7 @@ import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.declarations.builder.*
 import org.jetbrains.kotlin.fir.declarations.impl.*
 import org.jetbrains.kotlin.fir.declarations.utils.*
+import org.jetbrains.kotlin.fir.diagnostics.ConeDiagnostic
 import org.jetbrains.kotlin.fir.diagnostics.ConeSimpleDiagnostic
 import org.jetbrains.kotlin.fir.diagnostics.DiagnosticKind
 import org.jetbrains.kotlin.fir.expressions.*
@@ -367,7 +369,8 @@ class DeclarationsConverter(
      */
     fun convertAnnotationEntry(
         unescapedAnnotation: LighterASTNode,
-        defaultAnnotationUseSiteTarget: AnnotationUseSiteTarget? = null
+        defaultAnnotationUseSiteTarget: AnnotationUseSiteTarget? = null,
+        diagnostic: ConeDiagnostic? = null,
     ): FirAnnotationCall {
         var annotationUseSiteTarget: AnnotationUseSiteTarget? = null
         lateinit var constructorCalleePair: Pair<FirTypeRef, List<FirExpression>>
@@ -379,21 +382,34 @@ class DeclarationsConverter(
         }
         val qualifier = (constructorCalleePair.first as? FirUserTypeRef)?.qualifier?.last()
         val name = qualifier?.name ?: Name.special("<no-annotation-name>")
-        return buildAnnotationCall {
-            source = unescapedAnnotation.toFirSourceElement()
-            useSiteTarget = annotationUseSiteTarget ?: defaultAnnotationUseSiteTarget
-            annotationTypeRef = constructorCalleePair.first
-            calleeReference = buildSimpleNamedReference {
-                source = unescapedAnnotation
-                    .getChildNodeByType(CONSTRUCTOR_CALLEE)
-                    ?.getChildNodeByType(TYPE_REFERENCE)
-                    ?.getChildNodeByType(USER_TYPE)
-                    ?.getChildNodeByType(REFERENCE_EXPRESSION)
-                    ?.toFirSourceElement()
-                this.name = name
+        val theCalleeReference = buildSimpleNamedReference {
+            source = unescapedAnnotation
+                .getChildNodeByType(CONSTRUCTOR_CALLEE)
+                ?.getChildNodeByType(TYPE_REFERENCE)
+                ?.getChildNodeByType(USER_TYPE)
+                ?.getChildNodeByType(REFERENCE_EXPRESSION)
+                ?.toFirSourceElement()
+            this.name = name
+        }
+        return if (diagnostic == null) {
+            buildAnnotationCall {
+                source = unescapedAnnotation.toFirSourceElement()
+                useSiteTarget = annotationUseSiteTarget ?: defaultAnnotationUseSiteTarget
+                annotationTypeRef = constructorCalleePair.first
+                calleeReference = theCalleeReference
+                extractArgumentsFrom(constructorCalleePair.second)
+                typeArguments += qualifier?.typeArgumentList?.typeArguments ?: listOf()
             }
-            extractArgumentsFrom(constructorCalleePair.second)
-            typeArguments += qualifier?.typeArgumentList?.typeArguments ?: listOf()
+        } else {
+            buildErrorAnnotationCall {
+                source = unescapedAnnotation.toFirSourceElement()
+                useSiteTarget = annotationUseSiteTarget ?: defaultAnnotationUseSiteTarget
+                annotationTypeRef = constructorCalleePair.first
+                this.diagnostic = diagnostic
+                calleeReference = theCalleeReference
+                extractArgumentsFrom(constructorCalleePair.second)
+                typeArguments += qualifier?.typeArgumentList?.typeArguments ?: listOf()
+            }
         }
     }
 
@@ -585,6 +601,12 @@ class DeclarationsConverter(
                             modifiers.hasExpect()
                         )
                         generateValueOfFunction(
+                            baseModuleData,
+                            context.packageFqName,
+                            context.className,
+                            modifiers.hasExpect()
+                        )
+                        generateEntriesGetter(
                             baseModuleData,
                             context.packageFqName,
                             context.className,
@@ -940,7 +962,7 @@ class DeclarationsConverter(
         secondaryConstructor.forEachChildren {
             when (it.tokenType) {
                 MODIFIER_LIST -> modifiers = convertModifierList(it)
-                VALUE_PARAMETER_LIST -> firValueParameters += convertValueParameters(it)
+                VALUE_PARAMETER_LIST -> firValueParameters += convertValueParameters(it, ValueParameterDeclaration.FUNCTION)
                 CONSTRUCTOR_DELEGATION_CALL -> constructorDelegationCall = convertConstructorDelegationCall(it, classWrapper)
                 BLOCK -> block = it
             }
@@ -1522,7 +1544,7 @@ class DeclarationsConverter(
         setterParameter.forEachChildren {
             when (it.tokenType) {
                 MODIFIER_LIST -> modifiers = convertModifierList(it)
-                VALUE_PARAMETER -> firValueParameter = convertValueParameter(it).firValueParameter
+                VALUE_PARAMETER -> firValueParameter = convertValueParameter(it, ValueParameterDeclaration.SETTER).firValueParameter
             }
         }
 
@@ -1650,7 +1672,7 @@ class DeclarationsConverter(
                 valueParametersList?.let { list ->
                     valueParameters += convertValueParameters(
                         list,
-                        if (isAnonymousFunction) ValueParameterDeclaration.LAMBDA else ValueParameterDeclaration.OTHER
+                        if (isAnonymousFunction) ValueParameterDeclaration.LAMBDA else ValueParameterDeclaration.FUNCTION
                     ).map { it.firValueParameter }
                 }
 
@@ -1869,11 +1891,15 @@ class DeclarationsConverter(
         lateinit var identifier: String
         lateinit var firType: FirTypeRef
         lateinit var referenceExpression: LighterASTNode
+
+        val diagnostic = ConeSimpleDiagnostic(
+            "Type parameter annotations are not allowed inside where clauses", DiagnosticKind.AnnotationNotAllowed,
+        )
+
         val annotations = mutableListOf<FirAnnotation>()
         typeConstraint.forEachChildren {
             when (it.tokenType) {
-                //annotations will be saved later, on mapping stage with type parameters
-                ANNOTATION, ANNOTATION_ENTRY -> annotations += convertAnnotation(it)
+                ANNOTATION_ENTRY -> annotations += convertAnnotationEntry(it, diagnostic = diagnostic)
                 REFERENCE_EXPRESSION -> {
                     identifier = it.asText
                     referenceExpression = it
@@ -2155,7 +2181,7 @@ class DeclarationsConverter(
         functionType.forEachChildren {
             when (it.tokenType) {
                 FUNCTION_TYPE_RECEIVER -> receiverTypeReference = convertReceiverType(it)
-                VALUE_PARAMETER_LIST -> valueParametersList += convertValueParameters(it)
+                VALUE_PARAMETER_LIST -> valueParametersList += convertValueParameters(it, ValueParameterDeclaration.FUNCTIONAL_TYPE)
                 TYPE_REFERENCE -> returnTypeReference = convertType(it)
             }
         }
@@ -2180,7 +2206,7 @@ class DeclarationsConverter(
      */
     fun convertValueParameters(
         valueParameters: LighterASTNode,
-        valueParameterDeclaration: ValueParameterDeclaration = ValueParameterDeclaration.OTHER,
+        valueParameterDeclaration: ValueParameterDeclaration,
         additionalAnnotations: List<FirAnnotation> = emptyList()
     ): List<ValueParameter> {
         return valueParameters.forEachChildrenReturnList { node, container ->
@@ -2195,7 +2221,7 @@ class DeclarationsConverter(
      */
     fun convertValueParameter(
         valueParameter: LighterASTNode,
-        valueParameterDeclaration: ValueParameterDeclaration = ValueParameterDeclaration.OTHER,
+        valueParameterDeclaration: ValueParameterDeclaration,
         additionalAnnotations: List<FirAnnotation> = emptyList()
     ): ValueParameter {
         var modifiers = Modifier()
@@ -2222,7 +2248,11 @@ class DeclarationsConverter(
             source = valueParameter.toFirSourceElement()
             moduleData = baseModuleData
             origin = FirDeclarationOrigin.Source
-            returnTypeRef = firType ?: implicitType
+            returnTypeRef = firType
+                ?: when {
+                    valueParameterDeclaration.shouldExplicitParameterTypeBePresent -> createNoTypeForParameterTypeRef()
+                    else -> implicitType
+                }
             this.name = name
             symbol = FirValueParameterSymbol(name)
             defaultValue = firExpression

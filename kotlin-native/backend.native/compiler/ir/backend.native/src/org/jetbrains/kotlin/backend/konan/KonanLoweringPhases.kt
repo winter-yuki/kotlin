@@ -2,7 +2,7 @@ package org.jetbrains.kotlin.backend.konan
 
 import org.jetbrains.kotlin.backend.common.*
 import org.jetbrains.kotlin.backend.common.lower.*
-import org.jetbrains.kotlin.backend.common.lower.StringConcatenationLowering
+import org.jetbrains.kotlin.backend.common.lower.coroutines.AddContinuationToNonLocalSuspendFunctionsLowering
 import org.jetbrains.kotlin.backend.common.lower.inline.FunctionInlining
 import org.jetbrains.kotlin.backend.common.lower.inline.LocalClassesExtractionFromInlineFunctionsLowering
 import org.jetbrains.kotlin.backend.common.lower.inline.LocalClassesInInlineFunctionsLowering
@@ -10,8 +10,10 @@ import org.jetbrains.kotlin.backend.common.lower.inline.LocalClassesInInlineLamb
 import org.jetbrains.kotlin.backend.common.lower.loops.ForLoopsLowering
 import org.jetbrains.kotlin.backend.common.lower.optimizations.FoldConstantLowering
 import org.jetbrains.kotlin.backend.common.lower.optimizations.PropertyAccessorInlineLowering
+import org.jetbrains.kotlin.backend.konan.lower.UnboxInlineLowering
 import org.jetbrains.kotlin.backend.common.phaser.*
 import org.jetbrains.kotlin.backend.konan.ir.FunctionsWithoutBoundCheckGenerator
+import org.jetbrains.kotlin.backend.konan.llvm.redundantCoercionsCleaningPhase
 import org.jetbrains.kotlin.backend.konan.lower.*
 import org.jetbrains.kotlin.backend.konan.lower.InitializersLowering
 import org.jetbrains.kotlin.backend.konan.optimizations.KonanBCEForLoopBodyTransformer
@@ -38,25 +40,25 @@ private fun makeKonanFileLoweringPhase(
         lowering: (Context) -> FileLoweringPass,
         name: String,
         description: String,
-        prerequisite: Set<NamedCompilerPhase<Context, *>> = emptySet()
+        prerequisite: Set<AbstractNamedCompilerPhase<Context, *, *>> = emptySet()
 ) = makeIrFilePhase(lowering, name, description, prerequisite, actions = filePhaseActions)
 
 private fun makeKonanModuleLoweringPhase(
         lowering: (Context) -> FileLoweringPass,
         name: String,
         description: String,
-        prerequisite: Set<NamedCompilerPhase<Context, *>> = emptySet()
+        prerequisite: Set<AbstractNamedCompilerPhase<Context, *, *>> = emptySet()
 ) = makeIrModulePhase(lowering, name, description, prerequisite, actions = modulePhaseActions)
 
 internal fun makeKonanFileOpPhase(
         op: (Context, IrFile) -> Unit,
         name: String,
         description: String,
-        prerequisite: Set<NamedCompilerPhase<Context, *>> = emptySet()
-) = NamedCompilerPhase(
+        prerequisite: Set<AbstractNamedCompilerPhase<Context, *, *>> = emptySet()
+) = SameTypeNamedCompilerPhase(
         name, description, prerequisite, nlevels = 0,
         lower = object : SameTypeCompilerPhase<Context, IrFile> {
-            override fun invoke(phaseConfig: PhaseConfig, phaserState: PhaserState<IrFile>, context: Context, input: IrFile): IrFile {
+            override fun invoke(phaseConfig: PhaseConfigurationService, phaserState: PhaserState<IrFile>, context: Context, input: IrFile): IrFile {
                 op(context, input)
                 return input
             }
@@ -68,11 +70,11 @@ internal fun makeKonanModuleOpPhase(
         op: (Context, IrModuleFragment) -> Unit,
         name: String,
         description: String,
-        prerequisite: Set<NamedCompilerPhase<Context, *>> = emptySet()
-) = NamedCompilerPhase(
+        prerequisite: Set<AbstractNamedCompilerPhase<Context, *, *>> = emptySet()
+) = SameTypeNamedCompilerPhase(
         name, description, prerequisite, nlevels = 0,
         lower = object : SameTypeCompilerPhase<Context, IrModuleFragment> {
-            override fun invoke(phaseConfig: PhaseConfig, phaserState: PhaserState<IrModuleFragment>, context: Context, input: IrModuleFragment): IrModuleFragment {
+            override fun invoke(phaseConfig: PhaseConfigurationService, phaserState: PhaserState<IrModuleFragment>, context: Context, input: IrModuleFragment): IrModuleFragment {
                 op(context, input)
                 return input
             }
@@ -80,8 +82,8 @@ internal fun makeKonanModuleOpPhase(
         actions = modulePhaseActions
 )
 
-internal val specialBackendChecksPhase = konanUnitPhase(
-        op = { irModule!!.files.forEach { SpecialBackendChecksTraversal(this).lower(it) } },
+internal val specialBackendChecksPhase = makeKonanModuleLoweringPhase(
+        ::SpecialBackendChecksTraversal,
         name = "SpecialBackendChecks",
         description = "Special backend checks"
 )
@@ -149,6 +151,18 @@ internal val inventNamesForLocalClasses = makeKonanFileLoweringPhase(
 
 internal val extractLocalClassesFromInlineBodies = makeKonanFileOpPhase(
         { context, irFile ->
+            irFile.acceptChildrenVoid(object : IrElementVisitorVoid {
+                override fun visitElement(element: IrElement) {
+                    element.acceptChildrenVoid(this)
+                }
+
+                override fun visitFunction(declaration: IrFunction) {
+                    if (declaration.isInline)
+                        context.inlineFunctionsSupport.saveNonLoweredInlineFunction(declaration)
+                    declaration.acceptChildrenVoid(this)
+                }
+            })
+
             LocalClassesInInlineLambdasLowering(context).lower(irFile)
             LocalClassesInInlineFunctionsLowering(context).lower(irFile)
             LocalClassesExtractionFromInlineFunctionsLowering(context).lower(irFile)
@@ -158,20 +172,14 @@ internal val extractLocalClassesFromInlineBodies = makeKonanFileOpPhase(
         prerequisite = setOf(sharedVariablesPhase), // TODO: add "soft" dependency on inventNamesForLocalClasses
 )
 
+internal val wrapInlineDeclarationsWithReifiedTypeParametersLowering = makeKonanFileLoweringPhase(
+        ::WrapInlineDeclarationsWithReifiedTypeParametersLowering,
+        name = "WrapInlineDeclarationsWithReifiedTypeParameters",
+        description = "Wrap inline declarations with reified type parameters"
+)
+
 internal val inlinePhase = makeKonanFileOpPhase(
         { context, irFile ->
-            irFile.acceptChildrenVoid(object : IrElementVisitorVoid {
-                override fun visitElement(element: IrElement) {
-                    element.acceptChildrenVoid(this)
-                }
-
-                override fun visitFunction(declaration: IrFunction) {
-                    if (declaration.isInline)
-                        context.specialDeclarationsFactory.getNonLoweredInlineFunction(declaration)
-                    declaration.acceptChildrenVoid(this)
-                }
-            })
-
             FunctionInlining(context, NativeInlineFunctionResolver(context)).lower(irFile)
         },
         name = "Inline",
@@ -278,12 +286,10 @@ internal val rangeContainsLoweringPhase = makeKonanFileLoweringPhase(
         description = "Optimizes calls to contains() for ClosedRanges"
 )
 
-internal val functionsWithoutBoundCheck = makeKonanModuleOpPhase(
+internal val functionsWithoutBoundCheck = konanUnitPhase(
         name = "FunctionsWithoutBoundCheckGenerator",
         description = "Functions without bounds check generation",
-        op = { context, _ ->
-            FunctionsWithoutBoundCheckGenerator(context).generate()
-        }
+        op = { FunctionsWithoutBoundCheckGenerator(this).generate() }
 )
 
 internal val forLoopsPhase = makeKonanFileOpPhase(
@@ -377,8 +383,13 @@ internal val varargPhase = makeKonanFileLoweringPhase(
         prerequisite = setOf(functionReferencePhase, defaultParameterExtentPhase, interopPhase, functionsWithoutBoundCheck)
 )
 
-internal val coroutinesPhase = makeKonanFileLoweringPhase(
-        ::NativeSuspendFunctionsLowering,
+internal val coroutinesPhase = makeKonanFileOpPhase(
+        { context, irFile ->
+            NativeSuspendFunctionsLowering(context).lower(irFile)
+            AddContinuationToNonLocalSuspendFunctionsLowering(context).lower(irFile)
+            NativeAddContinuationToFunctionCallsLowering(context).lower(irFile)
+            AddFunctionSupertypeToSuspendFunctionLowering(context).lower(irFile)
+        },
         name = "Coroutines",
         description = "Coroutines lowering",
         prerequisite = setOf(localFunctionsPhase, finallyBlocksPhase, kotlinNothingValueExceptionPhase)
@@ -406,6 +417,13 @@ internal val autoboxPhase = makeKonanFileLoweringPhase(
         name = "Autobox",
         description = "Autoboxing of primitive types",
         prerequisite = setOf(bridgesPhase, coroutinesPhase)
+)
+
+internal val unboxInlinePhase = makeKonanModuleLoweringPhase(
+        ::UnboxInlineLowering,
+        name = "UnboxInline",
+        description = "Unbox functions inline lowering",
+        prerequisite = setOf(autoboxPhase, redundantCoercionsCleaningPhase)
 )
 
 internal val expressionBodyTransformPhase = makeKonanFileLoweringPhase(
@@ -444,4 +462,16 @@ internal val computeStringTrimPhase = makeKonanFileLoweringPhase(
         ::StringTrimLowering,
         name = "StringTrimLowering",
         description = "Compute trimIndent and trimMargin operations on constant strings"
+)
+
+internal val exportInternalAbiPhase = makeKonanFileLoweringPhase(
+        ::ExportCachesAbiVisitor,
+        name = "ExportInternalAbi",
+        description = "Add accessors to private entities"
+)
+
+internal val useInternalAbiPhase = makeKonanFileLoweringPhase(
+        ::ImportCachesAbiTransformer,
+        name = "UseInternalAbi",
+        description = "Use internal ABI functions to access private entities"
 )

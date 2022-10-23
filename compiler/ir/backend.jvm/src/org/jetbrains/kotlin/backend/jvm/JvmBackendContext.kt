@@ -71,8 +71,8 @@ class JvmBackendContext(
 
     override val builtIns = state.module.builtIns
     override val typeSystem: IrTypeSystemContext = JvmIrTypeSystemContext(irBuiltIns)
-    val typeMapper = IrTypeMapper(this)
-    val methodSignatureMapper = MethodSignatureMapper(this)
+    val defaultTypeMapper = IrTypeMapper(this)
+    val defaultMethodSignatureMapper = MethodSignatureMapper(this, defaultTypeMapper)
 
     val innerClassesSupport = JvmInnerClassesSupport(irFactory)
     val cachedDeclarations = JvmCachedDeclarations(
@@ -143,7 +143,8 @@ class JvmBackendContext(
 
     val inlineClassReplacements = MemoizedInlineClassReplacements(state.functionsWithInlineClassReturnTypesMangled, irFactory, this)
 
-    val multiFieldValueClassReplacements = MemoizedMultiFieldValueClassReplacements(irFactory, this)
+    val multiFieldValueClassReplacements =
+        MemoizedMultiFieldValueClassReplacements(irFactory, this)
 
     val continuationClassesVarsCountByType: MutableMap<IrAttributeContainer, Map<Type, Int>> = hashMapOf()
 
@@ -153,11 +154,11 @@ class JvmBackendContext(
 
     init {
         state.mapInlineClass = { descriptor ->
-            typeMapper.mapType(referenceClass(descriptor).defaultType)
+            defaultTypeMapper.mapType(referenceClass(descriptor).defaultType)
         }
     }
 
-    internal fun referenceClass(descriptor: ClassDescriptor): IrClassSymbol =
+    fun referenceClass(descriptor: ClassDescriptor): IrClassSymbol =
         symbolTable.lazyWrapper.referenceClass(descriptor)
 
     internal fun referenceTypeParameter(descriptor: TypeParameterDescriptor): IrTypeParameterSymbol =
@@ -195,6 +196,20 @@ class JvmBackendContext(
             val oldPartClasses = multifileFacade.value
             val newPartClasses = oldPartClasses.map { classSymbolMap[it.symbol]?.owner ?: it }
             multifileFacade.setValue(newPartClasses.toMutableList())
+        }
+
+        for ((staticReplacement, original) in multiFieldValueClassReplacements.originalFunctionForStaticReplacement) {
+            if (staticReplacement !is IrSimpleFunction) continue
+            val newOriginal = functionSymbolMap[original.symbol]?.owner ?: continue
+            val newStaticReplacement = multiFieldValueClassReplacements.getReplacementFunction(newOriginal) ?: continue
+            functionSymbolMap[staticReplacement.symbol] = newStaticReplacement.symbol
+        }
+
+        for ((methodReplacement, original) in multiFieldValueClassReplacements.originalFunctionForMethodReplacement) {
+            if (methodReplacement !is IrSimpleFunction) continue
+            val newOriginal = functionSymbolMap[original.symbol]?.owner ?: continue
+            val newMethodReplacement = multiFieldValueClassReplacements.getReplacementFunction(newOriginal) ?: continue
+            functionSymbolMap[methodReplacement.symbol] = newMethodReplacement.symbol
         }
 
         for ((staticReplacement, original) in inlineClassReplacements.originalFunctionForStaticReplacement) {

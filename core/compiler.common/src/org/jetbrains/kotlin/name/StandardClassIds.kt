@@ -16,6 +16,7 @@ object StandardClassIds {
     val BASE_INTERNAL_PACKAGE = BASE_KOTLIN_PACKAGE.child(Name.identifier("internal"))
     val BASE_INTERNAL_IR_PACKAGE = BASE_INTERNAL_PACKAGE.child(Name.identifier("ir"))
     val BASE_COROUTINES_PACKAGE = BASE_KOTLIN_PACKAGE.child(Name.identifier("coroutines"))
+    val BASE_ENUMS_PACKAGE = BASE_KOTLIN_PACKAGE.child(Name.identifier("enums"))
 
     val builtInsPackages = setOf(
         BASE_KOTLIN_PACKAGE,
@@ -24,7 +25,7 @@ object StandardClassIds {
         BASE_ANNOTATION_PACKAGE,
         BASE_REFLECT_PACKAGE,
         BASE_INTERNAL_PACKAGE,
-        BASE_COROUTINES_PACKAGE,
+        BASE_COROUTINES_PACKAGE
     )
 
     val Nothing = "Nothing".baseId()
@@ -134,6 +135,8 @@ object StandardClassIds {
     val AnnotationRetention = "AnnotationRetention".annotationId()
     val AnnotationTarget = "AnnotationTarget".annotationId()
 
+    val EnumEntries = "EnumEntries".enumsId()
+
     object Annotations {
         val Suppress = "Suppress".baseId()
         val PublishedApi = "PublishedApi".baseId()
@@ -154,6 +157,7 @@ object StandardClassIds {
         val JvmField = "JvmField".jvmId()
         val JvmDefault = "JvmDefault".jvmId()
         val JvmRepeatable = "JvmRepeatable".jvmId()
+        val JvmRecord = "JvmRecord".jvmId()
 
         val RawTypeAnnotation = "RawType".internalIrId()
         val FlexibleNullability = "FlexibleNullability".internalIrId()
@@ -199,6 +203,10 @@ object StandardClassIds {
 
         val not = "not".callableId(Boolean)
     }
+
+    object Java {
+        val Record = "Record".javaLangId()
+    }
 }
 
 private fun String.baseId() = ClassId(StandardClassIds.BASE_KOTLIN_PACKAGE, Name.identifier(this))
@@ -213,6 +221,7 @@ private fun String.jvmInternalId() = ClassId(StandardClassIds.BASE_JVM_INTERNAL_
 private fun String.internalId() = ClassId(StandardClassIds.BASE_INTERNAL_PACKAGE, Name.identifier(this))
 private fun String.internalIrId() = ClassId(StandardClassIds.BASE_INTERNAL_IR_PACKAGE, Name.identifier(this))
 private fun String.coroutinesId() = ClassId(StandardClassIds.BASE_COROUTINES_PACKAGE, Name.identifier(this))
+private fun String.enumsId() = ClassId(StandardClassIds.BASE_ENUMS_PACKAGE, Name.identifier(this))
 
 private fun String.callableId(packageName: FqName) = CallableId(packageName, Name.identifier(this))
 private fun String.callableId(classId: ClassId) = CallableId(classId, Name.identifier(this))

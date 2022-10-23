@@ -26,7 +26,7 @@ internal class NativeAnnotationImplementationTransformer(context: Context, irFil
 
     override fun getArrayContentEqualsSymbol(type: IrType) =
             when {
-                type.isPrimitiveArray() -> arrayContentEqualsMap[type]
+                type.isPrimitiveArray() || type.isUnsignedArray() -> arrayContentEqualsMap[type]
                 else -> arrayContentEqualsMap.entries.singleOrNull { (k, _) -> k.isArray() }?.value
             } ?: error("Can't find an Arrays.contentEquals method for array type ${type.render()}")
 
@@ -69,7 +69,7 @@ internal class NativeAnnotationImplementationTransformer(context: Context, irFil
         properties.forEach { property ->
             generatedConstructor.addValueParameter(property.name.asString(), property.getter!!.returnType)
         }
-        createConstructorBody(generatedConstructor, annotationClass.constructors.single())
+        createConstructorBody(generatedConstructor, annotationClass.primaryConstructor ?: error("Annotation class does not have primary constructor"))
     }
 
     private fun createConstructorBody(constructor: IrConstructor, delegate: IrConstructor) {

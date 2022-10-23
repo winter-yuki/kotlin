@@ -34,8 +34,6 @@ fun foo(n :Int ) : Int {
 // test.kt:11 foo
 // test.kt:8 foo
 // test.kt:9 foo
-// test.kt:9 foo
 // test.kt:11 foo
 // test.kt:11 foo
-// test.kt:11 foo
-// test.kt:11 foo
+// test.kt:5 box

@@ -30,12 +30,11 @@ import org.jetbrains.kotlin.analysis.api.lifetime.withValidityAssertion
 import org.jetbrains.kotlin.analysis.low.level.api.fir.api.LLFirResolveSession
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.descriptors.Visibility
-import org.jetbrains.kotlin.fir.containingClass
-import org.jetbrains.kotlin.fir.declarations.FirDeclarationOrigin
+import org.jetbrains.kotlin.fir.containingClassLookupTag
 import org.jetbrains.kotlin.fir.declarations.FirResolvePhase
 import org.jetbrains.kotlin.fir.declarations.synthetic.FirSyntheticProperty
 import org.jetbrains.kotlin.fir.declarations.utils.*
-import org.jetbrains.kotlin.fir.symbols.ensureResolved
+import org.jetbrains.kotlin.fir.symbols.lazyResolveToPhase
 import org.jetbrains.kotlin.fir.symbols.impl.FirPropertySymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirSyntheticPropertySymbol
 import org.jetbrains.kotlin.fir.symbols.impl.isExtension
@@ -68,11 +67,11 @@ internal class KtFirKotlinPropertySymbol(
     override val contextReceivers: List<KtContextReceiver> by cached { firSymbol.createContextReceivers(builder) }
 
     override val isExtension: Boolean get() = withValidityAssertion { firSymbol.isExtension }
-    override val initializer: KtInitializerValue? by cached { firSymbol.getKtConstantInitializer() }
+    override val initializer: KtInitializerValue? by cached { firSymbol.getKtConstantInitializer(firResolveSession) }
 
     override val symbolKind: KtSymbolKind
         get() = withValidityAssertion {
-            when (firSymbol.containingClass()?.classId) {
+            when (firSymbol.containingClassLookupTag()?.classId) {
                 null -> KtSymbolKind.TOP_LEVEL
                 else -> KtSymbolKind.CLASS_MEMBER
             }
@@ -100,7 +99,7 @@ internal class KtFirKotlinPropertySymbol(
     // NB: `field` in accessors indicates the property should have a backing field. To see that, though, we need BODY_RESOLVE.
     override val hasBackingField: Boolean
         get() = withValidityAssertion {
-            firSymbol.ensureResolved(FirResolvePhase.BODY_RESOLVE)
+            firSymbol.lazyResolveToPhase(FirResolvePhase.BODY_RESOLVE)
             firSymbol.fir.hasBackingField
         }
     override val isLateInit: Boolean get() = withValidityAssertion { firSymbol.isLateInit }
@@ -119,15 +118,13 @@ internal class KtFirKotlinPropertySymbol(
     override val hasSetter: Boolean get() = withValidityAssertion { firSymbol.setterSymbol != null }
 
     override fun createPointer(): KtSymbolPointer<KtKotlinPropertySymbol> = withValidityAssertion {
-        if (firSymbol.fir.origin != FirDeclarationOrigin.SubstitutionOverride) {
-            KtPsiBasedSymbolPointer.createForSymbolFromSource(this)?.let { return it }
-        }
+        KtPsiBasedSymbolPointer.createForSymbolFromSource(this)?.let { return it }
 
         return when (symbolKind) {
             KtSymbolKind.TOP_LEVEL -> TODO("Creating symbol for top level properties is not supported yet")
             KtSymbolKind.CLASS_MEMBER ->
                 KtFirMemberPropertySymbolPointer(
-                    firSymbol.containingClass()?.classId ?: error("ClassId should not be null for member property"),
+                    firSymbol.containingClassLookupTag()?.classId ?: error("ClassId should not be null for member property"),
                     firSymbol.name,
                     firSymbol.createSignature()
                 )

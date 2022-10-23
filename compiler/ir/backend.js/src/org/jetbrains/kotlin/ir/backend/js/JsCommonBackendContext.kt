@@ -17,12 +17,10 @@ import org.jetbrains.kotlin.incremental.components.NoLookupLocation
 import org.jetbrains.kotlin.ir.ObsoleteDescriptorBasedAPI
 import org.jetbrains.kotlin.ir.backend.js.utils.isDispatchReceiver
 import org.jetbrains.kotlin.ir.declarations.*
+import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
 import org.jetbrains.kotlin.ir.types.IrType
-import org.jetbrains.kotlin.ir.util.SymbolTable
-import org.jetbrains.kotlin.ir.util.getPropertyGetter
-import org.jetbrains.kotlin.ir.util.getPropertySetter
-import org.jetbrains.kotlin.ir.util.isOverridableOrOverrides
+import org.jetbrains.kotlin.ir.util.*
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.resolve.scopes.MemberScope
@@ -46,7 +44,11 @@ interface JsCommonBackendContext : CommonBackendContext {
     val suiteFun: IrSimpleFunctionSymbol?
     val testFun: IrSimpleFunctionSymbol?
 
+    val enumEntries: IrClassSymbol
+    val createEnumEntries: IrSimpleFunctionSymbol
+
     fun createTestContainerFun(irFile: IrFile): IrSimpleFunction
+
 }
 
 // TODO: investigate if it could be removed

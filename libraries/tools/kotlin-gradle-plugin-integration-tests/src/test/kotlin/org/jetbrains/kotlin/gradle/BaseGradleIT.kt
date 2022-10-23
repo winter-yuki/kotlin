@@ -24,6 +24,7 @@ import org.jetbrains.kotlin.konan.target.KonanTarget
 import org.jetbrains.kotlin.test.RunnerWithMuteInDatabase
 import org.junit.After
 import org.junit.AfterClass
+import org.junit.Assume
 import org.junit.Before
 import org.junit.runner.RunWith
 import java.io.File
@@ -243,6 +244,8 @@ abstract class BaseGradleIT {
                 "Could not stop some daemons ${(DaemonRegistry.activeDaemons).joinToString()}"
             }
         }
+
+        fun hostHaveUnsupportedTarget() = Assume.assumeFalse(HostManager.hostIsMac)
     }
 
     // the second parameter is for using with ToolingAPI, that do not like --daemon/--no-daemon  options at all
@@ -287,7 +290,6 @@ abstract class BaseGradleIT {
 
     data class KaptOptions(
         val verbose: Boolean,
-        val useWorkers: Boolean,
         val incrementalKapt: Boolean = false,
         val includeCompileClasspath: Boolean = true,
         val classLoadersCacheSize: Int? = null
@@ -425,12 +427,16 @@ abstract class BaseGradleIT {
             result = runProcess(cmd, projectDir, env, buildOptions)
             CompiledProject(this, result.output, result.exitCode).check()
         } catch (t: Throwable) {
-            println("<=== Test build: ${this.projectName} $cmd ===>")
+            println("<=== Test build: $projectName $cmd ===>")
 
             // to prevent duplication of output
             if (!options.forceOutputToStdout && result != null) {
-                println(result.output)
+                result.output
+                    .split("\n")
+                    .map { "    |test output $projectName|$it" }
+                    .forEach(::println)
             }
+
             throw t
         }
     }
@@ -550,6 +556,12 @@ abstract class BaseGradleIT {
 
     fun CompiledProject.assertFileExists(path: String = ""): CompiledProject {
         assertTrue(fileInWorkingDir(path).exists(), "The file [$path] does not exist.")
+        return this
+    }
+
+    fun CompiledProject.assertDirectoryExists(path: String): CompiledProject {
+        assertFileExists(path)
+        assertTrue(fileInWorkingDir(path).isDirectory, "$path is not a directory")
         return this
     }
 
@@ -869,6 +881,8 @@ Finished executing task ':$taskName'|
             options.incrementalJs?.let { add("-Pkotlin.incremental.js=$it") }
             options.incrementalJsKlib?.let { add("-Pkotlin.incremental.js.klib=$it") }
             options.jsIrBackend?.let { add("-Pkotlin.js.useIrBackend=$it") }
+            // because we have legacy compiler tests, we need nowarn for compiler testing
+            add("-Pkotlin.js.compiler.nowarn=true")
             options.usePreciseJavaTracking?.let { add("-Pkotlin.incremental.usePreciseJavaTracking=$it") }
             options.useClasspathSnapshot?.let { add("-P${COMPILE_INCREMENTAL_WITH_ARTIFACT_TRANSFORM.property}=$it") }
             options.androidGradlePluginVersion?.let { add("-Pandroid_tools_version=$it") }
@@ -891,7 +905,6 @@ Finished executing task ':$taskName'|
 
             options.kaptOptions?.also { kaptOptions ->
                 add("-Pkapt.verbose=${kaptOptions.verbose}")
-                add("-Pkapt.use.worker.api=${kaptOptions.useWorkers}")
                 add("-Pkapt.incremental.apt=${kaptOptions.incrementalKapt}")
                 add("-Pkapt.include.compile.classpath=${kaptOptions.includeCompileClasspath}")
                 kaptOptions.classLoadersCacheSize?.also { cacheSize ->
@@ -940,11 +953,7 @@ Finished executing task ':$taskName'|
             //The feature of failing the build on deprecation warnings is introduced in gradle 5.6
             val supportFailingBuildOnWarning =
                 GradleVersion.version(chooseWrapperVersionOrFinishTest()) >= GradleVersion.version("5.6")
-            // Agp uses Gradle internal API constructor DefaultDomainObjectSet(Class<T>) until Agp 3.6.0 which is deprecated by Gradle,
-            // so we don't run with --warning-mode=fail when Agp 3.6 or less is used.
-            val notUsingAgpWithWarnings =
-                options.androidGradlePluginVersion == null || options.androidGradlePluginVersion > AGPVersion.v3_6_0
-            if (supportFailingBuildOnWarning && notUsingAgpWithWarnings && options.warningMode == WarningMode.Fail) {
+            if (supportFailingBuildOnWarning && options.warningMode == WarningMode.Fail) {
                 add("--warning-mode=${WarningMode.Fail.name.lowercase(Locale.getDefault())}")
             }
             addAll(options.freeCommandLineArgs)
@@ -955,6 +964,7 @@ Finished executing task ':$taskName'|
             options.androidHome?.let { sdkDir ->
                 sdkDir.parentFile.mkdirs()
                 put("ANDROID_HOME", sdkDir.canonicalPath)
+                put("ANDROID_SDK_ROOT", sdkDir.canonicalPath)
             }
 
             options.javaHome?.let {

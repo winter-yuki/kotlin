@@ -3,9 +3,9 @@ plugins {
 }
 
 tasks.register("analysisAllTests") {
-    dependsOn(":dist")
     dependsOn(
         ":analysis:decompiled:decompiler-to-file-stubs:test",
+        ":analysis:decompiled:decompiler-to-psi:test",
         ":analysis:analysis-api:test",
         ":analysis:analysis-api-fir:test",
         ":analysis:analysis-api-fe10:test",

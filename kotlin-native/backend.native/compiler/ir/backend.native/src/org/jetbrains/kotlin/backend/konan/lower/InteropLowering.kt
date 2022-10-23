@@ -6,7 +6,6 @@
 package org.jetbrains.kotlin.backend.konan.lower
 
 import org.jetbrains.kotlin.backend.common.*
-import org.jetbrains.kotlin.backend.common.ir.*
 import org.jetbrains.kotlin.backend.common.lower.*
 import org.jetbrains.kotlin.backend.konan.*
 import org.jetbrains.kotlin.backend.konan.cgen.*
@@ -36,6 +35,9 @@ import org.jetbrains.kotlin.ir.symbols.impl.IrSimpleFunctionSymbolImpl
 import org.jetbrains.kotlin.ir.symbols.impl.IrValueParameterSymbolImpl
 import org.jetbrains.kotlin.ir.types.*
 import org.jetbrains.kotlin.ir.util.*
+import org.jetbrains.kotlin.ir.visitors.IrElementVisitorVoid
+import org.jetbrains.kotlin.ir.visitors.acceptChildrenVoid
+import org.jetbrains.kotlin.ir.visitors.acceptVoid
 import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
@@ -69,9 +71,10 @@ private abstract class BaseInteropIrTransformer(private val context: Context) : 
 
         val uniqueModuleName = irFile.packageFragmentDescriptor.module.name.asString()
                 .let { it.substring(1, it.lastIndex) }
+        val uniqueFileName = irFile.fileEntry.name
         val uniquePrefix = buildString {
             append('_')
-            uniqueModuleName.toByteArray().joinTo(this, "") {
+            (uniqueModuleName + uniqueFileName).toByteArray().joinTo(this, "") {
                 (0xFF and it.toInt()).toString(16).padStart(2, '0')
             }
             append('_')
@@ -94,11 +97,11 @@ private abstract class BaseInteropIrTransformer(private val context: Context) : 
             }
 
             override fun addC(lines: List<String>) {
-                context.cStubsManager.addStub(location, lines, language)
+                context.generationState.cStubsManager.addStub(location, lines, language)
             }
 
             override fun getUniqueCName(prefix: String) =
-                    "$uniquePrefix${context.cStubsManager.getUniqueName(prefix)}"
+                    "$uniquePrefix${context.generationState.cStubsManager.getUniqueName(prefix)}"
 
             override fun getUniqueKotlinFunctionReferenceClassName(prefix: String) =
                     "$prefix${context.functionReferenceCount++}"
@@ -127,7 +130,7 @@ private class InteropLoweringPart1(val context: Context) : BaseInteropIrTransfor
 
     lateinit var currentFile: IrFile
 
-    private val topLevelInitializers = mutableListOf<IrExpression>()
+    private val eagerTopLevelInitializers = mutableListOf<IrExpression>()
     private val newTopLevelDeclarations = mutableListOf<IrDeclaration>()
 
     override val irFile: IrFile
@@ -142,8 +145,8 @@ private class InteropLoweringPart1(val context: Context) : BaseInteropIrTransfor
         currentFile = irFile
         irFile.transformChildrenVoid(this)
 
-        topLevelInitializers.forEach { irFile.addTopLevelInitializer(it, context, false) }
-        topLevelInitializers.clear()
+        eagerTopLevelInitializers.forEach { irFile.addTopLevelInitializer(it, context, threadLocal = false, eager = true) }
+        eagerTopLevelInitializers.clear()
 
         irFile.addChildren(newTopLevelDeclarations)
         newTopLevelDeclarations.clear()
@@ -191,7 +194,7 @@ private class InteropLoweringPart1(val context: Context) : BaseInteropIrTransfor
 
         if (irClass.annotations.hasAnnotation(interop.exportObjCClass.fqNameSafe)) {
             val irBuilder = context.createIrBuilder(currentFile.symbol).at(irClass)
-            topLevelInitializers.add(irBuilder.getObjCClass(symbols, irClass.symbol))
+            eagerTopLevelInitializers.add(irBuilder.getObjCClass(symbols, irClass.symbol))
         }
     }
 
@@ -534,7 +537,7 @@ private class InteropLoweringPart1(val context: Context) : BaseInteropIrTransfor
     ): IrExpression = generateWithStubs(call) {
         if (method.parent !is IrClass) {
             // Category-provided.
-            this@InteropLoweringPart1.context.llvmImports.add(method.llvmSymbolOrigin)
+            this@InteropLoweringPart1.context.generationState.llvmImports.add(method.llvmSymbolOrigin)
         }
 
         this.generateObjCCall(
@@ -678,6 +681,42 @@ private class InteropLoweringPart1(val context: Context) : BaseInteropIrTransfor
             declaration
         } else {
             super.visitProperty(declaration)
+        }
+    }
+
+    override fun visitBlock(expression: IrBlock): IrExpression {
+        if (expression is IrReturnableBlock && expression.inlineFunctionSymbol?.isAutoreleasepool() == true) {
+            // Prohibit calling suspend functions from `autoreleasepool {}` block.
+            // See https://youtrack.jetbrains.com/issue/KT-50786 for more details.
+            // Note: we can't easily check this in frontend, because we need to prohibit indirect cases like
+            ///    inline fun <T> myAutoreleasepool(block: () -> T) = autoreleasepool(block)
+            ///    myAutoreleasepool { suspendHere() }
+
+            expression.acceptVoid(object : IrElementVisitorVoid {
+                override fun visitElement(element: IrElement) {
+                    element.acceptChildrenVoid(this)
+                }
+
+                override fun visitCall(expression: IrCall) {
+                    super.visitCall(expression)
+
+                    if (expression.symbol.owner.isSuspend) {
+                        context.reportCompilationError(
+                                "Calling suspend functions from `autoreleasepool {}` is prohibited, " +
+                                        "see https://youtrack.jetbrains.com/issue/KT-50786",
+                                currentFile,
+                                expression
+                        )
+                    }
+                }
+            })
+        }
+        return super.visitBlock(expression)
+    }
+
+    private fun IrFunctionSymbol.isAutoreleasepool(): Boolean {
+        return this.owner.name.asString() == "autoreleasepool" && this.owner.parent.let { parent ->
+            parent is IrPackageFragment && parent.fqName == InteropFqNames.packageName
         }
     }
 
@@ -962,7 +1001,7 @@ private class InteropTransformer(val context: Context, override val irFile: IrFi
     private fun generateCCall(expression: IrCall): IrExpression {
         val function = expression.symbol.owner
 
-        context.llvmImports.add(function.llvmSymbolOrigin)
+        context.generationState.llvmImports.add(function.llvmSymbolOrigin)
         val exceptionMode = ForeignExceptionMode.byValue(
                 function.konanLibrary?.manifestProperties?.getProperty(ForeignExceptionMode.manifestKey)
         )

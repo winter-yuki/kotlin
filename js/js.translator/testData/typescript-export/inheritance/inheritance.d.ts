@@ -2,8 +2,8 @@ declare namespace JS_TESTS {
     type Nullable<T> = T | null | undefined
     namespace foo {
         interface I<T, S, U> {
-            x: T;
-            readonly y: S;
+            x?: T;
+            readonly y?: S;
             z(u: U): void;
         }
         interface I2 {
@@ -13,6 +13,7 @@ declare namespace JS_TESTS {
         }
     }
     namespace foo {
+        const fifth: (foo.Third<boolean> & foo.IA & foo.IG<boolean>)/* foo.Fifth<boolean> */;
         abstract class AC implements foo.I2 {
             constructor();
             get x(): string;
@@ -100,5 +101,31 @@ declare namespace JS_TESTS {
             abstract get baz(): string;
             readonly __doNotUseOrImplementIt: foo.I3["__doNotUseOrImplementIt"];
         }
+        interface IA {
+            readonly foo: any;
+            readonly __doNotUseOrImplementIt: {
+                readonly "foo.IA": unique symbol;
+            };
+        }
+        interface IG<T> {
+            process(value: T): void;
+            readonly __doNotUseOrImplementIt: {
+                readonly "foo.IG": unique symbol;
+            };
+        }
+        class Third<T> extends /* foo.Second */ foo.First {
+            constructor();
+        }
+        class Sixth extends /* foo.Fifth<number> */ foo.Third<number> implements foo.IA, foo.IG<number>/*, foo.IC */ {
+            constructor();
+            process(value: number): void;
+            get foo(): number;
+            readonly __doNotUseOrImplementIt: foo.IA["__doNotUseOrImplementIt"] & foo.IG<number>["__doNotUseOrImplementIt"];
+        }
+        class First {
+            constructor();
+        }
+        function acceptForthLike<T extends (foo.Third<string> & foo.IA)/* foo.Forth<string> */>(forth: T): void;
+        function acceptMoreGenericForthLike<T extends foo.IA/* foo.IB */ & foo.IA/* foo.IC */ & foo.First/* foo.Second */>(forth: T): void;
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2021 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2022 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -31,7 +31,7 @@ sealed class FirCallableDeclaration : FirMemberDeclaration() {
     abstract override val status: FirDeclarationStatus
     abstract val returnTypeRef: FirTypeRef
     abstract val receiverTypeRef: FirTypeRef?
-    abstract val deprecation: DeprecationsPerUseSite?
+    abstract val deprecationsProvider: DeprecationsProvider
     abstract override val symbol: FirCallableSymbol<out FirCallableDeclaration>
     abstract val containerSource: DeserializedContainerSource?
     abstract val dispatchReceiverType: ConeSimpleKotlinType?
@@ -49,7 +49,7 @@ sealed class FirCallableDeclaration : FirMemberDeclaration() {
 
     abstract fun replaceReceiverTypeRef(newReceiverTypeRef: FirTypeRef?)
 
-    abstract fun replaceDeprecation(newDeprecation: DeprecationsPerUseSite?)
+    abstract fun replaceDeprecationsProvider(newDeprecationsProvider: DeprecationsProvider)
 
     abstract fun replaceContextReceivers(newContextReceivers: List<FirContextReceiver>)
 

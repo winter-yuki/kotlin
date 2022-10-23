@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2022 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -32,6 +32,7 @@ import org.jetbrains.kotlin.fir.tree.generator.FieldSets.valueParameters
 import org.jetbrains.kotlin.fir.tree.generator.FieldSets.visibility
 import org.jetbrains.kotlin.fir.tree.generator.context.AbstractFieldConfigurator
 import org.jetbrains.kotlin.fir.tree.generator.context.AbstractFirTreeBuilder
+import org.jetbrains.kotlin.fir.tree.generator.context.AbstractFirTreeBuilder.Companion.baseFirElement
 import org.jetbrains.kotlin.fir.tree.generator.context.type
 import org.jetbrains.kotlin.fir.tree.generator.model.*
 import org.jetbrains.kotlin.serialization.deserialization.descriptors.DeserializedContainerSource
@@ -88,7 +89,7 @@ object NodeConfigurator : AbstractFieldConfigurator<FirTreeBuilder>(FirTreeBuild
         callableDeclaration.configure {
             +field("returnTypeRef", typeRef, withReplace = true).withTransform()
             +field("receiverTypeRef", typeRef, nullable = true, withReplace = true).withTransform()
-            +field("deprecation", deprecationsPerUseSiteType, nullable = true).withReplace().apply { isMutable = true }
+            +field("deprecationsProvider", deprecationsProviderType).withReplace().apply { isMutable = true }
             +symbol("FirCallableSymbol", "out FirCallableDeclaration")
 
             +field("containerSource", type(DeserializedContainerSource::class), nullable = true)
@@ -105,6 +106,7 @@ object NodeConfigurator : AbstractFieldConfigurator<FirTreeBuilder>(FirTreeBuild
 
         errorExpression.configure {
             +field("expression", expression, nullable = true)
+            +field("nonExpressionElement", baseFirElement, nullable = true)
         }
 
         errorFunction.configure {
@@ -245,7 +247,7 @@ object NodeConfigurator : AbstractFieldConfigurator<FirTreeBuilder>(FirTreeBuild
 
         classLikeDeclaration.configure {
             +symbol("FirClassLikeSymbol", "out FirClassLikeDeclaration")
-            +field("deprecation", deprecationsPerUseSiteType, nullable = true).withReplace().apply { isMutable = true}
+            +field("deprecationsProvider", deprecationsProviderType).withReplace().apply { isMutable = true}
         }
 
         klass.configure {
@@ -325,6 +327,7 @@ object NodeConfigurator : AbstractFieldConfigurator<FirTreeBuilder>(FirTreeBuild
         }
 
         property.configure {
+            +fieldList(contextReceiver, withReplace = true).withTransform()
             +symbol("FirPropertySymbol")
             +field("delegateFieldSymbol", delegateFieldSymbolType, nullable = true)
             +booleanField("isLocal")
@@ -334,7 +337,7 @@ object NodeConfigurator : AbstractFieldConfigurator<FirTreeBuilder>(FirTreeBuild
 
         propertyAccessor.configure {
             +symbol("FirPropertyAccessorSymbol")
-            +field("propertySymbol", firPropertySymbolType, nullable = true).apply {
+            +field("propertySymbol", firPropertySymbolType).apply {
                 withBindThis = false
             }
             +booleanField("isGetter")
@@ -468,6 +471,10 @@ object NodeConfigurator : AbstractFieldConfigurator<FirTreeBuilder>(FirTreeBuild
             +field("argumentMapping", annotationArgumentMapping, withReplace = true)
         }
 
+        errorAnnotationCall.configure {
+            +field("argumentMapping", annotationArgumentMapping, withReplace = true)
+        }
+
         annotationArgumentMapping.configure {
             +field("mapping", type("Map") to listOf(nameType, expression))
         }
@@ -490,29 +497,14 @@ object NodeConfigurator : AbstractFieldConfigurator<FirTreeBuilder>(FirTreeBuild
             +intField("componentIndex")
         }
 
-        wrappedExpressionWithSmartcast.configure {
-            withArg("E", expression)
+        smartCastExpression.configure {
             +typeRefField
-            +field("originalExpression", "E", packageName = null)
+            +field("originalExpression", expression).withTransform()
             +field("typesFromSmartCast", "Collection<ConeKotlinType>", null, customType = coneKotlinTypeType)
-            +field("originalType", typeRef)
             +field("smartcastType", typeRef)
+            +field("smartcastTypeWithoutNullableNothing", typeRef, nullable = true)
             +booleanField("isStable")
             +smartcastStability
-        }
-
-        wrappedExpressionWithSmartcastToNothing.configure {
-            withArg("E", expression)
-            parentArg(wrappedExpressionWithSmartcast, "E", "E")
-            +field("smartcastTypeWithoutNullableNothing", typeRef)
-        }
-
-        expressionWithSmartcast.configure {
-            parentArg(wrappedExpressionWithSmartcast, "E", qualifiedAccessExpression)
-        }
-
-        expressionWithSmartcastToNothing.configure {
-            parentArg(wrappedExpressionWithSmartcastToNothing, "E", qualifiedAccessExpression)
         }
 
         safeCallExpression.configure {
@@ -579,14 +571,6 @@ object NodeConfigurator : AbstractFieldConfigurator<FirTreeBuilder>(FirTreeBuild
 
         whenSubjectExpression.configure {
             +field("whenRef", whenRefType)
-        }
-
-        whenSubjectExpressionWithSmartcast.configure {
-            parentArg(wrappedExpressionWithSmartcast, "E", whenSubjectExpression)
-        }
-
-        whenSubjectExpressionWithSmartcastToNothing.configure {
-            parentArg(wrappedExpressionWithSmartcastToNothing, "E", whenSubjectExpression)
         }
 
         wrappedExpression.configure {

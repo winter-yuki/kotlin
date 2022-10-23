@@ -62,7 +62,7 @@ internal fun irBuilder(
 
 private var topLevelInitializersCounter = 0
 
-internal fun IrFile.addTopLevelInitializer(expression: IrExpression, context: KonanBackendContext, threadLocal: Boolean) {
+internal fun IrFile.addTopLevelInitializer(expression: IrExpression, context: KonanBackendContext, threadLocal: Boolean, eager: Boolean) {
     val irField = IrFieldImpl(
             expression.startOffset, expression.endOffset,
             IrDeclarationOrigin.DEFINED,
@@ -78,6 +78,9 @@ internal fun IrFile.addTopLevelInitializer(expression: IrExpression, context: Ko
 
         if (threadLocal)
             annotations += buildSimpleAnnotation(context.irBuiltIns, startOffset, endOffset, context.ir.symbols.threadLocal.owner)
+
+        if (eager)
+            annotations += buildSimpleAnnotation(context.irBuiltIns, startOffset, endOffset, context.ir.symbols.eagerInitialization.owner)
 
         initializer = IrExpressionBodyImpl(startOffset, endOffset, expression)
     }
@@ -111,24 +114,6 @@ fun IrDeclarationContainer.addChildren(declarations: List<IrDeclaration>) {
 fun IrDeclarationContainer.addChild(declaration: IrDeclaration) {
     this.declarations += declaration
     declaration.accept(SetDeclarationsParentVisitor, this)
-}
-
-fun <T: IrElement> T.setDeclarationsParent(parent: IrDeclarationParent): T {
-    accept(SetDeclarationsParentVisitor, parent)
-    return this
-}
-
-object SetDeclarationsParentVisitor : IrElementVisitor<Unit, IrDeclarationParent> {
-    override fun visitElement(element: IrElement, data: IrDeclarationParent) {
-        if (element !is IrDeclarationParent) {
-            element.acceptChildren(this, data)
-        }
-    }
-
-    override fun visitDeclaration(declaration: IrDeclarationBase, data: IrDeclarationParent) {
-        declaration.parent = data
-        super.visitDeclaration(declaration, data)
-    }
 }
 
 tailrec fun IrDeclaration.getContainingFile(): IrFile? {

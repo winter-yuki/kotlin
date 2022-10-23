@@ -41,7 +41,7 @@ sourceSets["main"].withConvention(KotlinSourceSet::class) {
 
 tasks.withType<KotlinCompile> {
     kotlinOptions.jvmTarget = "1.8"
-    kotlinOptions.freeCompilerArgs = listOf("-Xskip-prerelease-check")
+    kotlinOptions.freeCompilerArgs += listOf("-Xskip-prerelease-check")
 }
 
 tasks.jar {
@@ -51,8 +51,8 @@ tasks.jar {
 dependencies {
     kotlinCompilerClasspath("org.jetbrains.kotlin:kotlin-compiler-embeddable:$kotlinVersion")
 
-    implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
-    implementation("org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion")
+    implementation(kotlinStdlib())
+    implementation(commonDependency("org.jetbrains.kotlin:kotlin-reflect")) { isTransitive = false }
     api("org.jetbrains.kotlin:kotlin-native-utils:$kotlinVersion")
     api("org.jetbrains.kotlin:kotlin-util-klib:$kotlinVersion")
 }

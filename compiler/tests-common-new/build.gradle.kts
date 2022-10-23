@@ -7,14 +7,13 @@ plugins {
 
 dependencies {
     testApi(project(":compiler:fir:entrypoint"))
+    testApi(project(":compiler:fir:fir-serialization"))
     testApi(project(":compiler:cli"))
     testImplementation(project(":compiler:ir.tree"))
     testImplementation(project(":compiler:backend.jvm.entrypoint"))
     testImplementation(project(":compiler:backend.jvm.lower"))
     testImplementation(intellijCore())
 
-    testCompileOnly(project(":kotlin-reflect-api"))
-    testRuntimeOnly(project(":kotlin-reflect"))
     testRuntimeOnly(project(":core:descriptors.runtime"))
 
     testImplementation(projectTests(":generators:test-generator"))
@@ -23,7 +22,6 @@ dependencies {
     testApi(projectTests(":compiler:test-infrastructure"))
     testApi(projectTests(":compiler:test-infrastructure-utils"))
     testApi(projectTests(":compiler:tests-compiler-utils"))
-    testApi(projectTests(":compiler:tests-common-jvm6"))
 
     /*
      * Actually those dependencies are needed only at runtime, but they
@@ -42,24 +40,20 @@ dependencies {
 
 optInToExperimentalCompilerApi()
 
-val generationRoot = projectDir.resolve("tests-gen")
-
 sourceSets {
     "main" { none() }
     "test" {
         projectDefault()
-        this.java.srcDir(generationRoot.name)
+        generatedTestDir()
     }
 }
 
-if (kotlinBuildProperties.isInJpsBuildIdeaSync) {
-    apply(plugin = "idea")
-    idea {
-        this.module.generatedSourceDirs.add(generationRoot)
-    }
-}
-
-projectTest(jUnitMode = JUnitMode.JUnit5) {
+projectTest(
+    jUnitMode = JUnitMode.JUnit5,
+    defineJDKEnvVariables = listOf(
+        JdkMajorVersion.JDK_11_0 // e.g. org.jetbrains.kotlin.test.runners.ForeignAnnotationsCompiledJavaTestGenerated.Java11Tests
+    )
+) {
     dependsOn(":dist")
     workingDir = rootDir
     useJUnitPlatform()

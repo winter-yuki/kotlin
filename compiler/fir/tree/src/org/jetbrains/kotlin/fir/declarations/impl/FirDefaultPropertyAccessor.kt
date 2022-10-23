@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2022 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -7,7 +7,6 @@ package org.jetbrains.kotlin.fir.declarations.impl
 
 import org.jetbrains.kotlin.KtFakeSourceElementKind
 import org.jetbrains.kotlin.KtSourceElement
-import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.descriptors.EffectiveVisibility
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.descriptors.Visibility
@@ -43,7 +42,7 @@ abstract class FirDefaultPropertyAccessor(
 ) : FirPropertyAccessorImpl(
     source,
     moduleData,
-    resolvePhase = if (effectiveVisibility != null) FirResolvePhase.BODY_RESOLVE else FirResolvePhase.TYPES,
+    resolvePhase = FirResolvePhase.RAW_FIR,
     origin,
     FirDeclarationAttributes(),
     status = if (effectiveVisibility == null)
@@ -51,7 +50,7 @@ abstract class FirDefaultPropertyAccessor(
     else
         FirResolvedDeclarationStatusImpl(visibility, modality, effectiveVisibility),
     propertyTypeRef,
-    deprecation = null,
+    deprecationsProvider = UnresolvedDeprecationProvider,
     containerSource = null,
     dispatchReceiverType = null,
     contextReceivers = mutableListOf(),
@@ -64,12 +63,8 @@ abstract class FirDefaultPropertyAccessor(
     annotations = mutableListOf(),
     typeParameters = mutableListOf(),
 ) {
-    override var resolvePhase
-        get() = if (status is FirResolvedDeclarationStatus) FirResolvePhase.BODY_RESOLVE else FirResolvePhase.TYPES
-        set(_) {}
-
     override val dispatchReceiverType: ConeSimpleKotlinType?
-        get() = propertySymbol?.dispatchReceiverType
+        get() = propertySymbol.dispatchReceiverType
 
     final override var body: FirBlock?
         get() = null

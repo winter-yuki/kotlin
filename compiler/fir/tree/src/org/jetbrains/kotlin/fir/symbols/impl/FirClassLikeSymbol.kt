@@ -5,11 +5,12 @@
 
 package org.jetbrains.kotlin.fir.symbols.impl
 
+import org.jetbrains.kotlin.config.ApiVersion
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.symbols.ConeClassLikeLookupTag
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
-import org.jetbrains.kotlin.fir.symbols.ensureResolved
+import org.jetbrains.kotlin.fir.symbols.lazyResolveToPhase
 import org.jetbrains.kotlin.fir.types.ConeKotlinType
 import org.jetbrains.kotlin.fir.types.FirResolvedTypeRef
 import org.jetbrains.kotlin.fir.types.coneType
@@ -24,11 +25,10 @@ sealed class FirClassLikeSymbol<D : FirClassLikeDeclaration>(
 
     val name get() = classId.shortClassName
 
-    val deprecation: DeprecationsPerUseSite?
-        get() {
-            ensureResolved(FirResolvePhase.COMPILER_REQUIRED_ANNOTATIONS)
-            return fir.deprecation
-        }
+    fun getDeprecation(apiVersion: ApiVersion): DeprecationsPerUseSite? {
+        lazyResolveToPhase(FirResolvePhase.COMPILER_REQUIRED_ANNOTATIONS)
+        return fir.deprecationsProvider.getDeprecationsInfo(apiVersion)
+    }
 
     val rawStatus: FirDeclarationStatus
         get() = fir.status
@@ -45,7 +45,7 @@ sealed class FirClassSymbol<C : FirClass>(classId: ClassId) : FirClassLikeSymbol
 
     val resolvedSuperTypeRefs: List<FirResolvedTypeRef>
         get() {
-            ensureResolved(FirResolvePhase.SUPER_TYPES)
+            lazyResolveToPhase(FirResolvePhase.SUPER_TYPES)
             @Suppress("UNCHECKED_CAST")
             return fir.superTypeRefs as List<FirResolvedTypeRef>
         }
@@ -68,7 +68,7 @@ sealed class FirClassSymbol<C : FirClass>(classId: ClassId) : FirClassLikeSymbol
 
     val resolvedStatus: FirResolvedDeclarationStatus
         get() {
-            ensureResolved(FirResolvePhase.STATUS)
+            lazyResolveToPhase(FirResolvePhase.STATUS)
             return fir.status as FirResolvedDeclarationStatus
         }
 }
@@ -79,7 +79,7 @@ class FirRegularClassSymbol(classId: ClassId) : FirClassSymbol<FirRegularClass>(
 
     val resolvedContextReceivers: List<FirContextReceiver>
         get() {
-            ensureResolved(FirResolvePhase.TYPES)
+            lazyResolveToPhase(FirResolvePhase.TYPES)
             return fir.contextReceivers
         }
 }
@@ -93,13 +93,13 @@ class FirTypeAliasSymbol(classId: ClassId) : FirClassLikeSymbol<FirTypeAlias>(cl
 
     val resolvedStatus: FirResolvedDeclarationStatus
         get() {
-            ensureResolved(FirResolvePhase.STATUS)
+            lazyResolveToPhase(FirResolvePhase.STATUS)
             return fir.status as FirResolvedDeclarationStatus
         }
 
     val resolvedExpandedTypeRef: FirResolvedTypeRef
         get() {
-            ensureResolved(FirResolvePhase.SUPER_TYPES)
+            lazyResolveToPhase(FirResolvePhase.SUPER_TYPES)
             return fir.expandedTypeRef as FirResolvedTypeRef
         }
 

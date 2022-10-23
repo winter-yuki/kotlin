@@ -1,17 +1,6 @@
 /*
- * Copyright 2010-2017 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2022 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
+ * that can be found in the LICENSE file.
  */
 
 #if KONAN_OBJC_INTEROP
@@ -50,12 +39,6 @@ const char* Kotlin_ObjCInterop_getUniquePrefix() {
 }
 
 extern "C" id objc_msgSendSuper2(struct objc_super *super, SEL op, ...);
-
-struct KotlinObjCClassData {
-  const TypeInfo* typeInfo;
-  Class objcClass;
-  int32_t bodyOffset;
-};
 
 // Acts only as container for the method, not actually applied to any class.
 @protocol HasKotlinObjCClassData
@@ -173,9 +156,11 @@ void releaseAsAssociatedObjectImp(id self, SEL _cmd, ReleaseMode mode) {
 
 extern "C" {
 
-Class Kotlin_Interop_getObjCClass(const char* name);
-
-const TypeInfo* GetObjCKotlinTypeInfo(ObjHeader* obj) RUNTIME_NOTHROW;
+Class Kotlin_Interop_getObjCClass(const char* name) {
+    Class result = objc_lookUpClass(name);
+    RuntimeCheck(result != nil, "Objective-C class '%s' not found. Ensure that the containing framework or library was linked.", name);
+    return result;
+}
 
 RUNTIME_NOTHROW const TypeInfo* GetObjCKotlinTypeInfo(ObjHeader* obj) {
     void* objcPtr = obj->GetAssociatedObject();
@@ -218,35 +203,6 @@ static void AddKotlinClassData(bool isClassMethod, Class clazz, void* imp) {
       isClassMethod ? object_getClass((id)clazz) : clazz, selector, (IMP)imp, typeEncoding);
   RuntimeCheck(added, "Unable to add method to Objective-C class");
 }
-
-struct ObjCMethodDescription {
-  void* (*imp)(void*, void*, ...);
-  const char* selector;
-  const char* encoding;
-};
-
-struct KotlinObjCClassInfo {
-  const char* name;
-  int exported;
-
-  const char* superclassName;
-  const char** protocolNames;
-
-  const struct ObjCMethodDescription* instanceMethods;
-  int32_t instanceMethodsNum;
-
-  const struct ObjCMethodDescription* classMethods;
-  int32_t classMethodsNum;
-
-  int32_t* bodyOffset;
-
-  const TypeInfo* typeInfo;
-  const TypeInfo* metaTypeInfo;
-
-  void** createdClass;
-
-  KotlinObjCClassData* (*classDataImp)(void*, void*);
-};
 
 static void AddMethods(Class clazz, const struct ObjCMethodDescription* methods, int32_t methodsNum) {
   for (int32_t i = 0; i < methodsNum; ++i) {
@@ -293,6 +249,8 @@ void* CreateKotlinObjCClass(const KotlinObjCClassInfo* info) {
   if (createdClass != nullptr) {
     return createdClass;
   }
+
+  kotlin::NativeOrUnregisteredThreadGuard threadStateGuard(/* reentrant = */ true);
 
   Class newClass = allocateClass(info);
 
@@ -391,10 +349,6 @@ void Kotlin_objc_release(id ptr) {
   objc_release(ptr);
 }
 
-Class Kotlin_objc_lookUpClass(const char* name) {
-  return objc_lookUpClass(name);
-}
-
 } // extern "C"
 
 #else  // KONAN_OBJC_INTEROP
@@ -424,11 +378,6 @@ void* Kotlin_objc_retain(void* ptr) {
 
 void Kotlin_objc_release(void* ptr) {
   RuntimeAssert(false, "Objective-C interop is disabled");
-}
-
-void* Kotlin_objc_lookUpClass(const char* name) {
-  RuntimeAssert(false, "Objective-C interop is disabled");
-  return nullptr;
 }
 
 } // extern "C"

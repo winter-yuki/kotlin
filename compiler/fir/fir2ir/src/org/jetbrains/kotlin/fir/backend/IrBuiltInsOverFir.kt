@@ -303,6 +303,16 @@ class IrBuiltInsOverFir(
     override val primitiveIrTypes = listOf(booleanType) + primitiveIrTypesWithComparisons
     private val baseIrTypes = primitiveIrTypes + stringType
 
+    private val bitwiseOperators = arrayOf(OperatorNameConventions.AND, OperatorNameConventions.OR, OperatorNameConventions.XOR)
+    private val shiftOperators = arrayOf(OperatorNameConventions.SHL, OperatorNameConventions.SHR, OperatorNameConventions.USHR)
+    private val arithmeticOperators = arrayOf(
+        OperatorNameConventions.PLUS,
+        OperatorNameConventions.MINUS,
+        OperatorNameConventions.TIMES,
+        OperatorNameConventions.DIV,
+        OperatorNameConventions.REM
+    )
+
     private fun getPrimitiveArithmeticOperatorResultType(target: IrType, arg: IrType) =
         when {
             arg == doubleType -> arg
@@ -813,10 +823,11 @@ class IrBuiltInsOverFir(
         origin: IrDeclarationOrigin = object : IrDeclarationOriginImpl("BUILTIN_CLASS_METHOD") {},
         modality: Modality = Modality.FINAL,
         isOperator: Boolean = false,
+        isInfix: Boolean = false,
         isIntrinsicConst: Boolean = true,
         build: IrFunctionBuilder.() -> Unit = {}
     ) = parent.createFunction(
-        name, returnType, valueParameterTypes, origin, modality, isOperator, isIntrinsicConst, build
+        name, returnType, valueParameterTypes, origin, modality, isOperator, isInfix, isIntrinsicConst, build
     ).also { fn ->
         fn.addDispatchReceiver { type = this@createMemberFunction.defaultType }
         declarations.add(fn)
@@ -846,12 +857,14 @@ class IrBuiltInsOverFir(
         origin: IrDeclarationOrigin = object : IrDeclarationOriginImpl("BUILTIN_CLASS_METHOD") {},
         modality: Modality = Modality.FINAL,
         isOperator: Boolean = false,
+        isInfix: Boolean = false,
         isIntrinsicConst: Boolean = true,
         build: IrFunctionBuilder.() -> Unit = {}
     ) =
         createMemberFunction(
             name.asString(), returnType, *valueParameterTypes,
-            origin = origin, modality = modality, isOperator = isOperator, isIntrinsicConst = isIntrinsicConst, build = build
+            origin = origin, modality = modality, isOperator = isOperator, isInfix = isInfix,
+            isIntrinsicConst = isIntrinsicConst, build = build
         )
 
     private fun IrClass.configureSuperTypes(vararg superTypes: BuiltInClassValue, defaultAny: Boolean = true) {
@@ -877,6 +890,7 @@ class IrBuiltInsOverFir(
         origin: IrDeclarationOrigin = IrDeclarationOrigin.IR_EXTERNAL_DECLARATION_STUB,
         modality: Modality = Modality.FINAL,
         isOperator: Boolean = false,
+        isInfix: Boolean = false,
         isIntrinsicConst: Boolean = false,
         build: IrFunctionBuilder.() -> Unit = {}
     ) = irFactory.buildFun {
@@ -885,6 +899,7 @@ class IrBuiltInsOverFir(
         this.origin = origin
         this.modality = modality
         this.isOperator = isOperator
+        this.isInfix = isInfix
         build()
     }.also { fn ->
         valueParameterTypes.forEachIndexed { index, (pName, irType) ->
@@ -1063,13 +1078,13 @@ class IrBuiltInsOverFir(
         }
 
     private fun IrClass.createStandardBitwiseOps(thisType: IrType) {
-        for (op in arrayOf(OperatorNameConventions.AND, OperatorNameConventions.OR, OperatorNameConventions.XOR)) {
-            createMemberFunction(op, thisType, "other" to thisType, isOperator = true)
+        for (op in bitwiseOperators) {
+            createMemberFunction(op, thisType, "other" to thisType, isInfix = true)
         }
-        for (op in arrayOf(OperatorNameConventions.SHL, OperatorNameConventions.SHR, OperatorNameConventions.USHR)) {
-            createMemberFunction(op, thisType, "bitCount" to intType, isOperator = true)
+        for (op in shiftOperators) {
+            createMemberFunction(op, thisType, "bitCount" to intType, isInfix = true)
         }
-        createMemberFunction(OperatorNameConventions.INV, thisType, isOperator = true)
+        createMemberFunction(OperatorNameConventions.INV, thisType)
     }
 
     private fun IrClass.createStandardRangeMembers(thisType: IrType) {
@@ -1090,13 +1105,7 @@ class IrBuiltInsOverFir(
                 isOperator = true
             )
             val targetArithmeticReturnType = getPrimitiveArithmeticOperatorResultType(thisType, argument)
-            for (op in arrayOf(
-                OperatorNameConventions.PLUS,
-                OperatorNameConventions.MINUS,
-                OperatorNameConventions.TIMES,
-                OperatorNameConventions.DIV,
-                OperatorNameConventions.REM
-            )) {
+            for (op in arithmeticOperators) {
                 createMemberFunction(op, targetArithmeticReturnType, "other" to argument, isOperator = true)
             }
         }

@@ -117,6 +117,11 @@ object JsEnvironmentConfigurationDirectives : SimpleDirectivesContainer() {
         applicability = DirectiveApplicability.Global
     )
 
+    val GENERATE_STRICT_IMPLICIT_EXPORT by directive(
+        description = "enable strict implicitly exported entities types inside d.ts files",
+        applicability = DirectiveApplicability.Global
+    )
+
     val SAFE_EXTERNAL_BOOLEAN by directive(
         description = "",
         applicability = DirectiveApplicability.Global
@@ -205,6 +210,11 @@ object JsEnvironmentConfigurationDirectives : SimpleDirectivesContainer() {
         applicability = DirectiveApplicability.Global
     )
 
+    val ONLY_IR_DCE by directive(
+        description = "Disable non DCE build",
+        applicability = DirectiveApplicability.Global
+    )
+
     val RUN_IC by directive(
         description = "",
         applicability = DirectiveApplicability.Global
@@ -245,5 +255,10 @@ object JsEnvironmentConfigurationDirectives : SimpleDirectivesContainer() {
             Don't added helper files to prevent linking issues.
         """.trimIndent(),
         applicability = DirectiveApplicability.Global,
+    )
+
+    val KEEP by stringDirective(
+        description = "Keep declarations",
+        applicability = DirectiveApplicability.Global
     )
 }

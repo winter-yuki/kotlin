@@ -248,14 +248,9 @@ private fun DependencyHandler.testApi(dependencyNotation: Any) {
     add("testApi", dependencyNotation)
 }
 
-val Project.protobufVersion: String get() = findProperty("versions.protobuf") as String
-
-val Project.protobufRepo: String
-    get() =
-        "https://teamcity.jetbrains.com/guestAuth/app/rest/builds/buildType:(id:Kotlin_Protobuf),status:SUCCESS,pinned:true,tag:$protobufVersion/artifacts/content/internal/repo/"
-
-fun Project.protobufLite(): String = "org.jetbrains.kotlin:protobuf-lite:$protobufVersion"
-fun Project.protobufFull(): String = "org.jetbrains.kotlin:protobuf-relocated:$protobufVersion"
+val Project.protobufRelocatedVersion: String get() = findProperty("versions.protobuf-relocated") as String
+fun Project.protobufLite(): String = "org.jetbrains.kotlin:protobuf-lite:$protobufRelocatedVersion"
+fun Project.protobufFull(): String = "org.jetbrains.kotlin:protobuf-relocated:$protobufRelocatedVersion"
 fun Project.kotlinxCollectionsImmutable() =
     "org.jetbrains.kotlinx:kotlinx-collections-immutable-jvm:${rootProject.extra["versions.kotlinx-collections-immutable"]}"
 
@@ -284,7 +279,10 @@ private fun String.toMaybeVersionedJarRegex(): Regex {
     return Regex(if (hasJarExtension) escaped else "$escaped(-\\d.*)?\\.jar") // TODO: consider more precise version part of the regex
 }
 
-fun Project.firstFromJavaHomeThatExists(vararg paths: String, jdkHome: File = File(this.property("JDK_18") as String)): File? =
+fun Project.firstFromJavaHomeThatExists(
+    vararg paths: String,
+    jdkHome: File = File((this.property("JDK_1_8") ?: this.property("JDK_18") ?: error("Can't find JDK_1_8 property")) as String)
+): File? =
     paths.map { File(jdkHome, it) }.firstOrNull { it.exists() }.also {
         if (it == null)
             logger.warn("Cannot find file by paths: ${paths.toList()} in $jdkHome")
@@ -297,7 +295,7 @@ fun Project.toolsJarApi(): Any =
         dependencies.project(":dependencies:tools-jar-api")
 
 fun Project.toolsJar(): FileCollection = files(
-    getToolchainLauncherFor(JdkMajorVersion.JDK_1_8)
+    getToolchainLauncherFor(DEFAULT_JVM_TOOLCHAIN)
         .map {
             Jvm.forHome(it.metadata.installationPath.asFile).toolsJar ?: throw GradleException("tools.jar not found!")
         }

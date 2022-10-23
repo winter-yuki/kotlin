@@ -6,6 +6,7 @@
 package kotlin.native
 
 import kotlin.experimental.ExperimentalObjCName
+import kotlin.experimental.ExperimentalObjCRefinement
 
 /**
  * Makes top level function available from C/C++ code with the given name.
@@ -22,14 +23,14 @@ public expect annotation class CName(val externName: String = "", val shortName:
 /**
  * Freezing API is deprecated since 1.7.20.
  *
- * See [NEW_MM.md#freezing-deprecation](https://github.com/JetBrains/kotlin/blob/master/kotlin-native/NEW_MM.md#freezing-deprecation) for details
+ * See [documentation](https://kotlinlang.org/docs/native-migration-guide.html) for details
  */
 // Note: when changing level of deprecation here, also change
 // * `freezing` mode handling in KonanConfig.kt
 // * frontend diagnostics in ErrorsNative.kt
 @SinceKotlin("1.7")
 @RequiresOptIn(
-    message = "Freezing API is deprecated since 1.7.20. See https://github.com/JetBrains/kotlin/blob/master/kotlin-native/NEW_MM.md#freezing-deprecation for details",
+    message = "Freezing API is deprecated since 1.7.20. See https://kotlinlang.org/docs/native-migration-guide.html for details",
     level = RequiresOptIn.Level.WARNING,
 )
 @Target(
@@ -65,3 +66,62 @@ expect annotation class FreezingIsDeprecated
 @OptionalExpectation
 @ExperimentalObjCName
 public expect annotation class ObjCName(val name: String = "", val swiftName: String = "", val exact: Boolean = false)
+
+/**
+ * Meta-annotation that instructs the Kotlin compiler to remove the annotated function or property from the public Objective-C API.
+ *
+ * Annotation processors that refine the public Objective-C API can annotate their annotations with this meta-annotation
+ * to have the original declarations automatically removed from the public API.
+ *
+ * Note: only annotations with [AnnotationTarget.FUNCTION] and/or [AnnotationTarget.PROPERTY] are supported.
+ */
+@Target(AnnotationTarget.ANNOTATION_CLASS)
+@Retention(AnnotationRetention.BINARY)
+@MustBeDocumented
+@OptionalExpectation
+@ExperimentalObjCRefinement
+public expect annotation class HidesFromObjC()
+
+/**
+ * Instructs the Kotlin compiler to remove this function or property from the public Objective-C API.
+ */
+@HidesFromObjC
+@Target(AnnotationTarget.PROPERTY, AnnotationTarget.FUNCTION)
+@Retention(AnnotationRetention.BINARY)
+@MustBeDocumented
+@OptionalExpectation
+@ExperimentalObjCRefinement
+public expect annotation class HiddenFromObjC()
+
+/**
+ * Meta-annotation that instructs the Kotlin compiler to mark the annotated function or property as
+ * `swift_private` in the generated Objective-C API.
+ *
+ * Annotation processors that refine the public API in Swift can annotate their annotations with this meta-annotation
+ * to automatically hide the annotated declarations from Swift.
+ *
+ * See Apple's documentation of the [`NS_REFINED_FOR_SWIFT`](https://developer.apple.com/documentation/swift/objective-c_and_c_code_customization/improving_objective-c_api_declarations_for_swift)
+ * macro for more information on refining Objective-C declarations in Swift.
+ *
+ * Note: only annotations with [AnnotationTarget.FUNCTION] and/or [AnnotationTarget.PROPERTY] are supported.
+ */
+@Target(AnnotationTarget.ANNOTATION_CLASS)
+@Retention(AnnotationRetention.BINARY)
+@MustBeDocumented
+@OptionalExpectation
+@ExperimentalObjCRefinement
+public expect annotation class RefinesInSwift()
+
+/**
+ * Instructs the Kotlin compiler to mark this function or property as `swift_private` in the generated Objective-C API.
+ *
+ * See Apple's documentation of the [`NS_REFINED_FOR_SWIFT`](https://developer.apple.com/documentation/swift/objective-c_and_c_code_customization/improving_objective-c_api_declarations_for_swift)
+ * macro for more information on refining Objective-C declarations in Swift.
+ */
+@RefinesInSwift
+@Target(AnnotationTarget.PROPERTY, AnnotationTarget.FUNCTION)
+@Retention(AnnotationRetention.BINARY)
+@MustBeDocumented
+@OptionalExpectation
+@ExperimentalObjCRefinement
+public expect annotation class ShouldRefineInSwift()

@@ -12,12 +12,10 @@ import org.gradle.internal.service.ServiceRegistry
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinJsCompilation
 import org.jetbrains.kotlin.gradle.plugin.mpp.isMain
-import org.jetbrains.kotlin.gradle.targets.js.dukat.DukatRootResolverPlugin
 import org.jetbrains.kotlin.gradle.targets.js.ir.KotlinJsIrCompilation
 import org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsRootExtension
 import org.jetbrains.kotlin.gradle.targets.js.nodejs.TasksRequirements
 import org.jetbrains.kotlin.gradle.targets.js.npm.*
-import org.jetbrains.kotlin.gradle.targets.js.npm.plugins.RootResolverPlugin
 import org.jetbrains.kotlin.gradle.targets.js.npm.resolved.KotlinCompilationNpmResolution
 import org.jetbrains.kotlin.gradle.targets.js.npm.resolved.KotlinProjectNpmResolution
 import org.jetbrains.kotlin.gradle.targets.js.npm.resolved.KotlinRootNpmResolution
@@ -36,7 +34,7 @@ import org.jetbrains.kotlin.gradle.utils.unavailableValueError
  * Regularly tasks share the same instance of this class, but with configuration cache each task that holds a reference to the instance will
  * create an own copy. We use build services as a single storage for the heavy state of this class.
  */
-internal class KotlinRootNpmResolver internal constructor(
+class KotlinRootNpmResolver internal constructor(
     @Transient
     val nodeJs: NodeJsRootExtension?,
     val forceFullResolve: Boolean
@@ -62,7 +60,7 @@ internal class KotlinRootNpmResolver internal constructor(
     @Volatile
     private var state_: RootResolverState? = RootResolverState.CONFIGURING
 
-    private var state
+    var state
         get() = state_ ?: resolverStateHolder.get().state
         set(value) {
             if (state_ != null) {
@@ -82,7 +80,7 @@ internal class KotlinRootNpmResolver internal constructor(
                 it.parameters.rootProjectDir.set(rootProject_.projectDir)
             }
 
-    val gradleNodeModules: GradleNodeModulesCache
+    internal val gradleNodeModules: GradleNodeModulesCache
         get() = gradleNodeModulesProvider.get().also {
             it.archiveOperations = archiveOperations
             it.fs = fs
@@ -95,13 +93,8 @@ internal class KotlinRootNpmResolver internal constructor(
                 it.parameters.rootProjectDir.set(rootProject_.projectDir)
             }
 
-    val compositeNodeModules: CompositeNodeModulesCache
+    internal val compositeNodeModules: CompositeNodeModulesCache
         get() = compositeNodeModulesProvider.get()
-
-    @Transient
-    private val plugins_: MutableList<RootResolverPlugin>? = mutableListOf<RootResolverPlugin>().also {
-        it.add(DukatRootResolverPlugin(forceFullResolve))
-    }
 
     @Transient
     private val projectResolvers_: MutableMap<String, KotlinProjectNpmResolver>? = mutableMapOf()
@@ -129,7 +122,6 @@ internal class KotlinRootNpmResolver internal constructor(
             KotlinRootNpmResolverStateHolder::class.qualifiedName,
             KotlinRootNpmResolverStateHolder::class.java
         ) { service ->
-            service.parameters.plugins.set(plugins_)
             service.parameters.projectResolvers.set(projectResolvers_)
             service.parameters.packageManager.set(nodeJs_.packageManager)
             service.parameters.yarnEnvironment.set(yarnEnvironment_?.get())
@@ -156,9 +148,6 @@ internal class KotlinRootNpmResolver internal constructor(
             stateHolder.initialized = true
             return projResolvers
         }
-
-    val plugins
-        get() = plugins_ ?: resolverStateHolder.get().parameters.plugins.get()
 
     private val projectResolvers
         get() = projectResolvers_ ?: configurationCacheProjectResolvers
@@ -190,7 +179,7 @@ internal class KotlinRootNpmResolver internal constructor(
         }
     }
 
-    operator fun get(projectPath: String) = projectResolvers[projectPath] ?: error("$projectPath is not configured for JS usage")
+    internal operator fun get(projectPath: String) = projectResolvers[projectPath] ?: error("$projectPath is not configured for JS usage")
 
     val compilations: Collection<KotlinJsCompilation>
         get() = projectResolvers.values.flatMap { it.compilationResolvers.map { it.compilation } }
@@ -198,7 +187,7 @@ internal class KotlinRootNpmResolver internal constructor(
     internal fun getPackageJsonHandlers(projectPath: String, compilationDisambiguatedName: String): List<PackageJson.() -> Unit> =
         resolverStateHolder.get().parameters.packageJsonHandlers.get()["$projectPath:$compilationDisambiguatedName"] ?: emptyList()
 
-    fun findDependentResolver(src: Project, target: Project): List<KotlinCompilationNpmResolver>? {
+    internal fun findDependentResolver(src: Project, target: Project): List<KotlinCompilationNpmResolver>? {
         // todo: proper finding using KotlinTargetComponent.findUsageContext
         val targetResolver = this[target.path]
         val mainCompilations = targetResolver.compilationResolvers.filter { it.compilation.isMain() }
@@ -224,6 +213,7 @@ internal class KotlinRootNpmResolver internal constructor(
                         containsIrJs = true
                     }
                 }
+
                 else -> {
                     check(!containsLegacyJs) { errorMessage }
                     containsLegacyJs = true
@@ -279,6 +269,9 @@ internal class KotlinRootNpmResolver internal constructor(
             logger: Logger
         ): KotlinRootNpmResolution {
             synchronized(projectResolvers) {
+                if (state == RootResolverState.INSTALLED) {
+                    return KotlinRootNpmResolution(rootProject, projectResolutions)
+                }
                 check(state == RootResolverState.PROJECTS_CLOSED) {
                     "Projects must be closed"
                 }
@@ -298,12 +291,6 @@ internal class KotlinRootNpmResolver internal constructor(
                 )
 
                 return KotlinRootNpmResolution(rootProject, projectResolutions)
-            }
-        }
-
-        internal fun closePlugins(resolution: KotlinRootNpmResolution) {
-            plugins.forEach {
-                it.close(resolution)
             }
         }
     }

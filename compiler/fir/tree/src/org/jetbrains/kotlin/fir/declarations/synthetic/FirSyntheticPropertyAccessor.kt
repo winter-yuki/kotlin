@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2020 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2022 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -24,7 +24,8 @@ import org.jetbrains.kotlin.serialization.deserialization.descriptors.Deserializ
 
 class FirSyntheticPropertyAccessor(
     val delegate: FirSimpleFunction,
-    override val isGetter: Boolean
+    override val isGetter: Boolean,
+    override val propertySymbol: FirPropertySymbol,
 ) : FirPropertyAccessor() {
     override val source: KtSourceElement?
         get() = delegate.source
@@ -50,8 +51,8 @@ class FirSyntheticPropertyAccessor(
     override val receiverTypeRef: FirTypeRef?
         get() = null
     
-    override val deprecation: DeprecationsPerUseSite?
-        get() = delegate.deprecation
+    override val deprecationsProvider: DeprecationsProvider
+        get() = delegate.deprecationsProvider
 
     override val valueParameters: List<FirValueParameter>
         get() = delegate.valueParameters
@@ -77,9 +78,6 @@ class FirSyntheticPropertyAccessor(
 
     override val contextReceivers: List<FirContextReceiver>
         get() = emptyList()
-
-    // NB: unused
-    override val propertySymbol: FirPropertySymbol? = null
 
     override val controlFlowGraphReference: FirControlFlowGraphReference? = null
 
@@ -145,7 +143,7 @@ class FirSyntheticPropertyAccessor(
         throw AssertionError("Mutation of synthetic property accessor isn't supported")
     }
 
-    override fun replaceDeprecation(newDeprecation: DeprecationsPerUseSite?) {
+    override fun replaceDeprecationsProvider(newDeprecationsProvider: DeprecationsProvider) {
         throw AssertionError("Mutation of synthetic property accessor isn't supported")
     }
 

@@ -68,7 +68,7 @@ internal class FirElementBuilder(
 
     private fun getOrBuildFirForKtFile(ktFile: KtFile): FirFile {
         val firFile = moduleComponents.firFileBuilder.buildRawFirFileWithCaching(ktFile)
-        moduleComponents.lazyFirDeclarationsResolver.lazyResolveFileDeclaration(
+        moduleComponents.firModuleLazyDeclarationResolver.lazyResolveFileDeclaration(
             firFile = firFile,
             toPhase = FirResolvePhase.BODY_RESOLVE,
             scopeSession = moduleComponents.scopeSessionProvider.getScopeSession(),
@@ -127,8 +127,8 @@ fun PsiElement.getNonLocalContainingInBodyDeclarationWith(): KtNamedDeclaration?
         when (declaration) {
             is KtNamedFunction -> declaration.bodyExpression?.isAncestor(this) == true
             is KtProperty -> declaration.initializer?.isAncestor(this) == true ||
-                    declaration.getter?.isAncestor(this) == true ||
-                    declaration.setter?.isAncestor(this) == true
+                    declaration.getter?.bodyExpression?.isAncestor(this) == true ||
+                    declaration.setter?.bodyExpression?.isAncestor(this) == true
             else -> false
         }
     }

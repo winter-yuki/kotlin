@@ -28,6 +28,7 @@ import org.jetbrains.kotlin.descriptors.impl.ReceiverParameterDescriptorImpl;
 import org.jetbrains.kotlin.psi.KtExpression;
 import org.jetbrains.kotlin.psi.KtFile;
 import org.jetbrains.kotlin.psi.KtPsiFactoryKt;
+import org.jetbrains.kotlin.psi.KtTypeReference;
 import org.jetbrains.kotlin.resolve.BindingContext;
 import org.jetbrains.kotlin.resolve.BindingTraceContext;
 import org.jetbrains.kotlin.resolve.TypeResolver;
@@ -584,6 +585,7 @@ public class KotlinTypeCheckerTest extends KotlinTestWithEnvironment {
     }
 
     private KotlinType makeType(LexicalScope scope, String typeStr) {
-        return typeResolver.resolveType(scope, KtPsiFactoryKt.KtPsiFactory(getProject()).createType(typeStr), DummyTraces.DUMMY_TRACE, true);
+        KtTypeReference typeReference = KtPsiFactoryKt.KtPsiFactory(getProject()).createType(typeStr);
+        return typeResolver.resolveTypeWithPossibleIntersections(scope, typeReference, DummyTraces.DUMMY_TRACE);
     }
 }

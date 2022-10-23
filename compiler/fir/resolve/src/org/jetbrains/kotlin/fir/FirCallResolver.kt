@@ -49,7 +49,6 @@ import org.jetbrains.kotlin.resolve.calls.tasks.ExplicitReceiverKind
 import org.jetbrains.kotlin.resolve.calls.tower.CandidateApplicability
 import org.jetbrains.kotlin.resolve.calls.tower.isSuccess
 import org.jetbrains.kotlin.types.Variance
-import org.jetbrains.kotlin.utils.addToStdlib.safeAs
 
 class FirCallResolver(
     private val components: FirAbstractBodyResolveTransformer.BodyResolveTransformerComponents,
@@ -341,6 +340,7 @@ class FirCallResolver(
                         qualifiedAccess.explicitReceiver,
                         referencedSymbol,
                         nonFatalDiagnosticFromExpression,
+                        session.languageVersionSettings.apiVersion
                     ),
                     annotations = qualifiedAccess.annotations
                 )
@@ -774,7 +774,7 @@ class FirCallResolver(
                         resolvedSymbol = coneSymbol
                     }
                 }
-                if (coneSymbol.safeAs<FirPropertySymbol>()?.hasExplicitBackingField == true) {
+                if ((coneSymbol as? FirPropertySymbol)?.hasExplicitBackingField == true) {
                     return FirPropertyWithExplicitBackingFieldResolvedNamedReference(
                         source, name, candidate.symbol, candidate.hasVisibleBackingField
                     )

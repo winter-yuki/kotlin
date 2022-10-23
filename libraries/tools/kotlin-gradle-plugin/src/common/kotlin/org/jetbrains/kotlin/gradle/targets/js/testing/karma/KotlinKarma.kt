@@ -19,7 +19,9 @@ import org.jetbrains.kotlin.gradle.internal.operation
 import org.jetbrains.kotlin.gradle.internal.processLogMessage
 import org.jetbrains.kotlin.gradle.internal.testing.TCServiceMessagesClientSettings
 import org.jetbrains.kotlin.gradle.internal.testing.TCServiceMessagesTestExecutionSpec
+import org.jetbrains.kotlin.gradle.internal.testing.TCServiceMessagesTestExecutor
 import org.jetbrains.kotlin.gradle.plugin.PropertiesProvider
+import org.jetbrains.kotlin.gradle.plugin.PropertiesProvider.Companion.kotlinPropertiesProvider
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinJsCompilation
 import org.jetbrains.kotlin.gradle.targets.js.*
 import org.jetbrains.kotlin.gradle.targets.js.dsl.WebpackRulesDsl.Companion.webpackRulesContainer
@@ -62,7 +64,7 @@ class KotlinKarma(
     private var configDirectory: File by property {
         defaultConfigDirectory
     }
-    private val isTeamCity by lazy { project.isTeamCity }
+    private val isTeamCity = project.providers.gradleProperty(TCServiceMessagesTestExecutor.TC_PROJECT_PROPERTY)
 
     override val requiredNpmDependencies: Set<RequiredKotlinJsDependency>
         get() = requiredDependencies + webpackConfig.getRequiredDependencies(versions)
@@ -93,9 +95,39 @@ class KotlinKarma(
         useMocha()
         useWebpack()
         useSourceMapSupport()
+        usePropBrowsers()
 
         // necessary for debug as a fallback when no debuggable browsers found
         addChromeLauncher()
+    }
+
+    private fun usePropBrowsers() {
+        val propValue = project.kotlinPropertiesProvider.jsKarmaBrowsers(compilation.target)
+        val propBrowsers = propValue?.split(",")
+        propBrowsers?.map(String::trim)?.forEach {
+            when (it.toLowerCase()) {
+                "chrome" -> useChrome()
+                "chrome-canary" -> useChromeCanary()
+                "chrome-canary-headless" -> useChromeCanaryHeadless()
+                "chrome-headless" -> useChromeHeadless()
+                "chrome-headless-no-sandbox" -> useChromeHeadlessNoSandbox()
+                "chromium" -> useChromium()
+                "chromium-headless" -> useChromiumHeadless()
+                "firefox" -> useFirefox()
+                "firefox-aurora" -> useFirefoxAurora()
+                "firefox-aurora-headless" -> useFirefoxAuroraHeadless()
+                "firefox-developer" -> useFirefoxDeveloper()
+                "firefox-developer-headless" -> useFirefoxDeveloperHeadless()
+                "firefox-headless" -> useFirefoxHeadless()
+                "firefox-nightly" -> useFirefoxNightly()
+                "firefox-nightly-headless" -> useFirefoxNightlyHeadless()
+                "ie" -> useIe()
+                "opera" -> useOpera()
+                "phantom-js" -> usePhantomJS()
+                "safari" -> useSafari()
+                else -> project.logger.warn("Unrecognised `kotlin.js.browser.karma.browsers` value [$it]. Ignoring...")
+            }
+        }
     }
 
     private fun useKotlinReporter() {
@@ -114,7 +146,7 @@ class KotlinKarma(
                     {
                         type: 'kotlin-test-js-runner/tc-log-appender.js',
                         //default layout
-                        layout: { type: 'pattern', pattern: '%[%d{DATE}:%p [%c]: %]%m' }
+                        layout: { type: 'pattern', pattern: '%[%d{DATETIME}:%p [%c]: %]%m' }
                     }
                 ]
             """.trimIndent()
@@ -209,6 +241,7 @@ class KotlinKarma(
     }
 
     private fun useWebpack() {
+        config.frameworks.add("webpack")
         requiredDependencies.add(versions.karmaWebpack)
         requiredDependencies.add(
             webpackMajorVersion.choose(
@@ -321,26 +354,6 @@ class KotlinKarma(
         }
     }
 
-    private fun createAdapterJs(
-        file: String,
-        debug: Boolean
-    ): File {
-        val adapterJs = npmProject.dir.resolve("adapter-browser.js")
-        adapterJs.printWriter().use { writer ->
-            val karmaRunner = npmProject.require("kotlin-test-js-runner/kotlin-test-karma-runner.js")
-            // It is necessary for debugger attaching (--inspect-brk analogue)
-            if (debug) {
-                writer.println("debugger;")
-            }
-
-            writer.println("require(${karmaRunner.jsQuoted()})")
-
-            writer.println("module.exports = require(${file.jsQuoted()})")
-        }
-
-        return adapterJs
-    }
-
     override fun createTestExecutionSpec(
         task: KotlinJsTest,
         forkOptions: ProcessForkOptions,
@@ -349,9 +362,8 @@ class KotlinKarma(
     ): TCServiceMessagesTestExecutionSpec {
         val file = task.inputFileProperty.get().asFile.toString()
 
-        val adapterJs = createAdapterJs(file, debug)
-
-        config.files.add(adapterJs.canonicalPath)
+        config.files.add(npmProject.require("kotlin-test-js-runner/kotlin-test-karma-runner.js"))
+        config.files.add(file)
 
         if (debug) {
             config.singleRun = false
@@ -383,7 +395,7 @@ class KotlinKarma(
             prependSuiteName = true,
             stackTraceParser = ::parseNodeJsStackTraceAsJvm,
             ignoreOutOfRootNodes = true,
-            escapeTCMessagesInLog = isTeamCity
+            escapeTCMessagesInLog = isTeamCity.isPresent
         )
 
         config.basePath = npmProject.nodeModulesDir.absolutePath

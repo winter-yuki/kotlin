@@ -38,7 +38,6 @@ fun IrFunction.hasStableJsName(context: JsIrBackendContext): Boolean {
 
     if (
         origin == JsLoweredDeclarationOrigin.JS_SHADOWED_EXPORT ||
-        origin == IrDeclarationOrigin.FUNCTION_FOR_DEFAULT_PARAMETER ||
         origin == JsLoweredDeclarationOrigin.BRIDGE_WITHOUT_STABLE_NAME ||
         origin == JsLoweredDeclarationOrigin.BRIDGE_PROPERTY_ACCESSOR
     ) {
@@ -118,5 +117,3 @@ fun invokeFunForLambda(call: IrCall) =
         .type
         .getClass()!!
         .invokeFun!!
-
-fun IrFunction.isInlineFunWithReifiedParameter() = isInline && typeParameters.any { it.isReified }

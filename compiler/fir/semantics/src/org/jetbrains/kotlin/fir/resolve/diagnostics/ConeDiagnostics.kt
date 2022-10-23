@@ -16,7 +16,6 @@ import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.*
 import org.jetbrains.kotlin.fir.types.ConeKotlinType
 import org.jetbrains.kotlin.fir.types.FirTypeRef
-import org.jetbrains.kotlin.fir.types.renderForDebugging
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.resolve.calls.tower.CandidateApplicability
@@ -173,7 +172,7 @@ class ConeOuterClassArgumentsRequired(
 }
 
 class ConeInstanceAccessBeforeSuperCall(val target: String) : ConeDiagnostic {
-    override val reason: String get() = "Cannot access ''${target}'' before superclass constructor has been called"
+    override val reason: String get() = "Cannot access ''${target}'' before the instance has been initialized"
 }
 
 class ConeUnsupportedCallableReferenceTarget(override val candidate: AbstractCandidate) : ConeDiagnosticWithSingleCandidate {
@@ -232,4 +231,13 @@ private fun describeSymbol(symbol: FirBasedSymbol<*>): String {
         is FirCallableSymbol<*> -> symbol.callableId.toString()
         else -> "$symbol"
     }
+}
+
+class ConeAmbiguousAlteredAssign(val altererNames: List<String?>) : ConeDiagnostic {
+    override val reason: String
+        get() = "Assign altered by multiple extensions"
+}
+
+object ConeForbiddenIntersection : ConeDiagnostic {
+    override val reason: String get() = "Such an intersection type is not allowed"
 }

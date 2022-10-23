@@ -50,7 +50,7 @@ class FirJavaClass @FirImplementationDetail internal constructor(
 ) : FirRegularClass() {
     override val hasLazyNestedClassifiers: Boolean get() = true
     override val controlFlowGraphReference: FirControlFlowGraphReference? get() = null
-    override var deprecation: DeprecationsPerUseSite? = null
+    override var deprecationsProvider: DeprecationsProvider = UnresolvedDeprecationProvider
 
     override val contextReceivers: List<FirContextReceiver>
         get() = emptyList()
@@ -70,8 +70,8 @@ class FirJavaClass @FirImplementationDetail internal constructor(
         resolvePhase = newResolvePhase
     }
 
-    override fun replaceDeprecation(newDeprecation: DeprecationsPerUseSite?) {
-        deprecation = newDeprecation
+    override fun replaceDeprecationsProvider(newDeprecationsProvider: DeprecationsProvider) {
+        deprecationsProvider = newDeprecationsProvider
     }
 
     override fun replaceControlFlowGraphReference(newControlFlowGraphReference: FirControlFlowGraphReference?) {}
@@ -125,7 +125,7 @@ class FirJavaClass @FirImplementationDetail internal constructor(
 }
 
 @FirBuilderDsl
-internal class FirJavaClassBuilder : FirRegularClassBuilder(), FirAnnotationContainerBuilder {
+class FirJavaClassBuilder : FirRegularClassBuilder(), FirAnnotationContainerBuilder {
     lateinit var visibility: Visibility
     var modality: Modality? = null
     var isFromSource: Boolean by Delegates.notNull()
@@ -174,6 +174,6 @@ internal class FirJavaClassBuilder : FirRegularClassBuilder(), FirAnnotationCont
         }
 }
 
-internal inline fun buildJavaClass(init: FirJavaClassBuilder.() -> Unit): FirJavaClass {
+inline fun buildJavaClass(init: FirJavaClassBuilder.() -> Unit): FirJavaClass {
     return FirJavaClassBuilder().apply(init).build()
 }

@@ -36,7 +36,7 @@ class JvmAndAndroidIntermediateSourceSetTest {
 
         /* Arbitrary minimal Android setup */
         val android = project.extensions.getByName("android") as LibraryExtension
-        android.compileSdkVersion(30)
+        android.compileSdk = 31
 
         /* Kotlin Setup */
         kotlin = project.multiplatformExtension
@@ -72,7 +72,7 @@ class JvmAndAndroidIntermediateSourceSetTest {
 
         val compilation = jvmAndAndroidMainMetadataCompilations.single()
         assertFalse(
-            compilation.compileKotlinTaskProvider.get().enabled,
+            compilation.compileTaskProvider.get().enabled,
             "Expected compilation task to be disabled, because not supported yet"
         )
     }

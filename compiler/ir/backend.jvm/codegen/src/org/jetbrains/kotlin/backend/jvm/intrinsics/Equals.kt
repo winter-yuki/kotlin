@@ -6,10 +6,10 @@
 package org.jetbrains.kotlin.backend.jvm.intrinsics
 
 import com.intellij.psi.tree.IElementType
-import org.jetbrains.kotlin.backend.jvm.JvmBackendContext
 import org.jetbrains.kotlin.backend.jvm.codegen.*
 import org.jetbrains.kotlin.backend.jvm.ir.isSmartcastFromHigherThanNullable
 import org.jetbrains.kotlin.backend.jvm.ir.receiverAndArgs
+import org.jetbrains.kotlin.backend.jvm.mapping.mapTypeAsDeclaration
 import org.jetbrains.kotlin.codegen.AsmUtil
 import org.jetbrains.kotlin.codegen.AsmUtil.isPrimitive
 import org.jetbrains.kotlin.codegen.DescriptorAsmUtil.genAreEqualCall
@@ -18,16 +18,13 @@ import org.jetbrains.kotlin.codegen.intrinsics.IntrinsicMethods
 import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.ir.declarations.isSingleFieldValueClass
 import org.jetbrains.kotlin.ir.descriptors.toIrBasedKotlinType
-import org.jetbrains.kotlin.ir.expressions.IrExpression
-import org.jetbrains.kotlin.ir.expressions.IrFunctionAccessExpression
-import org.jetbrains.kotlin.ir.expressions.IrStatementOrigin
+import org.jetbrains.kotlin.ir.expressions.*
+import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.ir.types.classOrNull
 import org.jetbrains.kotlin.ir.types.isNullable
-import org.jetbrains.kotlin.ir.util.isEnumClass
-import org.jetbrains.kotlin.ir.util.isEnumEntry
-import org.jetbrains.kotlin.ir.util.isIntegerConst
-import org.jetbrains.kotlin.ir.util.isNullConst
+import org.jetbrains.kotlin.ir.util.*
 import org.jetbrains.kotlin.lexer.KtTokens
+import org.jetbrains.kotlin.load.kotlin.TypeMappingMode
 import org.jetbrains.kotlin.resolve.jvm.AsmTypes
 import org.jetbrains.kotlin.resolve.jvm.jvmSignature.JvmMethodSignature
 import org.jetbrains.kotlin.types.isNullable
@@ -80,12 +77,12 @@ class Equals(val operator: IElementType) : IntrinsicMethod() {
             }
         }
 
-        val leftType = with(codegen) { a.asmType }
+        val leftType = codegen.typeMapper.mapTypeAsDeclaration(a.type)
         if (expression.origin == IrStatementOrigin.EQEQEQ || expression.origin == IrStatementOrigin.EXCLEQEQ) {
             return referenceEquals(a, b, leftType, codegen, data)
         }
 
-        val rightType = with(codegen) { b.asmType }
+        val rightType = codegen.typeMapper.mapTypeAsDeclaration(b.type)
 
         // Avoid boxing for `primitive == object` and `boxed primitive == primitive` where we know
         // what comparison means. The optimization does not apply to `object == primitive` as equals
@@ -110,15 +107,22 @@ class Equals(val operator: IElementType) : IntrinsicMethod() {
         }
 
         // We can use reference equality for enums, otherwise we fall back to boxed equality.
-        val aIsEnum = a.type.classOrNull?.owner?.run { isEnumClass || isEnumEntry } == true
-        val bIsEnum = b.type.classOrNull?.owner?.run { isEnumClass || isEnumEntry } == true
-        return if (aIsEnum || bIsEnum) {
-            referenceEquals(a, b, leftType, codegen, data)
-        } else {
-            a.accept(codegen, data).materializeAt(AsmTypes.OBJECT_TYPE, codegen.context.irBuiltIns.anyNType)
-            b.accept(codegen, data).materializeAt(AsmTypes.OBJECT_TYPE, codegen.context.irBuiltIns.anyNType)
-            genAreEqualCall(codegen.mv)
-            MaterialValue(codegen, Type.BOOLEAN_TYPE, codegen.context.irBuiltIns.booleanType)
+        return when {
+            a.isEnumValue || b.isEnumValue ->
+                referenceEquals(a, b, leftType, codegen, data)
+
+            a.isClassValue && b.isClassValue -> {
+                val leftValue = codegen.generateClassLiteralReference(a, wrapIntoKClass = false, wrapPrimitives = true, data = data)
+                val rightValue = codegen.generateClassLiteralReference(b, wrapIntoKClass = false, wrapPrimitives = true, data = data)
+                BooleanComparison(operator, leftValue, rightValue)
+            }
+
+            else -> {
+                a.accept(codegen, data).materializeAt(AsmTypes.OBJECT_TYPE, codegen.context.irBuiltIns.anyNType)
+                b.accept(codegen, data).materializeAt(AsmTypes.OBJECT_TYPE, codegen.context.irBuiltIns.anyNType)
+                genAreEqualCall(codegen.mv)
+                MaterialValue(codegen, Type.BOOLEAN_TYPE, codegen.context.irBuiltIns.booleanType)
+            }
         }
     }
 
@@ -139,6 +143,12 @@ class Equals(val operator: IElementType) : IntrinsicMethod() {
             BooleanComparison(operator, leftValue, rightValue)
         }
     }
+
+    private val IrExpression.isEnumValue: Boolean
+        get() = type.classOrNull?.owner?.run { isEnumClass || isEnumEntry } == true
+
+    private val IrExpression.isClassValue: Boolean
+        get() = this is IrGetClass || this is IrClassReference
 }
 
 
@@ -148,12 +158,12 @@ class Ieee754Equals(val operandType: Type) : IntrinsicMethod() {
     override fun toCallable(
         expression: IrFunctionAccessExpression,
         signature: JvmMethodSignature,
-        context: JvmBackendContext
+        classCodegen: ClassCodegen
     ): IrIntrinsicFunction {
         class Ieee754AreEqual(
             val left: Type,
             val right: Type
-        ) : IrIntrinsicFunction(expression, signature, context, listOf(left, right)) {
+        ) : IrIntrinsicFunction(expression, signature, classCodegen, listOf(left, right)) {
             override fun genInvokeInstruction(v: InstructionAdapter) {
                 v.invokestatic(
                     IntrinsicMethods.INTRINSICS_CLASS_NAME, "areEqual",
@@ -178,15 +188,15 @@ class Ieee754Equals(val operandType: Type) : IntrinsicMethod() {
         val arg1isNullable = arg1Type.isNullable()
 
         val useNonIEEE754Comparison =
-            !context.state.languageVersionSettings.supportsFeature(LanguageFeature.ProperIeee754Comparisons)
-                    && (arg0.isSmartcastFromHigherThanNullable(context) || arg1.isSmartcastFromHigherThanNullable(context))
+            !classCodegen.context.state.languageVersionSettings.supportsFeature(LanguageFeature.ProperIeee754Comparisons)
+                    && (arg0.isSmartcastFromHigherThanNullable(classCodegen.context) || arg1.isSmartcastFromHigherThanNullable(classCodegen.context))
 
         return when {
             useNonIEEE754Comparison ->
                 Ieee754AreEqual(AsmTypes.OBJECT_TYPE, AsmTypes.OBJECT_TYPE)
 
             !arg0isNullable && !arg1isNullable ->
-                object : IrIntrinsicFunction(expression, signature, context, listOf(operandType, operandType)) {
+                object : IrIntrinsicFunction(expression, signature, classCodegen, listOf(operandType, operandType)) {
                     override fun genInvokeInstruction(v: InstructionAdapter) {
                         StackValue.cmp(KtTokens.EQEQ, operandType, StackValue.onStack(operandType), StackValue.onStack(operandType))
                             .put(Type.BOOLEAN_TYPE, v)

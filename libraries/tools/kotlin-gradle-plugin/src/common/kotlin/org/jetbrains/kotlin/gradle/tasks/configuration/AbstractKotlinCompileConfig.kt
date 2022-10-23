@@ -18,8 +18,9 @@ import org.jetbrains.kotlin.gradle.plugin.*
 import org.jetbrains.kotlin.gradle.plugin.PropertiesProvider.Companion.kotlinPropertiesProvider
 import org.jetbrains.kotlin.gradle.plugin.mpp.associateWithClosure
 import org.jetbrains.kotlin.gradle.plugin.mpp.pm20.KotlinCompilationData
-import org.jetbrains.kotlin.gradle.plugin.sources.applyLanguageSettingsToKotlinOptions
-import org.jetbrains.kotlin.gradle.report.BuildMetricsReporterService
+import org.jetbrains.kotlin.gradle.plugin.sources.applyLanguageSettingsToCompilerOptions
+import org.jetbrains.kotlin.gradle.report.BuildMetricsService
+import org.jetbrains.kotlin.gradle.report.BuildReportsService
 import org.jetbrains.kotlin.gradle.tasks.AbstractKotlinCompile
 import org.jetbrains.kotlin.gradle.tasks.KOTLIN_BUILD_DIR_NAME
 import org.jetbrains.kotlin.project.model.LanguageSettings
@@ -40,8 +41,8 @@ internal abstract class AbstractKotlinCompileConfig<TASK : AbstractKotlinCompile
         configureTaskProvider { taskProvider ->
             project.runOnceAfterEvaluated("apply properties and language settings to ${taskProvider.name}") {
                 taskProvider.configure {
-                    applyLanguageSettingsToKotlinOptions(
-                        languageSettings.get(), (it as org.jetbrains.kotlin.gradle.dsl.KotlinCompile<*>).kotlinOptions
+                    applyLanguageSettingsToCompilerOptions(
+                        languageSettings.get(), (it as org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask<*>).compilerOptions
                     )
                 }
             }
@@ -58,8 +59,11 @@ internal abstract class AbstractKotlinCompileConfig<TASK : AbstractKotlinCompile
                 .disallowChanges()
 
             task.localStateDirectories.from(task.taskBuildLocalStateDirectory).disallowChanges()
-            BuildMetricsReporterService.registerIfAbsent(project)?.let {
-                task.buildMetricsReporterService.value(it)
+            BuildMetricsService.registerIfAbsent(project)?.also {
+                task.buildMetricsService.value(it)
+                BuildReportsService.registerIfAbsent(project, it)?.also {
+                    task.buildReportsService.value(it)
+                }
             }
 
             propertiesProvider.kotlinDaemonJvmArgs?.let { kotlinDaemonJvmArgs ->
@@ -67,7 +71,8 @@ internal abstract class AbstractKotlinCompileConfig<TASK : AbstractKotlinCompile
                     kotlinDaemonJvmArgs.split("\\s+".toRegex())
                 })
             }
-            task.compilerExecutionStrategy.value(propertiesProvider.kotlinCompilerExecutionStrategy)
+            task.compilerExecutionStrategy.convention(propertiesProvider.kotlinCompilerExecutionStrategy).finalizeValueOnRead()
+            task.useDaemonFallbackStrategy.convention(propertiesProvider.kotlinDaemonUseFallbackStrategy).finalizeValueOnRead()
 
             task.incremental = false
             task.useModuleDetection.convention(false)

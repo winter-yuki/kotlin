@@ -19,12 +19,10 @@ buildscript {
 apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
 apply plugin: 'kotlin-kapt'
-apply plugin: 'kotlin-android-extensions'
 apply plugin: 'realm-android'
 
 android {
     compileSdkVersion 23
-    buildToolsVersion "25.0.2"
     defaultConfig {
         applicationId 'io.realm.examples.kotlin'
         minSdkVersion 14

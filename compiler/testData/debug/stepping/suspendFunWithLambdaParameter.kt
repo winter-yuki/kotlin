@@ -19,10 +19,7 @@ suspend fun box() {
 // test.kt:11 box
 
 // EXPECTATIONS JS_IR
-// test.kt:8 $boxCOROUTINE$0.doResume_5yljmg_k$
+// test.kt:8 doResume
 // test.kt:4 foo
 // test.kt:4 foo
 // test.kt:9 box$lambda
-// test.kt:9 box$lambda
-// test.kt:4 foo
-// test.kt:7 box

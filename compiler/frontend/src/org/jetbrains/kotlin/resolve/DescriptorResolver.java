@@ -1094,6 +1094,23 @@ public class DescriptorResolver {
                     substitutedSuperType = approximatingSuperType;
                 }
 
+                UnwrappedType unwrapped = type.unwrap();
+                boolean lowerNullable = FlexibleTypesKt.lowerIfFlexible(unwrapped).isMarkedNullable();
+                boolean upperNullable = FlexibleTypesKt.upperIfFlexible(unwrapped).isMarkedNullable();
+                if (languageVersionSettings.supportsFeature(LanguageFeature.KeepNullabilityWhenApproximatingLocalType)) {
+                    if (lowerNullable != upperNullable) {
+                        return KotlinTypeFactory.flexibleType(
+                                FlexibleTypesKt.lowerIfFlexible(substitutedSuperType),
+                                FlexibleTypesKt.upperIfFlexible(substitutedSuperType).makeNullableAsSpecified(true));
+                    }
+                    return TypeUtils.makeNullableIfNeeded(substitutedSuperType, upperNullable);
+                } else if (upperNullable) {
+                    if (lowerNullable) {
+                        trace.report(APPROXIMATED_LOCAL_TYPE_WILL_BECOME_NULLABLE.on(declaration, substitutedSuperType));
+                    } else {
+                        trace.report(APPROXIMATED_LOCAL_TYPE_WILL_BECOME_FLEXIBLE.on(declaration, substitutedSuperType));
+                    }
+                }
                 return substitutedSuperType;
             }
             else {

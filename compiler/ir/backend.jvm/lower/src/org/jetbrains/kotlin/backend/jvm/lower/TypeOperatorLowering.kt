@@ -19,6 +19,7 @@ import org.jetbrains.kotlin.backend.jvm.JvmLoweredDeclarationOrigin
 import org.jetbrains.kotlin.backend.jvm.ir.*
 import org.jetbrains.kotlin.backend.jvm.unboxInlineClass
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
+import org.jetbrains.kotlin.ir.IrBuiltIns
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.IrStatement
 import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
@@ -36,6 +37,9 @@ import org.jetbrains.kotlin.ir.visitors.IrElementVisitorVoid
 import org.jetbrains.kotlin.ir.visitors.acceptChildrenVoid
 import org.jetbrains.kotlin.ir.visitors.acceptVoid
 import org.jetbrains.kotlin.name.Name
+import org.jetbrains.kotlin.types.Variance
+import org.jetbrains.kotlin.types.checker.SimpleClassicTypeSystemContext.getArgument
+import org.jetbrains.kotlin.types.checker.SimpleClassicTypeSystemContext.isTypeVariableType
 import org.jetbrains.kotlin.utils.addToStdlib.safeAs
 import org.jetbrains.org.objectweb.asm.Handle
 import org.jetbrains.org.objectweb.asm.Opcodes
@@ -88,6 +92,8 @@ private class TypeOperatorLowering(private val backendContext: JvmBackendContext
                 builder.irAs(argument, type)
             argument.type.isInlineClassType() && argument.type.isSubtypeOfClass(type.erasedUpperBound.symbol) ->
                 argument
+            isCompatibleArrayType(argument.type, type) ->
+                argument
             type.isNullable() || argument.isDefinitelyNotNull() ->
                 builder.irAs(argument, type)
             else -> {
@@ -120,6 +126,22 @@ private class TypeOperatorLowering(private val backendContext: JvmBackendContext
                 }
             }
         }
+
+    private fun isCompatibleArrayType(actualType: IrType, expectedType: IrType): Boolean {
+        var actual = actualType
+        var expected = expectedType
+        while ((actual.isArray() || actual.isNullableArray()) && (expected.isArray() || expected.isNullableArray())) {
+            actual = actual.getArrayElementLowerType()
+            expected = expected.getArrayElementLowerType()
+        }
+        if (actual == actualType || expected == expectedType) return false
+        return actual.isSubtypeOfClass(expected.erasedUpperBound.symbol)
+    }
+
+    private fun IrType.getArrayElementLowerType(): IrType =
+        if (isBoxedArray && this is IrSimpleType && (arguments.singleOrNull() as? IrTypeProjection)?.variance == Variance.IN_VARIANCE)
+            backendContext.irBuiltIns.anyNType
+        else getArrayElementType(backendContext.irBuiltIns)
 
     // TODO extract null check elimination on IR somewhere?
     private fun IrExpression.isDefinitelyNotNull(): Boolean =
@@ -165,7 +187,7 @@ private class TypeOperatorLowering(private val backendContext: JvmBackendContext
 
     private fun JvmIrBuilder.jvmOriginalMethodType(methodSymbol: IrFunctionSymbol) =
         irCall(backendContext.ir.symbols.jvmOriginalMethodTypeIntrinsic, context.irBuiltIns.anyType).apply {
-            putValueArgument(0, irRawFunctionReferefence(context.irBuiltIns.anyType, methodSymbol))
+            putValueArgument(0, irRawFunctionReference(context.irBuiltIns.anyType, methodSymbol))
         }
 
     /**
@@ -350,9 +372,9 @@ private class TypeOperatorLowering(private val backendContext: JvmBackendContext
 
     private fun mapDeserializedLambda(info: SerializableMethodRefInfo) =
         DeserializedLambdaInfo(
-            functionalInterfaceClass = backendContext.typeMapper.mapType(info.samType).internalName,
-            implMethodHandle = backendContext.methodSignatureMapper.mapToMethodHandle(info.implFunSymbol.owner),
-            functionalInterfaceMethod = backendContext.methodSignatureMapper.mapAsmMethod(info.samMethodSymbol.owner)
+            functionalInterfaceClass = backendContext.defaultTypeMapper.mapType(info.samType).internalName,
+            implMethodHandle = backendContext.defaultMethodSignatureMapper.mapToMethodHandle(info.implFunSymbol.owner),
+            functionalInterfaceMethod = backendContext.defaultMethodSignatureMapper.mapAsmMethod(info.samMethodSymbol.owner)
         )
 
     private fun JvmIrBuilder.generateSerializedLambdaEquals(
@@ -511,7 +533,7 @@ private class TypeOperatorLowering(private val backendContext: JvmBackendContext
         dynamicCall: IrCall
     ): IrCall {
         val samMethodType = jvmOriginalMethodType(samMethodSymbol)
-        val implFunRawRef = irRawFunctionReferefence(context.irBuiltIns.anyType, implFunSymbol)
+        val implFunRawRef = irRawFunctionReference(context.irBuiltIns.anyType, implFunSymbol)
         val instanceMethodType = jvmOriginalMethodType(instanceMethodSymbol)
 
         var bootstrapMethod = jdkMetafactoryHandle
@@ -569,12 +591,12 @@ private class TypeOperatorLowering(private val backendContext: JvmBackendContext
         samMethod: IrSimpleFunction,
         extraOverriddenMethods: List<IrSimpleFunction>
     ): Collection<IrSimpleFunction> {
-        val jvmInstanceMethod = backendContext.methodSignatureMapper.mapAsmMethod(instanceMethod)
-        val jvmSamMethod = backendContext.methodSignatureMapper.mapAsmMethod(samMethod)
+        val jvmInstanceMethod = backendContext.defaultMethodSignatureMapper.mapAsmMethod(instanceMethod)
+        val jvmSamMethod = backendContext.defaultMethodSignatureMapper.mapAsmMethod(samMethod)
 
         val signatureToNonFakeOverride = LinkedHashMap<Method, IrSimpleFunction>()
         for (overridden in extraOverriddenMethods) {
-            val jvmOverriddenMethod = backendContext.methodSignatureMapper.mapAsmMethod(overridden)
+            val jvmOverriddenMethod = backendContext.defaultMethodSignatureMapper.mapAsmMethod(overridden)
             if (jvmOverriddenMethod != jvmInstanceMethod && jvmOverriddenMethod != jvmSamMethod) {
                 signatureToNonFakeOverride[jvmOverriddenMethod] = overridden
             }

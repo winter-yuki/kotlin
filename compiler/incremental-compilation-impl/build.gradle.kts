@@ -30,7 +30,7 @@ dependencies {
     testApi(commonDependency("org.jetbrains.intellij.deps:jdom"))
 
     testImplementation(commonDependency("com.google.code.gson:gson"))
-    testRuntimeOnly(project(":kotlin-reflect"))
+    testRuntimeOnly(commonDependency("org.jetbrains.kotlin:kotlin-reflect")) { isTransitive = false }
     testRuntimeOnly(project(":core:descriptors.runtime"))
 }
 
@@ -49,7 +49,7 @@ projectTest("testJvmICWithJdk11", parallel = true) {
     filter {
         includeTestsMatching("org.jetbrains.kotlin.incremental.IncrementalJvmCompilerRunnerTestGenerated*")
     }
-    javaLauncher.set(project.getToolchainLauncherFor(JdkMajorVersion.JDK_11))
+    javaLauncher.set(project.getToolchainLauncherFor(JdkMajorVersion.JDK_11_0))
 }
 
 testsJar()

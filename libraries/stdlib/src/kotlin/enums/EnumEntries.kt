@@ -21,8 +21,24 @@ public sealed interface EnumEntries<E : Enum<E>> : List<E>
 
 @PublishedApi
 @ExperimentalStdlibApi
-@SinceKotlin("1.8")
+@SinceKotlin("1.8") // Used by JVM compiler
 internal fun <E : Enum<E>> enumEntries(entriesProvider: () -> Array<E>): EnumEntries<E> = EnumEntriesList(entriesProvider)
+
+@PublishedApi
+@ExperimentalStdlibApi
+@SinceKotlin("1.8") // Used by Native/JS compilers and Java serialization
+internal fun <E : Enum<E>> enumEntries(entries: Array<E>): EnumEntries<E> = EnumEntriesList { entries }.also {
+    /*
+     * Here we are enforcing initialization of _entries property.
+     * It is required because of two reasons.
+     *   1. In old Native mm the object will be frozen after creation, so it must be immutable
+     *   2. Native doesn't support @Volatile for now, so this initialization is not generally safe, if
+     *      done after object is published.
+     *
+     * This is very implementation-dependent hack, and it should be removed when/if both reasons above are gone.
+     */
+    it.size
+}
 
 /*
  * For enum class E, this class is instantiated in the following manner (NB it's pseudocode that does not
@@ -55,28 +71,15 @@ internal fun <E : Enum<E>> enumEntries(entriesProvider: () -> Array<E>): EnumEnt
  */
 @SinceKotlin("1.8")
 @ExperimentalStdlibApi
-private class EnumEntriesList<E : Enum<E>>(private val entriesProvider: () -> Array<E>) : EnumEntries<E>, AbstractList<E>() {
-
-    /*
-     * Open questions to implementation:
-     *
-     * - Are we allowed to use e.ordinal as an index?
-     *   - e.g. indexOf(e) = e.ordinal
-     *
-     * - Are we allowed to short-circuit methods?
-     *     - e.g. `EEL.contains(anyE)` is always true as long as no reflection is involved
-     *
-     *  - Should it be Java-serializable? (then we definitely can suffer from short-circuiting and should be extra-careful around read-resolve)
-     *
-     *  - Should it be sealed or just a class with internal constructor? TODO discuss on design to align this policy over all the language
-     *    - Probably should to avoid exposing AbstractList superclass directly?
-     *
-     *  - TODO package-info for kotlinlang
-     */
+private class EnumEntriesList<T : Enum<T>>(private val entriesProvider: () -> Array<T>) : EnumEntries<T>, AbstractList<T>(), Serializable {
+// WA for JS IR bug:
+//  class type parameter MUST be different form E (AbstractList<E> type parameter),
+//  otherwise the bridge names for contains() and indexOf() will be clashed with the original method names,
+//  and produced JS code will not contain type checks and will not work correctly.
 
     @Volatile // Volatile is required for safe publication of the array. It doesn't incur any real-world penalties
-    private var _entries: Array<E>? = null
-    private val entries: Array<E>
+    private var _entries: Array<T>? = null
+    private val entries: Array<T>
         get() {
             var e = _entries
             if (e != null) return e
@@ -88,9 +91,38 @@ private class EnumEntriesList<E : Enum<E>>(private val entriesProvider: () -> Ar
     override val size: Int
         get() = entries.size
 
-    override fun get(index: Int): E {
+    override fun get(index: Int): T {
         val entries = entries
         checkElementIndex(index, entries.size)
         return entries[index]
     }
+
+    // By definition, EnumEntries contains **all** enums in declaration order,
+    // thus we are able to short-circuit the implementation here
+
+    override fun contains(element: T): Boolean {
+        @Suppress("SENSELESS_COMPARISON")
+        if (element === null) return false // WA for JS IR bug
+        // Check identity due to UnsafeVariance
+        val target = entries.getOrNull(element.ordinal)
+        return target === element
+    }
+
+    override fun indexOf(element: T): Int {
+        @Suppress("SENSELESS_COMPARISON")
+        if (element === null) return -1 // WA for JS IR bug
+        // Check identity due to UnsafeVariance
+        val ordinal = element.ordinal
+        val target = entries.getOrNull(ordinal)
+        return if (target === element) ordinal else -1
+    }
+
+    override fun lastIndexOf(element: T): Int = indexOf(element)
+
+    @Suppress("unused") // Used for Java serialization
+    private fun writeReplace(): Any {
+        return EnumEntriesSerializationProxy(entries)
+    }
 }
+
+internal expect class EnumEntriesSerializationProxy<E : Enum<E>>(entries: Array<E>)

@@ -499,20 +499,22 @@ ObjHeader* ObjHeader::GetOrSetWeakCounter(ObjHeader* counter) {
 
 #if KONAN_OBJC_INTEROP
 
-void* ObjHeader::GetAssociatedObject() {
-    if (!has_meta_object()) {
+void* ObjHeader::GetAssociatedObject() const {
+    auto metaObj = this->meta_object_or_null();
+    if (metaObj == nullptr) {
       return nullptr;
     }
-    return this->meta_object()->associatedObject_;
-}
-
-void** ObjHeader::GetAssociatedObjectLocation() {
-    return &this->meta_object()->associatedObject_;
+    return metaObj->associatedObject_;
 }
 
 void ObjHeader::SetAssociatedObject(void* obj) {
     this->meta_object()->associatedObject_ = obj;
 }
+
+void* ObjHeader::CasAssociatedObject(void* expectedObj, void* obj) {
+    return __sync_val_compare_and_swap(&this->meta_object()->associatedObject_, expectedObj, obj);
+}
+
 
 #endif // KONAN_OBJC_INTEROP
 
@@ -3514,6 +3516,9 @@ void Kotlin_native_internal_GC_collect(KRef) {
 #endif
 }
 
+extern "C" void Kotlin_Internal_GC_GCInfoBuilder_Fill(KRef builder, int id) {
+}
+
 void Kotlin_native_internal_GC_collectCyclic(KRef) {
 #if USE_CYCLIC_GC
   if (g_hasCyclicCollector)
@@ -3794,6 +3799,22 @@ CODEGEN_INLINE_POLICY RUNTIME_NOTHROW void Kotlin_mm_safePointWhileLoopBody() {
     // no-op, used by the new MM only.
 }
 
+RUNTIME_NOTHROW ALWAYS_INLINE void Kotlin_processObjectInMark(void* state, ObjHeader* object) {
+    // no-op, used by the new MM only.
+}
+
+RUNTIME_NOTHROW ALWAYS_INLINE void Kotlin_processArrayInMark(void* state, ObjHeader* object) {
+    // no-op, used by the new MM only.
+}
+
+RUNTIME_NOTHROW ALWAYS_INLINE void Kotlin_processFieldInMark(void* state, ObjHeader* field) {
+    // no-op, used by the new MM only.
+}
+
+RUNTIME_NOTHROW ALWAYS_INLINE void Kotlin_processEmptyObjectInMark(void* state, ObjHeader* object) {
+    // no-op, used by the new MM only.
+}
+
 } // extern "C"
 
 #if !KONAN_NO_EXCEPTIONS
@@ -3844,3 +3865,5 @@ void kotlin::StartFinalizerThreadIfNeeded() noexcept {}
 bool kotlin::FinalizersThreadIsRunning() noexcept {
     return false;
 }
+
+

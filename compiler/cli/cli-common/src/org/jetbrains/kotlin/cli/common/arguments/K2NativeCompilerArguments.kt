@@ -153,9 +153,6 @@ class K2NativeCompilerArguments : CommonCompilerArguments() {
     @Argument(value = "-Xemit-lazy-objc-header", description = "")
     var emitLazyObjCHeader: String? = null
 
-    @Argument(value = "-Xenable", deprecatedName = "--enable", valueDescription = "<Phase>", description = "Enable backend phase")
-    var enablePhases: Array<String>? = null
-
     @Argument(
         value = "-Xexport-library",
         valueDescription = "<path>",
@@ -206,20 +203,23 @@ class K2NativeCompilerArguments : CommonCompilerArguments() {
 
 
     @Argument(
-        value = MAKE_CACHE,
-        valueDescription = "<path>",
-        description = "Path of the library to be compiled to cache",
-        delimiter = ""
-    )
-    var librariesToCache: Array<String>? = null
-
-    @Argument(
         value = ADD_CACHE,
         valueDescription = "<path>",
         description = "Path to the library to be added to cache",
         delimiter = ""
     )
     var libraryToAddToCache: String? = null
+
+    @Argument(
+        value = "-Xfile-to-cache",
+        valueDescription = "<path>",
+        description = "Path to file to cache",
+        delimiter = ""
+    )
+    var filesToCache: Array<String>? = null
+
+    @Argument(value = "-Xmake-per-file-cache", description = "Force compiler to produce per-file cache")
+    var makePerFileCache: Boolean = false
 
     @Argument(value = "-Xexport-kdoc", description = "Export KDoc in framework header")
     var exportKDoc: Boolean = false
@@ -230,17 +230,8 @@ class K2NativeCompilerArguments : CommonCompilerArguments() {
     @Argument(value = "-Xcheck-state-at-external-calls", description = "Check all calls of possibly long external functions are done in Native state")
     var checkExternalCalls: Boolean = false
 
-    @Argument(value = "-Xprint-descriptors", deprecatedName = "--print_descriptors", description = "Print descriptor tree")
-    var printDescriptors: Boolean = false
-
     @Argument(value = "-Xprint-ir", deprecatedName = "--print_ir", description = "Print IR")
     var printIr: Boolean = false
-
-    @Argument(value = "-Xprint-ir-with-descriptors", deprecatedName = "--print_ir_with_descriptors", description = "Print IR with descriptors")
-    var printIrWithDescriptors: Boolean = false
-
-    @Argument(value = "-Xprint-locations", deprecatedName = "--print_locations", description = "Print locations")
-    var printLocations: Boolean = false
 
     @Argument(value = "-Xprint-files", description = "Print files")
     var printFiles: Boolean = false
@@ -390,6 +381,9 @@ class K2NativeCompilerArguments : CommonCompilerArguments() {
     @Argument(value = "-Xomit-framework-binary", description = "Omit binary when compiling framework")
     var omitFrameworkBinary: Boolean = false
 
+    @Argument(value = "-Xforce-compiler-driver", description = "Force compiler to use specific compiler driver: static or dynamic")
+    var forceCompilerDriver: String? = null
+
     override fun configureAnalysisFlags(collector: MessageCollector, languageVersion: LanguageVersion): MutableMap<AnalysisFlag<*>, Any> =
         super.configureAnalysisFlags(collector, languageVersion).also {
             val optInList = it[AnalysisFlags.optIn] as List<*>
@@ -415,7 +409,6 @@ class K2NativeCompilerArguments : CommonCompilerArguments() {
         const val STATIC_FRAMEWORK_FLAG = "-Xstatic-framework"
         const val INCLUDE_ARG = "-Xinclude"
         const val CACHED_LIBRARY = "-Xcached-library"
-        const val MAKE_CACHE = "-Xmake-cache"
         const val ADD_CACHE = "-Xadd-cache"
         const val SHORT_MODULE_NAME_ARG = "-Xshort-module-name"
     }

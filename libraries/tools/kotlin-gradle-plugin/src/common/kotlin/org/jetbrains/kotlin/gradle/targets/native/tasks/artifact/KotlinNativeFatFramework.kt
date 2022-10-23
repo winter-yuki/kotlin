@@ -9,9 +9,7 @@ import org.gradle.api.Project
 import org.gradle.api.Task
 import org.gradle.api.plugins.ExtensionAware
 import org.gradle.language.base.plugins.LifecycleBasePlugin
-import org.jetbrains.kotlin.gradle.dsl.KotlinCommonToolOptions
-import org.jetbrains.kotlin.gradle.dsl.KotlinNativeFatFramework
-import org.jetbrains.kotlin.gradle.dsl.KotlinNativeFatFrameworkConfig
+import org.jetbrains.kotlin.gradle.dsl.*
 import org.jetbrains.kotlin.gradle.plugin.mpp.BitcodeEmbeddingMode
 import org.jetbrains.kotlin.gradle.plugin.mpp.NativeBuildType
 import org.jetbrains.kotlin.gradle.plugin.mpp.NativeOutputKind
@@ -54,6 +52,7 @@ abstract class KotlinNativeFatFrameworkConfigImpl @Inject constructor(artifactNa
             isStatic = isStatic,
             linkerOptions = linkerOptions,
             kotlinOptionsFn = kotlinOptionsFn,
+            toolOptionsConfigure = toolOptionsConfigure,
             binaryOptions = binaryOptions,
             targets = targets,
             embedBitcode = embedBitcode,
@@ -68,7 +67,10 @@ class KotlinNativeFatFrameworkImpl(
     override val modes: Set<NativeBuildType>,
     override val isStatic: Boolean,
     override val linkerOptions: List<String>,
+    @Suppress("DEPRECATION")
+    @Deprecated("Replaced by toolOptionsConfigure", replaceWith = ReplaceWith("toolOptionsConfigure"))
     override val kotlinOptionsFn: KotlinCommonToolOptions.() -> Unit,
+    override val toolOptionsConfigure: KotlinCommonCompilerToolOptions.() -> Unit,
     override val binaryOptions: Map<String, String>,
     override val targets: Set<KonanTarget>,
     override val embedBitcode: BitcodeEmbeddingMode?,
@@ -109,7 +111,7 @@ class KotlinNativeFatFrameworkImpl(
                     taskNameSuffix = nameSuffix
                 )
                 fatTask.dependsOn(targetTask)
-                val frameworkFileProvider = targetTask.map { it.outputFile }
+                val frameworkFileProvider = targetTask.flatMap { it.outputFile }
                 FrameworkDescriptor(frameworkFileProvider.get(), isStatic, target)
             }
             fatTask.configure { it.fromFrameworkDescriptors(frameworkDescriptors) }

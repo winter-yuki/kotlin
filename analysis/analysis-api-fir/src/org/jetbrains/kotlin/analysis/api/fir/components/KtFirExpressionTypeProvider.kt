@@ -48,7 +48,7 @@ internal class KtFirExpressionTypeProvider(
                 val containingClass =
                     (fir.dispatchReceiver as? FirThisReceiverExpression)?.calleeReference?.boundSymbol as? FirClassSymbol<*>
                 if (fir.calleeReference is FirSuperReference && fir.typeRef is FirErrorTypeRef && containingClass != null) {
-                    val superTypes = containingClass.superConeTypes
+                    val superTypes = containingClass.resolvedSuperTypes
                     when (superTypes.size) {
                         0 -> analysisSession.builtinTypes.ANY
                         1 -> superTypes.single().asKtType()
@@ -90,12 +90,18 @@ internal class KtFirExpressionTypeProvider(
         if (expression !is KtArrayAccessExpression) return null
         val assignment = expression.parent as? KtBinaryExpression ?: return null
         if (assignment.operationToken !in KtTokens.ALL_ASSIGNMENTS) return null
+        if (assignment.left != expression) return null
         val setTargetArgumentParameter = fir.argumentMapping?.entries?.last()?.value ?: return null
         return setTargetArgumentParameter.returnTypeRef.coneType.asKtType()
     }
 
     override fun getReturnTypeForKtDeclaration(declaration: KtDeclaration): KtType {
-        val firDeclaration = declaration.getOrBuildFirOfType<FirCallableDeclaration>(firResolveSession)
+        val firDeclaration = when {
+            declaration is KtNamedFunction && declaration.name == null ->
+                declaration.getOrBuildFirOfType<FirAnonymousFunctionExpression>(firResolveSession).anonymousFunction
+            else ->
+                declaration.getOrBuildFirOfType<FirCallableDeclaration>(firResolveSession)
+        }
         return firDeclaration.returnTypeRef.coneType.asKtType()
     }
 
@@ -230,11 +236,12 @@ internal class KtFirExpressionTypeProvider(
         }
 
         when (val fir = expression.getOrBuildFir(analysisSession.firResolveSession)) {
-            is FirExpressionWithSmartcastToNothing -> if (fir.isStable) {
-                return DefiniteNullability.DEFINITELY_NULL
-            }
-            is FirExpressionWithSmartcast -> if (fir.isStable && fir.isNotNullable()) {
-                return DefiniteNullability.DEFINITELY_NOT_NULL
+            is FirSmartCastExpression -> if (fir.isStable) {
+                if (fir.smartcastTypeWithoutNullableNothing != null) {
+                    return DefiniteNullability.DEFINITELY_NULL
+                } else if (fir.isNotNullable()) {
+                    return DefiniteNullability.DEFINITELY_NOT_NULL
+                }
             }
             is FirExpression -> if (fir.isNotNullable()) {
                 return DefiniteNullability.DEFINITELY_NOT_NULL

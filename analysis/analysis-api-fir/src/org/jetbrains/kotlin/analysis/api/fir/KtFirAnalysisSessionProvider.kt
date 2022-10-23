@@ -15,38 +15,20 @@ import org.jetbrains.kotlin.analysis.api.symbols.KtSymbol
 import org.jetbrains.kotlin.analysis.api.lifetime.KtLifetimeToken
 import org.jetbrains.kotlin.analysis.low.level.api.fir.api.LLFirResolveSession
 import org.jetbrains.kotlin.analysis.low.level.api.fir.api.getFirResolveSession
-import org.jetbrains.kotlin.analysis.low.level.api.fir.util.firErrorWithAttachment
 import org.jetbrains.kotlin.analysis.project.structure.KtModule
 import org.jetbrains.kotlin.psi.KtElement
-import org.jetbrains.kotlin.utils.errorWithAttachment
+import org.jetbrains.kotlin.analysis.utils.errors.buildErrorWithAttachment
 
 @OptIn(KtAnalysisApiInternals::class)
 class KtFirAnalysisSessionProvider(project: Project) : CachingKtAnalysisSessionProvider<LLFirResolveSession>(project) {
-    override fun getFirResolveSession(contextElement: KtElement): LLFirResolveSession {
-        return contextElement.getFirResolveSession()
-    }
-
-    override fun getFirResolveSession(contextSymbol: KtSymbol): LLFirResolveSession {
-        return when (contextSymbol) {
-            is KtFirSymbol<*> -> contextSymbol.firResolveSession
-            else -> errorWithAttachment("Invalid symbol") {
-                withSymbolAttachment("symbol", contextSymbol)
-            }
-        }
-    }
-
     override fun getFirResolveSession(contextModule: KtModule): LLFirResolveSession {
-        checkNotNull(contextModule.project)
-        return contextModule.getFirResolveSession(contextModule.project!!)
+        return contextModule.getFirResolveSession(project)
     }
 
     override fun createAnalysisSession(
         firResolveSession: LLFirResolveSession,
         token: KtLifetimeToken,
-    ): KtAnalysisSession {
-        @Suppress("DEPRECATION")
-        return KtFirAnalysisSession.createAnalysisSessionByFirResolveSession(firResolveSession, token)
-    }
+    ): KtAnalysisSession = KtFirAnalysisSession.createAnalysisSessionByFirResolveSession(firResolveSession, token)
 }
 
 

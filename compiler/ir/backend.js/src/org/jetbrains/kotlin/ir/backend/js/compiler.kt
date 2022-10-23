@@ -7,6 +7,7 @@ package org.jetbrains.kotlin.ir.backend.js
 
 import org.jetbrains.kotlin.backend.common.phaser.PhaseConfig
 import org.jetbrains.kotlin.backend.common.phaser.invokeToplevel
+import org.jetbrains.kotlin.backend.common.serialization.linkerissues.checkNoUnboundSymbols
 import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.ir.IrBuiltIns
 import org.jetbrains.kotlin.ir.backend.js.codegen.JsGenerationGranularity
@@ -21,7 +22,6 @@ import org.jetbrains.kotlin.ir.declarations.IrFactory
 import org.jetbrains.kotlin.ir.declarations.IrModuleFragment
 import org.jetbrains.kotlin.ir.util.ExternalDependenciesGenerator
 import org.jetbrains.kotlin.ir.util.SymbolTable
-import org.jetbrains.kotlin.ir.util.noUnboundLeft
 import org.jetbrains.kotlin.js.backend.ast.JsProgram
 import org.jetbrains.kotlin.js.config.JSConfigurationKeys
 import org.jetbrains.kotlin.js.config.RuntimeDiagnostic
@@ -52,6 +52,7 @@ fun compile(
     phaseConfig: PhaseConfig,
     irFactory: IrFactory,
     exportedDeclarations: Set<FqName> = emptySet(),
+    keep: Set<String> = emptySet(),
     dceRuntimeDiagnostic: RuntimeDiagnostic? = null,
     es6mode: Boolean = false,
     verifySignatures: Boolean = true,
@@ -77,6 +78,7 @@ fun compile(
         deserializer,
         phaseConfig,
         exportedDeclarations,
+        keep,
         dceRuntimeDiagnostic,
         es6mode,
         baseClassIntoMetadata,
@@ -95,9 +97,10 @@ fun compileIr(
     moduleToName: Map<IrModuleFragment, String>,
     irBuiltIns: IrBuiltIns,
     symbolTable: SymbolTable,
-    deserializer: JsIrLinker,
+    irLinker: JsIrLinker,
     phaseConfig: PhaseConfig,
     exportedDeclarations: Set<FqName>,
+    keep: Set<String>,
     dceRuntimeDiagnostic: RuntimeDiagnostic?,
     es6mode: Boolean,
     baseClassIntoMetadata: Boolean,
@@ -108,13 +111,12 @@ fun compileIr(
 ): LoweredIr {
     val moduleDescriptor = moduleFragment.descriptor
     val irFactory = symbolTable.irFactory
+    val shouldGeneratePolyfills = configuration.getBoolean(JSConfigurationKeys.GENERATE_POLYFILLS)
 
     val allModules = when (mainModule) {
         is MainModule.SourceFiles -> dependencyModules + listOf(moduleFragment)
         is MainModule.Klib -> dependencyModules
     }
-
-    val allowUnboundSymbols = configuration[JSConfigurationKeys.PARTIAL_LINKAGE] ?: false
 
     val context = JsIrBackendContext(
         moduleDescriptor,
@@ -122,6 +124,7 @@ fun compileIr(
         symbolTable,
         allModules.first(),
         exportedDeclarations,
+        keep,
         configuration,
         es6mode = es6mode,
         dceRuntimeDiagnostic = dceRuntimeDiagnostic,
@@ -129,20 +132,21 @@ fun compileIr(
         safeExternalBoolean = safeExternalBoolean,
         safeExternalBooleanDiagnostic = safeExternalBooleanDiagnostic,
         granularity = granularity,
-        icCompatibleIr2Js = if (icCompatibleIr2Js) IcCompatibleIr2Js.COMPATIBLE else IcCompatibleIr2Js.DISABLED
+        icCompatibleIr2Js = if (icCompatibleIr2Js) IcCompatibleIr2Js.COMPATIBLE else IcCompatibleIr2Js.DISABLED,
     )
 
     // Load declarations referenced during `context` initialization
-    val irProviders = listOf(deserializer)
+    val irProviders = listOf(irLinker)
     ExternalDependenciesGenerator(symbolTable, irProviders).generateUnboundSymbolsAsDependencies()
 
-    deserializer.postProcess()
-    if (!allowUnboundSymbols) {
-        symbolTable.noUnboundLeft("Unbound symbols at the end of linker")
-    }
+    irLinker.postProcess()
+    irLinker.checkNoUnboundSymbols(symbolTable, "at the end of IR linkage process")
 
     allModules.forEach { module ->
-        collectNativeImplementations(context, module)
+        if (shouldGeneratePolyfills) {
+            collectNativeImplementations(context, module)
+        }
+
         moveBodilessDeclarationsToSeparatePlace(context, module)
     }
 
@@ -161,7 +165,9 @@ fun generateJsCode(
     moduleFragment: IrModuleFragment,
     nameTables: NameTables
 ): String {
-    collectNativeImplementations(context, moduleFragment)
+    if (context.configuration.getBoolean(JSConfigurationKeys.GENERATE_POLYFILLS)) {
+        collectNativeImplementations(context, moduleFragment)
+    }
     moveBodilessDeclarationsToSeparatePlace(context, moduleFragment)
     jsPhases.invokeToplevel(PhaseConfig(jsPhases), context, listOf(moduleFragment))
 

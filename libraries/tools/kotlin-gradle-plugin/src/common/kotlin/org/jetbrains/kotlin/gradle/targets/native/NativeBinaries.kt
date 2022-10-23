@@ -13,10 +13,13 @@ import org.gradle.api.Project
 import org.gradle.api.artifacts.Dependency
 import org.gradle.api.attributes.Attribute
 import org.gradle.api.attributes.HasAttributes
+import org.gradle.api.file.Directory
+import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.AbstractExecTask
 import org.gradle.api.tasks.TaskProvider
 import org.jetbrains.kotlin.gradle.tasks.KotlinNativeLink
+import org.jetbrains.kotlin.gradle.utils.Xcode
 import org.jetbrains.kotlin.gradle.utils.lowerCamelCaseName
 import org.jetbrains.kotlin.konan.target.KonanTarget
 import java.io.File
@@ -97,9 +100,13 @@ sealed class NativeBinary(
 
     // Output access.
     // TODO: Provide output configurations and integrate them with Gradle Native.
-    var outputDirectory: File = with(project) {
+    var outputDirectory: File
+        get() = outputDirectoryProperty.get().asFile
+        set(value) = outputDirectoryProperty.set(value)
+
+    val outputDirectoryProperty: DirectoryProperty = with(project) {
         val targetSubDirectory = target.disambiguationClassifier?.let { "$it/" }.orEmpty()
-        buildDir.resolve("bin/$targetSubDirectory${this@NativeBinary.name}")
+        objects.directoryProperty().convention(layout.buildDirectory.dir("bin/$targetSubDirectory${this@NativeBinary.name}"))
     }
 
     val outputFile: File by lazy {
@@ -272,13 +279,25 @@ class Framework(
     /**
      * Embed bitcode for the framework or not. See [BitcodeEmbeddingMode].
      */
-    var embedBitcode: org.jetbrains.kotlin.gradle.plugin.mpp.BitcodeEmbeddingMode = buildType.embedBitcode(konanTarget)
+    val embedBitcodeMode = project.objects.property(org.jetbrains.kotlin.gradle.plugin.mpp.BitcodeEmbeddingMode::class.java).apply {
+        convention(project.provider {
+            Xcode?.defaultBitcodeEmbeddingMode(konanTarget, buildType)
+                ?: org.jetbrains.kotlin.gradle.plugin.mpp.BitcodeEmbeddingMode.DISABLE
+        })
+    }
+
+    @Deprecated("Use 'embedBitcodeMode' property instead.")
+    var embedBitcode: org.jetbrains.kotlin.gradle.plugin.mpp.BitcodeEmbeddingMode
+        get() = embedBitcodeMode.get()
+        set(value) {
+            embedBitcodeMode.set(value)
+        }
 
     /**
      * Enable or disable embedding bitcode for the framework. See [BitcodeEmbeddingMode].
      */
     fun embedBitcode(mode: org.jetbrains.kotlin.gradle.plugin.mpp.BitcodeEmbeddingMode) {
-        embedBitcode = mode
+        embedBitcodeMode.set(mode)
     }
 
     /**

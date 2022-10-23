@@ -105,11 +105,14 @@ class WasmBackendContext(
     val wasmSymbols: WasmSymbols = WasmSymbols(this@WasmBackendContext, symbolTable)
     override val reflectionSymbols: ReflectionSymbols get() = wasmSymbols.reflectionSymbols
 
+    override val enumEntries = wasmSymbols.enumEntries
+    override val createEnumEntries = wasmSymbols.createEnumEntries
+
     override val propertyLazyInitialization: PropertyLazyInitialization =
         PropertyLazyInitialization(enabled = propertyLazyInitialization, eagerInitialization = wasmSymbols.eagerInitialization)
 
     override val ir = object : Ir<WasmBackendContext>(this, irModuleFragment) {
-        override val symbols: Symbols<WasmBackendContext> = wasmSymbols
+        override val symbols: Symbols = wasmSymbols
         override fun shouldGenerateHandlerParameterForDefaultBodyFun() = true
     }
 

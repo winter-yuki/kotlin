@@ -1,6 +1,7 @@
 import org.jetbrains.kotlin.gradle.targets.js.KotlinJsCompilerAttribute
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinUsages
+import org.jetbrains.kotlin.gradle.targets.js.d8.D8RootPlugin
 
 description = "Atomicfu Compiler Plugin"
 
@@ -69,7 +70,6 @@ dependencies {
     testApi(project(":kotlin-test:kotlin-test-jvm"))
 
     testRuntimeOnly(kotlinStdlib())
-    testRuntimeOnly(project(":kotlin-reflect"))
     testRuntimeOnly(project(":kotlin-preloader")) // it's required for ant tests
     testRuntimeOnly(project(":compiler:backend-common"))
     testRuntimeOnly(commonDependency("org.fusesource.jansi", "jansi"))
@@ -118,11 +118,13 @@ projectTest(jUnitMode = JUnitMode.JUnit5) {
     setUpJsIrBoxTests()
 }
 
+val d8Plugin = D8RootPlugin.apply(rootProject)
+d8Plugin.version = v8Version
+
 fun Test.setupV8() {
-    dependsOn(":js:js.tests:unzipV8")
+    dependsOn(d8Plugin.setupTaskProvider)
     doFirst {
-        val unzipV8Task = project.tasks.getByPath(":js:js.tests:unzipV8")
-        systemProperty("javascript.engine.path.V8", File(unzipV8Task.outputs.files.single().path, "d8"))
+        systemProperty("javascript.engine.path.V8", d8Plugin.requireConfigured().executablePath.absolutePath)
     }
 }
 

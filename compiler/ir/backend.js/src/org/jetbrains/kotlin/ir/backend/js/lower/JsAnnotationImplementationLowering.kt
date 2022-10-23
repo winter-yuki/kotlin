@@ -20,6 +20,7 @@ import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.ir.types.isArray
 import org.jetbrains.kotlin.ir.util.isAnnotationClass
 import org.jetbrains.kotlin.ir.util.isPrimitiveArray
+import org.jetbrains.kotlin.ir.util.isUnsignedArray
 
 
 // JS PIR (and IC) requires DeclarationTransformer instead of FileLoweringPass
@@ -40,10 +41,12 @@ class JsAnnotationImplementationTransformer(val jsContext: JsIrBackendContext) :
         compilationException("Should not be called", implClass)
 
     override fun visitClassNew(declaration: IrClass): IrStatement {
-        if (declaration.isAnnotationClass) {
-            implementGeneratedFunctions(declaration, declaration)
+        return declaration.apply {
+            if (isAnnotationClass) {
+                implementGeneratedFunctions(this, this)
+            }
+            addConstructorBodyForCompatibility()
         }
-        return super.visitClassNew(declaration)
     }
 
     private val arraysContentEquals: Map<IrType, IrSimpleFunctionSymbol> =
@@ -51,7 +54,7 @@ class JsAnnotationImplementationTransformer(val jsContext: JsIrBackendContext) :
 
     override fun getArrayContentEqualsSymbol(type: IrType) =
         when {
-            type.isPrimitiveArray() -> arraysContentEquals[type]
+            type.isPrimitiveArray() || type.isUnsignedArray() -> arraysContentEquals[type]
             else -> arraysContentEquals.entries.singleOrNull { (k, _) -> k.isArray() }?.value
         } ?: compilationException("Can't find an Arrays.contentEquals method for array type", type)
 

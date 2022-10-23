@@ -43,6 +43,9 @@ interface IrDeclarationOrigin {
     object GENERATED_DATA_CLASS_MEMBER : IrDeclarationOriginImpl("GENERATED_DATA_CLASS_MEMBER")
     object GENERATED_SINGLE_FIELD_VALUE_CLASS_MEMBER : IrDeclarationOriginImpl("GENERATED_SINGLE_FIELD_VALUE_CLASS_MEMBER")
     object GENERATED_MULTI_FIELD_VALUE_CLASS_MEMBER : IrDeclarationOriginImpl("GENERATED_MULTI_FIELD_VALUE_CLASS_MEMBER")
+    object GENERATED_MULTI_FIELD_VALUE_CLASS_PARAMETER : IrDeclarationOriginImpl("GENERATED_MULTI_FIELD_VALUE_CLASS_PARAMETER")
+    object TEMPORARY_MULTI_FIELD_VALUE_CLASS_VARIABLE : IrDeclarationOriginImpl("TEMPORARY_MULTI_FIELD_VALUE_CLASS_VARIABLE")
+    object MULTI_FIELD_VALUE_CLASS_REPRESENTATION_VARIABLE : IrDeclarationOriginImpl("MULTI_FIELD_VALUE_CLASS_REPRESENTATION_VARIABLE")
     object LOCAL_FUNCTION : IrDeclarationOriginImpl("LOCAL_FUNCTION")
     object LOCAL_FUNCTION_FOR_LAMBDA : IrDeclarationOriginImpl("LOCAL_FUNCTION_FOR_LAMBDA")
     object CATCH_PARAMETER : IrDeclarationOriginImpl("CATCH_PARAMETER")
@@ -60,7 +63,10 @@ interface IrDeclarationOrigin {
 
     object FIELD_FOR_ENUM_ENTRY : IrDeclarationOriginImpl("FIELD_FOR_ENUM_ENTRY")
     object SYNTHETIC_HELPER_FOR_ENUM_VALUES : IrDeclarationOriginImpl("SYNTHETIC_HELPER_FOR_ENUM_VALUES", isSynthetic = true)
+    object SYNTHETIC_HELPER_FOR_ENUM_ENTRIES : IrDeclarationOriginImpl("SYNTHETIC_HELPER_FOR_ENUM_ENTRIES", isSynthetic = true)
     object FIELD_FOR_ENUM_VALUES : IrDeclarationOriginImpl("FIELD_FOR_ENUM_VALUES", isSynthetic = true)
+    object FIELD_FOR_ENUM_ENTRIES: IrDeclarationOriginImpl("FIELD_FOR_ENUM_ENTRIES", isSynthetic = true)
+    object PROPERTY_FOR_ENUM_ENTRIES: IrDeclarationOriginImpl("PROPERTY_FOR_ENUM_ENTRIES", isSynthetic = false)
     object FIELD_FOR_OBJECT_INSTANCE : IrDeclarationOriginImpl("FIELD_FOR_OBJECT_INSTANCE")
     object FIELD_FOR_CLASS_CONTEXT_RECEIVER : IrDeclarationOriginImpl("FIELD_FOR_CLASS_CONTEXT_RECEIVER", isSynthetic = true)
 

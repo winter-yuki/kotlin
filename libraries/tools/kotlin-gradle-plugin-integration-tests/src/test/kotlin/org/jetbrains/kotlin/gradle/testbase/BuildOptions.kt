@@ -36,10 +36,10 @@ data class BuildOptions(
     val buildReport: List<BuildReportType> = emptyList(),
     val useFir: Boolean = false,
     val usePreciseJavaTracking: Boolean? = null,
+    val freeArgs: List<String> = emptyList(),
 ) {
     data class KaptOptions(
         val verbose: Boolean = false,
-        val useWorkers: Boolean = false,
         val incrementalKapt: Boolean = false,
         val includeCompileClasspath: Boolean = false,
         val classLoadersCacheSize: Int? = null
@@ -101,7 +101,6 @@ data class BuildOptions(
 
         if (kaptOptions != null) {
             arguments.add("-Pkapt.verbose=${kaptOptions.verbose}")
-            arguments.add("-Pkapt.use.worker.api=${kaptOptions.useWorkers}")
             arguments.add("-Pkapt.incremental.apt=${kaptOptions.incrementalKapt}")
             arguments.add("-Pkapt.include.compile.classpath=${kaptOptions.includeCompileClasspath}")
             kaptOptions.classLoadersCacheSize?.let { cacheSize ->
@@ -115,6 +114,8 @@ data class BuildOptions(
             jsOptions.useIrBackend?.let { arguments.add("-Pkotlin.js.useIrBackend=$it") }
             jsOptions.jsCompilerType?.let { arguments.add("-Pkotlin.js.compiler=$it") }
         }
+        // because we have legacy compiler tests, we need nowarn for compiler testing
+        arguments.add("-Pkotlin.js.compiler.nowarn=true")
 
         if (androidVersion != null) {
             arguments.add("-Pandroid_tools_version=${androidVersion}")
@@ -132,6 +133,9 @@ data class BuildOptions(
         if (usePreciseJavaTracking != null) {
             arguments.add("-Pkotlin.incremental.usePreciseJavaTracking=$usePreciseJavaTracking")
         }
+
+        arguments.addAll(freeArgs)
+
         return arguments.toList()
     }
 }

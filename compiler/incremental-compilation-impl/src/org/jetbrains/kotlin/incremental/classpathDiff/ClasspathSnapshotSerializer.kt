@@ -120,6 +120,8 @@ private object RegularKotlinClassSnapshotExternalizer : DataExternalizer<Regular
         LongExternalizer.save(output, snapshot.classAbiHash)
         NullableValueExternalizer(KotlinClassInfoExternalizer).save(output, snapshot.classMemberLevelSnapshot)
         ListExternalizer(JvmClassNameExternalizer).save(output, snapshot.supertypes)
+        NullableValueExternalizer(StringExternalizer).save(output, snapshot.companionObjectName)
+        NullableValueExternalizer(ListExternalizer(StringExternalizer)).save(output, snapshot.constantsInCompanionObject)
     }
 
     override fun read(input: DataInput): RegularKotlinClassSnapshot {
@@ -128,7 +130,9 @@ private object RegularKotlinClassSnapshotExternalizer : DataExternalizer<Regular
             classId = ClassIdExternalizerWithInterning.read(input),
             classAbiHash = LongExternalizer.read(input),
             classMemberLevelSnapshot = NullableValueExternalizer(KotlinClassInfoExternalizer).read(input),
-            supertypes = ListExternalizer(JvmClassNameExternalizerWithInterning).read(input)
+            supertypes = ListExternalizer(JvmClassNameExternalizerWithInterning).read(input),
+            companionObjectName = NullableValueExternalizer(StringExternalizer).read(input),
+            constantsInCompanionObject = NullableValueExternalizer(ListExternalizer(StringExternalizer)).read(input)
         )
     }
 }
@@ -182,7 +186,7 @@ internal object KotlinClassInfoExternalizer : DataExternalizer<KotlinClassInfo> 
         ListExternalizer(StringExternalizer).save(output, info.classHeaderStrings.toList())
         NullableValueExternalizer(StringExternalizer).save(output, info.multifileClassName)
         LinkedHashMapExternalizer(StringExternalizer, ConstantExternalizer).save(output, info.constantsMap)
-        LinkedHashMapExternalizer(StringExternalizer, LongExternalizer).save(output, info.inlineFunctionsMap)
+        LinkedHashMapExternalizer(StringExternalizer, LongExternalizer).save(output, info.inlineFunctionsAndAccessorsMap)
     }
 
     override fun read(input: DataInput): KotlinClassInfo {
@@ -194,7 +198,7 @@ internal object KotlinClassInfoExternalizer : DataExternalizer<KotlinClassInfo> 
             classHeaderStrings = ListExternalizer(StringExternalizer).read(input).toTypedArray(),
             multifileClassName = NullableValueExternalizer(StringExternalizer).read(input),
             constantsMap = LinkedHashMapExternalizer(StringExternalizer, ConstantExternalizer).read(input),
-            inlineFunctionsMap = LinkedHashMapExternalizer(StringExternalizer, LongExternalizer).read(input)
+            inlineFunctionsAndAccessorsMap = LinkedHashMapExternalizer(StringExternalizer, LongExternalizer).read(input)
         )
     }
 }

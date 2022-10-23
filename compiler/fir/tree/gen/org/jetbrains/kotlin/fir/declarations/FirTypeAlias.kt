@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2021 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2022 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -26,7 +26,7 @@ abstract class FirTypeAlias : FirClassLikeDeclaration(), FirTypeParametersOwner 
     abstract override val origin: FirDeclarationOrigin
     abstract override val attributes: FirDeclarationAttributes
     abstract override val status: FirDeclarationStatus
-    abstract override val deprecation: DeprecationsPerUseSite?
+    abstract override val deprecationsProvider: DeprecationsProvider
     abstract override val typeParameters: List<FirTypeParameter>
     abstract val name: Name
     abstract override val symbol: FirTypeAliasSymbol
@@ -41,7 +41,7 @@ abstract class FirTypeAlias : FirClassLikeDeclaration(), FirTypeParametersOwner 
 
     abstract override fun replaceResolvePhase(newResolvePhase: FirResolvePhase)
 
-    abstract override fun replaceDeprecation(newDeprecation: DeprecationsPerUseSite?)
+    abstract override fun replaceDeprecationsProvider(newDeprecationsProvider: DeprecationsProvider)
 
     abstract fun replaceExpandedTypeRef(newExpandedTypeRef: FirTypeRef)
 

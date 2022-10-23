@@ -5,11 +5,11 @@ plugins {
     id("jps-compatible")
 }
 
-project.configureJvmToolchain(JdkMajorVersion.JDK_11)
+project.configureJvmToolchain(JdkMajorVersion.JDK_11_0)
 
 dependencies {
     testImplementation(kotlinStdlib())
-    testImplementation(project(":kotlin-reflect"))
+    testImplementation(commonDependency("org.jetbrains.kotlin:kotlin-reflect")) { isTransitive = false }
     testImplementation(intellijCore())
     testImplementation(commonDependency("commons-lang:commons-lang"))
     testImplementation(commonDependency("org.jetbrains.teamcity:serviceMessages"))
@@ -57,7 +57,8 @@ enum class TestProperty(shortName: String) {
     GC_TYPE("gcType"),
     GC_SCHEDULER("gcScheduler"),
     CACHE_MODE("cacheMode"),
-    EXECUTION_TIMEOUT("executionTimeout");
+    EXECUTION_TIMEOUT("executionTimeout"),
+    SANITIZER("sanitizer");
 
     private val propertyName = "kotlin.internal.native.test.$shortName"
 
@@ -110,9 +111,16 @@ fun nativeTest(taskName: String, vararg tags: String) = projectTest(
         TestProperty.COMPILER_CLASSPATH.setUpFromGradleProperty(this) {
             val customNativeHome = TestProperty.KOTLIN_NATIVE_HOME.readGradleProperty(this)
             if (customNativeHome != null) {
-                file(customNativeHome).resolve("konan/lib/kotlin-native-compiler-embeddable.jar").absolutePath
+                file(customNativeHome).run {
+                    val embeddableJar = resolve("konan/lib/kotlin-native-compiler-embeddable.jar").absolutePath
+                    val troveJar = resolve("konan/lib/trove4j.jar").absolutePath
+                    troveJar + File.pathSeparatorChar.toString() + embeddableJar
+                }
             } else {
-                val kotlinNativeCompilerEmbeddable = configurations.detachedConfiguration(dependencies.project(":kotlin-native-compiler-embeddable"))
+                val kotlinNativeCompilerEmbeddable = configurations.detachedConfiguration(
+                    dependencies.project(":kotlin-native-compiler-embeddable"),
+                    dependencies.module(commonDependency("org.jetbrains.intellij.deps:trove4j"))
+                )
                 dependsOn(kotlinNativeCompilerEmbeddable)
                 kotlinNativeCompilerEmbeddable.files.joinToString(";")
             }
@@ -130,6 +138,7 @@ fun nativeTest(taskName: String, vararg tags: String) = projectTest(
         TestProperty.GC_SCHEDULER.setUpFromGradleProperty(this)
         TestProperty.CACHE_MODE.setUpFromGradleProperty(this)
         TestProperty.EXECUTION_TIMEOUT.setUpFromGradleProperty(this)
+        TestProperty.SANITIZER.setUpFromGradleProperty(this)
 
         // Pass the current Gradle task name so test can use it in logging.
         environment("GRADLE_TASK_NAME", path)
@@ -167,6 +176,7 @@ val codegenBoxTest = nativeTest("codegenBoxTest", "codegen")
 val stdlibTest = nativeTest("stdlibTest", "stdlib")
 val kotlinTestLibraryTest = nativeTest("kotlinTestLibraryTest", "kotlin-test")
 val klibAbiTest = nativeTest("klibAbiTest", "klib-abi")
+val klibBinaryCompatibilityTest = nativeTest("klibBinaryCompatibilityTest", "klib-binary-compatibility")
 
 // "test" task is created by convention. We can't just remove it. Let's enable it in developer's environment, so it can be used
 // to run any test from IDE or from console, but disable it at TeamCity where it is not supposed to be ever used.
@@ -177,6 +187,6 @@ val test by nativeTest("test" /* no tags */).apply {
 }
 
 val generateTests by generator("org.jetbrains.kotlin.generators.tests.GenerateNativeTestsKt") {
-    javaLauncher.set(project.getToolchainLauncherFor(JdkMajorVersion.JDK_11))
+    javaLauncher.set(project.getToolchainLauncherFor(JdkMajorVersion.JDK_11_0))
     dependsOn(":compiler:generateTestData")
 }

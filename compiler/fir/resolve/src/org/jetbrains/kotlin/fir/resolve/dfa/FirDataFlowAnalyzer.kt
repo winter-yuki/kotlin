@@ -168,6 +168,7 @@ abstract class FirDataFlowAnalyzer<FLOW : Flow>(
 
     fun isAccessToUnstableLocalVariable(expression: FirExpression): Boolean {
         val qualifiedAccessExpression = when (expression) {
+            is FirSmartCastExpression -> expression.originalExpression as FirQualifiedAccessExpression
             is FirQualifiedAccessExpression -> expression
             is FirWhenSubjectExpression -> {
                 val whenExpression = expression.whenRef.value
@@ -354,7 +355,6 @@ abstract class FirDataFlowAnalyzer<FLOW : Flow>(
     }
 
     fun exitAnonymousObject(anonymousObject: FirAnonymousObject): ControlFlowGraph {
-        // TODO: support capturing of mutable properties, KT-44877
         val (node, controlFlowGraph) = graphBuilder.exitAnonymousObject(anonymousObject)
         node.mergeIncomingFlow()
         return controlFlowGraph
@@ -1012,6 +1012,10 @@ abstract class FirDataFlowAnalyzer<FLOW : Flow>(
         processConditionalContract(qualifiedAccessExpression)
     }
 
+    fun exitSmartCastExpression(smartCastExpression: FirSmartCastExpression) {
+        graphBuilder.exitSmartCastExpression(smartCastExpression).mergeIncomingFlow()
+    }
+
     fun enterSafeCallAfterNullCheck(safeCall: FirSafeCallExpression) {
         val node = graphBuilder.enterSafeCall(safeCall).mergeIncomingFlow()
         val previousNode = node.firstPreviousNode
@@ -1221,9 +1225,14 @@ abstract class FirDataFlowAnalyzer<FLOW : Flow>(
     fun exitVariableAssignment(assignment: FirVariableAssignment) {
         val node = graphBuilder.exitVariableAssignment(assignment).mergeIncomingFlow()
         val property = assignment.lValue.resolvedSymbol?.fir as? FirProperty ?: return
-        // TODO: add unstable smartcast
-        if (property.isLocal || !property.isVar) {
+        if (property.isLocal || property.isVal) {
             exitVariableInitialization(node, assignment.rValue, property, assignment, hasExplicitType = false)
+        } else {
+            // TODO: add unstable smartcast for non-local var
+            val variable = variableStorage.getRealVariableWithoutUnwrappingAlias(node.flow, property.symbol, assignment)
+            if (variable != null) {
+                logicSystem.removeAllAboutVariable(node.flow, variable)
+            }
         }
         processConditionalContract(assignment)
     }
@@ -1249,7 +1258,7 @@ abstract class FirDataFlowAnalyzer<FLOW : Flow>(
             logicSystem.recordNewAssignment(flow, propertyVariable, context.newAssignmentIndex())
         }
 
-        variableStorage.getOrCreateRealVariable(flow, initializer.symbol, initializer)
+        variableStorage.getOrCreateRealVariable(flow, initializer.symbol, initializer.unwrapSmartcastExpression())
             ?.let { initializerVariable ->
                 val isInitializerStable =
                     initializerVariable.isStable || (initializerVariable.hasLocalStability && initializer.isAccessToStableVariable())
@@ -1284,7 +1293,7 @@ abstract class FirDataFlowAnalyzer<FLOW : Flow>(
     }
 
     private fun FirExpression.isAccessToStableVariable(): Boolean =
-        this is FirQualifiedAccessExpression && !isAccessToUnstableLocalVariable(this)
+        !isAccessToUnstableLocalVariable(this)
 
     private val RealVariable.isStable get() = stability == PropertyStability.STABLE_VALUE
     private val RealVariable.hasLocalStability get() = stability == PropertyStability.LOCAL_VAR
@@ -1555,13 +1564,13 @@ abstract class FirDataFlowAnalyzer<FLOW : Flow>(
         var deadForwardCount = 0
         for (previousNode in previousNodes) {
             val incomingEdgeKind = incomingEdges.getValue(previousNode).kind
-            if (isDead) {
-                if (!incomingEdgeKind.isBack) {
-                    previousFlows += previousNode.flow
-                }
+
+            if (isDead && incomingEdgeKind.usedInDeadDfa) {
+                previousFlows += previousNode.flow
             } else if (incomingEdgeKind.usedInDfa) {
                 previousFlows += previousNode.flow
             }
+
             if (incomingEdgeKind == EdgeKind.DeadForward) {
                 deadForwardCount++
             }

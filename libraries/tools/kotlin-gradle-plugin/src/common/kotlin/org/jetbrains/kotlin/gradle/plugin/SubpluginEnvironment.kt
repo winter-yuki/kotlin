@@ -94,7 +94,7 @@ internal fun addCompilationSourcesToExternalCompileTask(
     task: TaskProvider<out AbstractKotlinCompileTool<*>>
 ) {
     if (compilation is KotlinJvmAndroidCompilation) {
-        compilation.androidVariant.forEachKotlinSourceDirectorySet { sourceSet ->
+        compilation.androidVariant.forEachKotlinSourceDirectorySet(compilation.project) { sourceSet ->
             task.configure { it.setSource(sourceSet) }
         }
         compilation.androidVariant.forEachJavaSourceDir { sources ->
@@ -111,7 +111,7 @@ internal fun addCompilationSourcesToExternalCompileTask(
 internal fun findJavaTaskForKotlinCompilation(compilation: KotlinCompilation<*>): TaskProvider<out JavaCompile>? =
     when (compilation) {
         is KotlinJvmAndroidCompilation -> compilation.compileJavaTaskProvider
-        is KotlinWithJavaCompilation -> compilation.compileJavaTaskProvider
+        is KotlinWithJavaCompilation<*, *> -> compilation.compileJavaTaskProvider
         is KotlinJvmCompilation -> compilation.compileJavaTaskProvider // may be null for Kotlin-only JVM target in MPP
         else -> null
     }

@@ -45,6 +45,8 @@ object ErrorsNative {
     @JvmField
     val INVALID_OBJC_NAME_FIRST_CHAR = DiagnosticFactory1.create<KtElement, String>(Severity.ERROR)
     @JvmField
+    val EMPTY_OBJC_NAME = DiagnosticFactory0.create<KtElement>(Severity.ERROR)
+    @JvmField
     val INCOMPATIBLE_OBJC_NAME_OVERRIDE = DiagnosticFactory2.create<KtElement, DeclarationDescriptor, Collection<DeclarationDescriptor>>(Severity.ERROR)
     @JvmField
     val INAPPLICABLE_EXACT_OBJC_NAME = DiagnosticFactory0.create<KtElement>(Severity.ERROR)
@@ -52,6 +54,12 @@ object ErrorsNative {
     val MISSING_EXACT_OBJC_NAME = DiagnosticFactory0.create<KtElement>(Severity.ERROR)
     @JvmField
     val NON_LITERAL_OBJC_NAME_ARG = DiagnosticFactory0.create<KtElement>(Severity.ERROR)
+    @JvmField
+    val REDUNDANT_SWIFT_REFINEMENT = DiagnosticFactory0.create<KtElement>(Severity.ERROR)
+    @JvmField
+    val INCOMPATIBLE_OBJC_REFINEMENT_OVERRIDE = DiagnosticFactory2.create<KtElement, DeclarationDescriptor, Collection<DeclarationDescriptor>>(Severity.ERROR)
+    @JvmField
+    val INVALID_OBJC_REFINEMENT_TARGETS = DiagnosticFactory0.create<KtElement>(Severity.ERROR)
 
     init {
         Errors.Initializer.initializeFactoryNames(ErrorsNative::class.java)

@@ -7,6 +7,7 @@ package org.jetbrains.kotlin.ir.backend.js.ic
 import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
 import org.jetbrains.kotlin.ir.backend.js.*
+import org.jetbrains.kotlin.ir.backend.js.codegen.JsGenerationGranularity
 import org.jetbrains.kotlin.ir.backend.js.lower.serialization.ir.JsIrLinker
 import org.jetbrains.kotlin.ir.backend.js.transformers.irToJs.JsIrFragmentAndBinaryAst
 import org.jetbrains.kotlin.ir.declarations.*
@@ -21,21 +22,24 @@ import org.jetbrains.kotlin.name.FqName
 import java.io.File
 import java.util.EnumSet
 
-
-fun interface CacheExecutor {
-    fun execute(
-        mainModule: IrModuleFragment,
+fun interface JsIrCompilerICInterface {
+    fun compile(
         allModules: Collection<IrModuleFragment>,
-        deserializer: JsIrLinker,
-        configuration: CompilerConfiguration,
         dirtyFiles: Collection<IrFile>,
-        exportedDeclarations: Set<FqName>,
         mainArguments: List<String>?
     ): List<JsIrFragmentAndBinaryAst>
 }
 
+fun interface JsIrCompilerICInterfaceFactory {
+    fun createCompilerForIC(
+        mainModule: IrModuleFragment,
+        configuration: CompilerConfiguration
+    ): JsIrCompilerICInterface
+}
+
 enum class DirtyFileState(val str: String) {
     ADDED_FILE("added file"),
+    MODIFIED_CONFIG("modified config"),
     MODIFIED_IR("modified ir"),
     UPDATED_EXPORTS("updated exports"),
     UPDATED_IMPORTS("updated imports"),
@@ -51,7 +55,7 @@ class CacheUpdater(
     private val compilerConfiguration: CompilerConfiguration,
     private val irFactory: () -> IrFactory,
     private val mainArguments: List<String>?,
-    private val executor: CacheExecutor
+    private val compilerInterfaceFactory: JsIrCompilerICInterfaceFactory
 ) {
     private val signatureHashCalculator = IdSignatureHashCalculator()
 
@@ -87,7 +91,7 @@ class CacheUpdater(
         val allResolvedDependencies = jsResolveLibraries(
             allModules,
             compilerConfiguration[JSConfigurationKeys.REPOSITORIES] ?: emptyList(),
-            compilerConfiguration[IrMessageLogger.IR_MESSAGE_LOGGER].toResolverLogger()
+            compilerConfiguration.resolverLogger
         )
 
         return allResolvedDependencies.getFullList().associateBy { KotlinLibraryFile(it) }
@@ -188,13 +192,14 @@ class CacheUpdater(
         val removedFilesMetadata = mutableMapOf<KotlinLibraryFile, Map<KotlinSourceFile, KotlinSourceFileMetadata>>()
 
         val modifiedFiles = KotlinSourceFileMap(incrementalCaches.entries.associate { (lib, cache) ->
-            val (dirtyFiles, removedFiles, newFiles) = cache.collectModifiedFiles(configHash)
+            val (dirtyFiles, removedFiles, newFiles, modifiedConfigFiles) = cache.collectModifiedFiles(configHash)
 
             val fileStats by lazy(LazyThreadSafetyMode.NONE) { dirtyFileStats.getOrPutFiles(lib) }
             newFiles.forEach { fileStats.addDirtFileStat(it, DirtyFileState.ADDED_FILE) }
+            modifiedConfigFiles.forEach { fileStats.addDirtFileStat(it, DirtyFileState.MODIFIED_CONFIG) }
             removedFiles.forEach { fileStats.addDirtFileStat(it.key, DirtyFileState.REMOVED_FILE) }
             dirtyFiles.forEach {
-                if (it.key !in newFiles) {
+                if (it.key !in newFiles && it.key !in modifiedConfigFiles) {
                     fileStats.addDirtFileStat(it.key, DirtyFileState.MODIFIED_IR)
                 }
             }
@@ -291,65 +296,126 @@ class CacheUpdater(
         }
     }
 
+    private data class SignatureSource(val lib: KotlinLibraryFile, val src: KotlinSourceFile, val symbol: IrSymbol)
+
+    private fun addParentSignatures(
+        signatures: Collection<IdSignature>,
+        idSignatureToFile: Map<IdSignature, SignatureSource>,
+        importerLibFile: KotlinLibraryFile,
+        importerSrcFile: KotlinSourceFile
+    ): Set<IdSignature> {
+        val allSignatures = HashSet<IdSignature>(signatures.size)
+
+        fun addAllParents(sig: IdSignature) {
+            val signatureSrc = idSignatureToFile[sig] ?: return
+            if (signatureSrc.lib == importerLibFile && signatureSrc.src == importerSrcFile) {
+                return
+            }
+            if (allSignatures.add(sig)) {
+                (signatureSrc.symbol.owner as? IrDeclaration)?.let { declaration ->
+                    (declaration.parent as? IrSymbolOwner)?.let { parent ->
+                        parent.symbol.signature?.let(::addAllParents)
+                    }
+                }
+            }
+        }
+
+        signatures.forEach(::addAllParents)
+
+        return allSignatures
+    }
+
+    private fun IdSignatureHashCalculator.addAllSignatureSymbols(idSignatureToFile: Map<IdSignature, SignatureSource>) {
+        for ((signature, signatureSrc) in idSignatureToFile) {
+            addHashForSignatureIfNotExist(signature, signatureSrc.symbol)
+        }
+    }
+
+    private fun KotlinSourceFileMutableMap<DirtyFileMetadata>.getExportedSignaturesAndAddMetadata(
+        jsIrLinker: JsIrLinker,
+        irModule: IrModuleFragment,
+        libFile: KotlinLibraryFile,
+        dirtySrcFiles: Set<KotlinSourceFile>
+    ): Map<IdSignature, SignatureSource> {
+        val idSignatureToFile = hashMapOf<IdSignature, SignatureSource>()
+        val moduleDeserializer = jsIrLinker.moduleDeserializer(irModule.descriptor)
+        val incrementalCache = getLibIncrementalCache(libFile)
+        for (fileDeserializer in moduleDeserializer.fileDeserializers()) {
+            val reachableSignatures = fileDeserializer.symbolDeserializer.signatureDeserializer.signatureToIndexMapping()
+            val maybeImportedSignatures = reachableSignatures.keys.toMutableSet()
+            val implementedSymbols = collectImplementedSymbol(fileDeserializer.symbolDeserializer.deserializedSymbols)
+            for ((signature, symbol) in implementedSymbols) {
+                var symbolCanBeExported = maybeImportedSignatures.remove(signature)
+                resolveFakeOverrideFunction(symbol)?.let { resolvedSignature ->
+                    if (resolvedSignature !in implementedSymbols) {
+                        maybeImportedSignatures.add(resolvedSignature)
+                    }
+                    symbolCanBeExported = true
+                }
+                if (symbolCanBeExported) {
+                    idSignatureToFile[signature] = SignatureSource(libFile, KotlinSourceFile(fileDeserializer.file), symbol)
+                }
+            }
+
+            val libSrcFile = KotlinSourceFile(fileDeserializer.file)
+            if (libSrcFile in dirtySrcFiles) {
+                val metadata = incrementalCache.fetchSourceFileFullMetadata(libSrcFile)
+                this[libFile, libSrcFile] = DirtyFileMetadata(maybeImportedSignatures, metadata.directDependencies)
+            }
+        }
+        return idSignatureToFile
+    }
+
+    private fun DirtyFileMetadata.setAllDependencies(
+        idSignatureToFile: Map<IdSignature, SignatureSource>,
+        updatedMetadata: KotlinSourceFileMap<DirtyFileMetadata>,
+        libFile: KotlinLibraryFile,
+        srcFile: KotlinSourceFile
+    ) {
+        val allImportedSignatures = addParentSignatures(maybeImportedSignatures, idSignatureToFile, libFile, srcFile)
+        for (importedSignature in allImportedSignatures) {
+            val (dependencyLib, dependencyFile) = idSignatureToFile[importedSignature] ?: continue
+            signatureHashCalculator[importedSignature]?.also { signatureHash ->
+                addDirectDependency(dependencyLib, dependencyFile, importedSignature, signatureHash)
+            } ?: notFoundIcError("signature $importedSignature hash", dependencyLib, dependencyFile)
+
+            updatedMetadata[dependencyLib, dependencyFile]?.also { dependencyMetadata ->
+                dependencyMetadata.addInverseDependency(libFile, srcFile, importedSignature)
+            }
+        }
+    }
+
     private fun rebuildDirtySourceMetadata(
         jsIrLinker: JsIrLinker,
         loadedFragments: Map<KotlinLibraryFile, IrModuleFragment>,
         dirtySrcFiles: KotlinSourceFileMap<KotlinSourceFileExports>,
     ): KotlinSourceFileMap<DirtyFileMetadata> {
-        val idSignatureToFile = mutableMapOf<IdSignature, Pair<KotlinLibraryFile, KotlinSourceFile>>()
+        val idSignatureToFile = hashMapOf<IdSignature, SignatureSource>()
         val updatedMetadata = KotlinSourceFileMutableMap<DirtyFileMetadata>()
 
         for ((lib, irModule) in loadedFragments) {
-            val moduleDeserializer = jsIrLinker.moduleDeserializer(irModule.descriptor)
-            val incrementalCache = getLibIncrementalCache(lib)
-            for (fileDeserializer in moduleDeserializer.fileDeserializers()) {
-                val libSrcFile = KotlinSourceFile(fileDeserializer.file)
-
-                val reachableSignatures = fileDeserializer.symbolDeserializer.signatureDeserializer.signatureToIndexMapping()
-                val maybeImportedSignatures = reachableSignatures.keys.toMutableSet()
-                val implementedSymbols = collectImplementedSymbol(fileDeserializer.symbolDeserializer.deserializedSymbols)
-                for ((signature, symbol) in implementedSymbols) {
-                    var symbolCanBeExported = maybeImportedSignatures.remove(signature)
-                    resolveFakeOverrideFunction(symbol)?.let { resolvedSignature ->
-                        if (resolvedSignature !in implementedSymbols) {
-                            maybeImportedSignatures.add(resolvedSignature)
-                        }
-                        symbolCanBeExported = true
-                    }
-                    if (symbolCanBeExported) {
-                        signatureHashCalculator.addHashForSignatureIfNotExist(signature, symbol)
-                        idSignatureToFile[signature] = lib to libSrcFile
-                    }
-                }
-
-                val metadata = incrementalCache.fetchSourceFileFullMetadata(libSrcFile)
-                updatedMetadata[lib, libSrcFile] = DirtyFileMetadata(maybeImportedSignatures, metadata.directDependencies)
-            }
+            val libDirtySrcFiles = dirtySrcFiles[lib]?.keys ?: emptySet()
+            idSignatureToFile += updatedMetadata.getExportedSignaturesAndAddMetadata(jsIrLinker, irModule, lib, libDirtySrcFiles)
         }
+
+        signatureHashCalculator.addAllSignatureSymbols(idSignatureToFile)
 
         for ((libFile, srcFiles) in updatedMetadata) {
             val libDirtySrcFiles = dirtySrcFiles[libFile] ?: continue
-            for ((srcFile, internalHeader) in srcFiles) {
+            for ((srcFile, updatedHeader) in srcFiles) {
                 val dirtySrcFile = libDirtySrcFiles[srcFile] ?: continue
                 dirtySrcFile.inverseDependencies.forEachFile { dependentLibFile, dependentSrcFile, signatures ->
-                    signatures.forEach {
-                        val (dependencyLib, dependencyFile) = idSignatureToFile[it] ?: (libFile to srcFile)
+                    signatures.forEach { signature ->
+                        val signatureSrc = idSignatureToFile[signature]
+                        val dependencyLib = signatureSrc?.lib ?: libFile
+                        val dependencyFile = signatureSrc?.src ?: srcFile
                         updatedMetadata[dependencyLib, dependencyFile]?.also { dependencyMetadata ->
-                            dependencyMetadata.addInverseDependency(dependentLibFile, dependentSrcFile, it)
-                        } ?: notFoundIcError("metadata", dependencyLib, dependencyFile)
+                            dependencyMetadata.addInverseDependency(dependentLibFile, dependentSrcFile, signature)
+                        }
                     }
                 }
 
-                for (importedSignature in internalHeader.maybeImportedSignatures) {
-                    val (dependencyLib, dependencyFile) = idSignatureToFile[importedSignature] ?: continue
-                    signatureHashCalculator[importedSignature]?.also { signatureHash ->
-                        internalHeader.addDirectDependency(dependencyLib, dependencyFile, importedSignature, signatureHash)
-                    } ?: notFoundIcError("signature $importedSignature hash", dependencyLib, dependencyFile)
-
-                    updatedMetadata[dependencyLib, dependencyFile]?.also { dependencyMetadata ->
-                        dependencyMetadata.addInverseDependency(libFile, srcFile, importedSignature)
-                    } ?: notFoundIcError("metadata", dependencyLib, dependencyFile)
-                }
+                updatedHeader.setAllDependencies(idSignatureToFile, updatedMetadata, libFile, srcFile)
             }
         }
 
@@ -439,18 +505,18 @@ class CacheUpdater(
         }
     }
 
-    private fun collectFilesWithModifiedExportsOrInlineImports(
+    private fun collectFilesWithModifiedExportsAndImports(
         loadedDirtyFiles: KotlinSourceFileMap<DirtyFileMetadata>
     ): KotlinSourceFileMap<UpdatedDependenciesMetadata> {
-        val filesWithModifiedExports = KotlinSourceFileMutableMap<UpdatedDependenciesMetadata>()
+        val filesWithModifiedExportsAndImports = KotlinSourceFileMutableMap<UpdatedDependenciesMetadata>()
 
         loadedDirtyFiles.forEachFile { libFile, srcFile, srcFileMetadata ->
-            filesWithModifiedExports.addDependenciesWithUpdatedSignatures(libFile, srcFile, srcFileMetadata)
-            filesWithModifiedExports.addDependenciesWithRemovedInverseDependencies(libFile, srcFile, srcFileMetadata)
-            filesWithModifiedExports.addDependentsWithUpdatedImports(libFile, srcFile, srcFileMetadata)
+            filesWithModifiedExportsAndImports.addDependenciesWithUpdatedSignatures(libFile, srcFile, srcFileMetadata)
+            filesWithModifiedExportsAndImports.addDependenciesWithRemovedInverseDependencies(libFile, srcFile, srcFileMetadata)
+            filesWithModifiedExportsAndImports.addDependentsWithUpdatedImports(libFile, srcFile, srcFileMetadata)
         }
 
-        return filesWithModifiedExports
+        return filesWithModifiedExportsAndImports
     }
 
     private fun collectFilesToRebuildSignatures(
@@ -512,6 +578,7 @@ class CacheUpdater(
                 }
                 artifacts += incrementalCache.buildModuleArtifactAndCommitCache(
                     moduleName = libFragment.name.asString(),
+                    externalModuleName = lib.jsOutputName,
                     rebuiltFileFragments = libRebuiltFiles,
                     signatureToIndexMapping = signatureToIndexMapping
                 )
@@ -521,6 +588,95 @@ class CacheUpdater(
         addArtifact(mainLibrary)
 
         return artifacts
+    }
+
+    private fun updateStdlibIntrinsicDependencies(
+        linker: JsIrLinker,
+        mainModule: IrModuleFragment,
+        loadedFragments: Map<KotlinLibraryFile, IrModuleFragment>,
+        dirtyFileExports: KotlinSourceFileMap<*>
+    ) {
+        val stdlibDescriptor = mainModule.descriptor.builtIns.builtInsModule
+        val (stdlibFile, stdlibIr) = loadedFragments.entries.find {
+            it.value.descriptor === stdlibDescriptor
+        } ?: notFoundIcError("stdlib loaded fragment")
+
+        val stdlibDirtyFiles = dirtyFileExports[stdlibFile]?.keys ?: return
+
+        signatureHashCalculator.updateInlineFunctionTransitiveHashes(listOf(stdlibIr))
+
+        val updatedMetadata = KotlinSourceFileMutableMap<DirtyFileMetadata>()
+        val idSignatureToFile = updatedMetadata.getExportedSignaturesAndAddMetadata(linker, stdlibIr, stdlibFile, stdlibDirtyFiles)
+
+        signatureHashCalculator.addAllSignatureSymbols(idSignatureToFile)
+
+        updatedMetadata.forEachFile { libFile, srcFile, updatedHeader ->
+            updatedHeader.setAllDependencies(idSignatureToFile, updatedMetadata, libFile, srcFile)
+        }
+
+        val incrementalCache = getLibIncrementalCache(stdlibFile)
+        updatedMetadata.forEachFile { libFile, srcFile, updatedHeader ->
+            if (libFile != stdlibFile) {
+                icError("unexpected lib while parsing stdlib dependencies", libFile, srcFile)
+            }
+
+            val cachedHeader = incrementalCache.fetchSourceFileFullMetadata(srcFile)
+
+            val needUpdate = when {
+                !updatedHeader.directDependencies.allFiles { lib, file, dependencies ->
+                    cachedHeader.directDependencies[lib, file]?.keys?.containsAll(dependencies.keys) ?: dependencies.isEmpty()
+                } -> true
+
+                !updatedHeader.inverseDependencies.allFiles { lib, file, invDependencies ->
+                    cachedHeader.inverseDependencies[lib, file]?.containsAll(invDependencies) ?: invDependencies.isEmpty()
+                } -> true
+
+                else -> false
+            }
+            if (needUpdate) {
+                cachedHeader.directDependencies.forEachFile { lib, file, dependencies ->
+                    val updatedDependencies = updatedHeader.directDependencies[lib, file]
+                    if (updatedDependencies != null) {
+                        updatedDependencies += dependencies
+                    } else {
+                        updatedHeader.directDependencies[lib, file] = HashMap(dependencies)
+                    }
+                }
+                cachedHeader.inverseDependencies.forEachFile { lib, file, dependencies ->
+                    val updatedDependencies = updatedHeader.inverseDependencies[lib, file]
+                    if (updatedDependencies != null) {
+                        updatedDependencies += dependencies
+                    } else {
+                        updatedHeader.inverseDependencies[lib, file] = HashSet(dependencies)
+                    }
+                }
+                incrementalCache.updateSourceFileMetadata(srcFile, updatedHeader)
+            }
+        }
+    }
+
+    private fun compileDirtyFiles(
+        linker: JsIrLinker,
+        loadedFragments: Map<KotlinLibraryFile, IrModuleFragment>,
+        dirtyFileExports: KotlinSourceFileMap<*>
+    ): List<JsIrFragmentAndBinaryAst> {
+        val mainModule = loadedFragments[mainLibraryFile] ?: notFoundIcError("main lib loaded fragment", mainLibraryFile)
+        val compilerForIC = compilerInterfaceFactory.createCompilerForIC(mainModule, compilerConfiguration)
+
+        // Load declarations referenced during `context` initialization
+        linker.loadUnboundSymbols(true)
+
+        updateStdlibIntrinsicDependencies(linker, mainModule, loadedFragments, dirtyFileExports)
+
+        return compilerForIC.compile(
+            allModules = loadedFragments.values,
+            dirtyFiles = loadedFragments.flatMap { (libFile, libFragment) ->
+                dirtyFileExports[libFile]?.let { libDirtyFiles ->
+                    libFragment.files.filter { file -> KotlinSourceFile(file) in libDirtyFiles }
+                } ?: emptyList()
+            },
+            mainArguments = mainArguments
+        )
     }
 
     fun actualizeCaches(eventCallback: (String) -> Unit = {}): List<ModuleArtifact> {
@@ -542,7 +698,7 @@ class CacheUpdater(
 
             val dirtyHeaders = rebuildDirtySourceMetadata(loadedIr.linker, loadedIr.loadedFragments, lastDirtyFiles)
 
-            val filesWithModifiedExportsOrImports = collectFilesWithModifiedExportsOrInlineImports(dirtyHeaders)
+            val filesWithModifiedExportsOrImports = collectFilesWithModifiedExportsAndImports(dirtyHeaders)
 
             val filesToRebuild = collectFilesToRebuildSignatures(filesWithModifiedExportsOrImports)
 
@@ -563,19 +719,7 @@ class CacheUpdater(
             eventCallback("final loading of updated files")
         }
 
-        val rebuiltFragments = executor.execute(
-            mainModule = loadedIr.loadedFragments[mainLibraryFile] ?: notFoundIcError("main lib loaded fragment", mainLibraryFile),
-            allModules = loadedIr.loadedFragments.values,
-            deserializer = loadedIr.linker,
-            configuration = compilerConfiguration,
-            dirtyFiles = loadedIr.loadedFragments.flatMap { (libFile, libFragment) ->
-                dirtyFileExports[libFile]?.let { libDirtyFiles ->
-                    libFragment.files.filter { file -> KotlinSourceFile(file) in libDirtyFiles }
-                } ?: emptyList()
-            },
-            exportedDeclarations = emptySet(),
-            mainArguments = mainArguments
-        )
+        val rebuiltFragments = compileDirtyFiles(loadedIr.linker, loadedIr.loadedFragments, dirtyFileExports)
         eventCallback("updated files processing (lowering)")
 
         val artifacts = buildModuleArtifactsAndCommitCache(loadedIr.linker, loadedIr.loadedFragments, rebuiltFragments)
@@ -612,33 +756,14 @@ fun rebuildCacheForDirtyFiles(
         currentIrModule.files.filter { irFile -> irFile.fileEntry.name in files }
     } ?: currentIrModule.files
 
-    return currentIrModule to buildCacheForModuleFiles(
-        mainModule = currentIrModule,
-        allModules = irModules.values,
-        deserializer = jsIrLinker,
-        configuration = configuration,
-        dirtyFiles = dirtyIrFiles,
-        exportedDeclarations = exportedDeclarations,
-        mainArguments = mainArguments
-    )
-}
+    val compilerWithIC = JsIrCompilerWithIC(currentIrModule, configuration, JsGenerationGranularity.PER_MODULE, exportedDeclarations)
 
-fun buildCacheForModuleFiles(
-    mainModule: IrModuleFragment,
-    allModules: Collection<IrModuleFragment>,
-    deserializer: JsIrLinker,
-    configuration: CompilerConfiguration,
-    dirtyFiles: Collection<IrFile>,
-    exportedDeclarations: Set<FqName>,
-    mainArguments: List<String>?
-): List<JsIrFragmentAndBinaryAst> {
-    return compileWithIC(
-        mainModule = mainModule,
-        allModules = allModules,
-        filesToLower = dirtyFiles,
-        configuration = configuration,
-        deserializer = deserializer,
-        mainArguments = mainArguments,
-        exportedDeclarations = exportedDeclarations,
+    // Load declarations referenced during `context` initialization
+    jsIrLinker.loadUnboundSymbols(true)
+
+    return currentIrModule to compilerWithIC.compile(
+        allModules = irModules.values,
+        dirtyFiles = dirtyIrFiles,
+        mainArguments = mainArguments
     )
 }

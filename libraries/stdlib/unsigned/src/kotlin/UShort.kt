@@ -123,29 +123,29 @@ public value class UShort @kotlin.internal.IntrinsicConstEvaluation @PublishedAp
     public inline operator fun div(other: ULong): ULong = this.toULong().div(other)
 
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
-     * 
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
      * The result is always less than the divisor.
      */
     @kotlin.internal.InlineOnly
     public inline operator fun rem(other: UByte): UInt = this.toUInt().rem(other.toUInt())
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
-     * 
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
      * The result is always less than the divisor.
      */
     @kotlin.internal.InlineOnly
     public inline operator fun rem(other: UShort): UInt = this.toUInt().rem(other.toUInt())
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
-     * 
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
      * The result is always less than the divisor.
      */
     @kotlin.internal.InlineOnly
     public inline operator fun rem(other: UInt): UInt = this.toUInt().rem(other)
     /**
-     * Calculates the remainder of truncating division of this value by the other value.
-     * 
+     * Calculates the remainder of truncating division of this value (dividend) by the other value (divisor).
+     *
      * The result is always less than the divisor.
      */
     @kotlin.internal.InlineOnly
@@ -153,65 +153,65 @@ public value class UShort @kotlin.internal.IntrinsicConstEvaluation @PublishedAp
 
     /**
      * Divides this value by the other value, flooring the result to an integer that is closer to negative infinity.
-     * 
+     *
      * For unsigned types, the results of flooring division and truncating division are the same.
      */
     @kotlin.internal.InlineOnly
     public inline fun floorDiv(other: UByte): UInt = this.toUInt().floorDiv(other.toUInt())
     /**
      * Divides this value by the other value, flooring the result to an integer that is closer to negative infinity.
-     * 
+     *
      * For unsigned types, the results of flooring division and truncating division are the same.
      */
     @kotlin.internal.InlineOnly
     public inline fun floorDiv(other: UShort): UInt = this.toUInt().floorDiv(other.toUInt())
     /**
      * Divides this value by the other value, flooring the result to an integer that is closer to negative infinity.
-     * 
+     *
      * For unsigned types, the results of flooring division and truncating division are the same.
      */
     @kotlin.internal.InlineOnly
     public inline fun floorDiv(other: UInt): UInt = this.toUInt().floorDiv(other)
     /**
      * Divides this value by the other value, flooring the result to an integer that is closer to negative infinity.
-     * 
+     *
      * For unsigned types, the results of flooring division and truncating division are the same.
      */
     @kotlin.internal.InlineOnly
     public inline fun floorDiv(other: ULong): ULong = this.toULong().floorDiv(other)
 
     /**
-     * Calculates the remainder of flooring division of this value by the other value.
-     * 
+     * Calculates the remainder of flooring division of this value (dividend) by the other value (divisor).
+     *
      * The result is always less than the divisor.
-     * 
+     *
      * For unsigned types, the remainders of flooring division and truncating division are the same.
      */
     @kotlin.internal.InlineOnly
     public inline fun mod(other: UByte): UByte = this.toUInt().mod(other.toUInt()).toUByte()
     /**
-     * Calculates the remainder of flooring division of this value by the other value.
-     * 
+     * Calculates the remainder of flooring division of this value (dividend) by the other value (divisor).
+     *
      * The result is always less than the divisor.
-     * 
+     *
      * For unsigned types, the remainders of flooring division and truncating division are the same.
      */
     @kotlin.internal.InlineOnly
     public inline fun mod(other: UShort): UShort = this.toUInt().mod(other.toUInt()).toUShort()
     /**
-     * Calculates the remainder of flooring division of this value by the other value.
-     * 
+     * Calculates the remainder of flooring division of this value (dividend) by the other value (divisor).
+     *
      * The result is always less than the divisor.
-     * 
+     *
      * For unsigned types, the remainders of flooring division and truncating division are the same.
      */
     @kotlin.internal.InlineOnly
     public inline fun mod(other: UInt): UInt = this.toUInt().mod(other)
     /**
-     * Calculates the remainder of flooring division of this value by the other value.
-     * 
+     * Calculates the remainder of flooring division of this value (dividend) by the other value (divisor).
+     *
      * The result is always less than the divisor.
-     * 
+     *
      * For unsigned types, the remainders of flooring division and truncating division are the same.
      */
     @kotlin.internal.InlineOnly
@@ -236,6 +236,16 @@ public value class UShort @kotlin.internal.IntrinsicConstEvaluation @PublishedAp
     /** Creates a range from this value to the specified [other] value. */
     @kotlin.internal.InlineOnly
     public inline operator fun rangeTo(other: UShort): UIntRange = UIntRange(this.toUInt(), other.toUInt())
+
+    /**
+     * Creates a range from this value up to but excluding the specified [other] value.
+     *
+     * If the [other] value is less than or equal to `this` value, then the returned range is empty.
+     */
+    @SinceKotlin("1.7")
+    @ExperimentalStdlibApi
+    @kotlin.internal.InlineOnly
+    public inline operator fun rangeUntil(other: UShort): UIntRange = this.toUInt() until other.toUInt()
 
     /** Performs a bitwise AND operation between the two values. */
     @kotlin.internal.InlineOnly

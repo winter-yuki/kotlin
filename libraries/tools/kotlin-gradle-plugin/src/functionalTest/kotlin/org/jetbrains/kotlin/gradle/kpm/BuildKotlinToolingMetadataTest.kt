@@ -5,6 +5,7 @@
 
 package org.jetbrains.kotlin.gradle.kpm
 
+import com.android.build.api.dsl.ApplicationExtension
 import com.android.build.gradle.BaseExtension
 import org.gradle.api.JavaVersion
 import org.gradle.api.Project
@@ -22,6 +23,8 @@ import org.jetbrains.kotlin.library.KotlinAbiVersion
 import org.jetbrains.kotlin.tooling.KotlinToolingMetadata
 import org.jetbrains.kotlin.tooling.toJsonString
 import org.gradle.kotlin.dsl.create
+import org.jetbrains.kotlin.gradle.disableLegacyWarning
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.plugin.*
 import kotlin.test.*
 
@@ -99,10 +102,12 @@ class KotlinToolingMetadataWithModelMappingTest {
         project.plugins.apply("com.android.application")
         project.plugins.apply("kotlin-multiplatform")
 
-        val android = project.extensions.getByType(BaseExtension::class.java)
+        disableLegacyWarning(project)
+
+        val android = project.extensions.getByType(ApplicationExtension::class.java)
         val kotlin = multiplatformExtension
 
-        android.compileSdkVersion(28)
+        android.compileSdk = 31
         kotlin.android()
         kotlin.jvm()
         kotlin.js {
@@ -167,8 +172,8 @@ class KotlinToolingMetadataWithModelMappingTest {
         project.plugins.apply("kotlin-multiplatform")
         val kotlin = multiplatformExtension
         val jvm = kotlin.jvm()
-        jvm.compilations.getByName(KotlinCompilation.MAIN_COMPILATION_NAME).kotlinOptions.jvmTarget = "12"
-        jvm.compilations.getByName(KotlinCompilation.TEST_COMPILATION_NAME).kotlinOptions.jvmTarget = "10"
+        jvm.compilations.getByName(KotlinCompilation.MAIN_COMPILATION_NAME).compilerOptions.options.jvmTarget.set(JvmTarget.JVM_12)
+        jvm.compilations.getByName(KotlinCompilation.TEST_COMPILATION_NAME).compilerOptions.options.jvmTarget.set(JvmTarget.JVM_10)
 
         assertEquals(
             "12", getKotlinToolingMetadata().projectTargets

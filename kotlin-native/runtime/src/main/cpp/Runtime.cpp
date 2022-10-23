@@ -1,17 +1,6 @@
 /*
- * Copyright 2010-2017 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2022 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
+ * that can be found in the LICENSE file.
  */
 
 #include "Atomic.h"
@@ -40,12 +29,6 @@ using kotlin::internal::FILE_NOT_INITIALIZED;
 using kotlin::internal::FILE_BEING_INITIALIZED;
 using kotlin::internal::FILE_INITIALIZED;
 using kotlin::internal::FILE_FAILED_TO_INITIALIZE;
-
-typedef void (*Initializer)(int initialize, MemoryState* memory);
-struct InitNode {
-  Initializer init;
-  InitNode* next;
-};
 
 namespace {
 
@@ -209,7 +192,7 @@ void Kotlin_deinitRuntimeCallback(void* argument) {
 
 extern "C" {
 
-void AppendToInitializersTail(InitNode *next) {
+RUNTIME_NOTHROW void AppendToInitializersTail(InitNode *next) {
   // TODO: use RuntimeState.
   if (initHeadNode == nullptr) {
     initHeadNode = next;
@@ -472,25 +455,27 @@ RUNTIME_NOTHROW void Kotlin_initRuntimeIfNeededFromKotlin() {
     }
 }
 
-}  // extern "C"
+static void CallInitGlobalAwaitInitialized(int *state) {
+    int localState;
+    // Switch to the native state to avoid dead-locks.
+    {
+        kotlin::ThreadStateGuard guard(kotlin::ThreadState::kNative);
+        do {
+            localState = atomicGetAcquire(state);
+        } while (localState != FILE_INITIALIZED && localState != FILE_FAILED_TO_INITIALIZE);
+    }
+    if (localState == FILE_FAILED_TO_INITIALIZE) ThrowFileFailedToInitializeException();
+}
 
-namespace {
-void callInitGlobalPossiblyLockImpl(int volatile* state, void (*init)()) {
-    int localState = *state;
+NO_INLINE void CallInitGlobalPossiblyLock(int* state, void (*init)()) {
+    int localState = atomicGetAcquire(state);
     if (localState == FILE_INITIALIZED) return;
     if (localState == FILE_FAILED_TO_INITIALIZE)
         ThrowFileFailedToInitializeException();
     int threadId = konan::currentThreadId();
     if ((localState & 3) == FILE_BEING_INITIALIZED) {
         if ((localState & ~3) != (threadId << 2)) {
-            // Switch to the native state to avoid dead-locks.
-            kotlin::ThreadStateGuard guard(kotlin::ThreadState::kNative);
-            do {
-                localState = *state;
-                if (localState == FILE_FAILED_TO_INITIALIZE)
-                    // Call of a Kotlin function.
-                    kotlin::CallWithThreadState<kotlin::ThreadState::kRunnable>(ThrowFileFailedToInitializeException);
-            } while (localState != FILE_INITIALIZED);
+            CallInitGlobalAwaitInitialized(state);
         }
         return;
     }
@@ -502,32 +487,14 @@ void callInitGlobalPossiblyLockImpl(int volatile* state, void (*init)()) {
         try {
             init();
         } catch (...) {
-            *state = FILE_FAILED_TO_INITIALIZE;
+            atomicSetRelease(state, FILE_FAILED_TO_INITIALIZE);
             throw;
         }
 #endif
-        std::atomic_thread_fence(std::memory_order_release);
-        *state = FILE_INITIALIZED;
+        atomicSetRelease(state, FILE_INITIALIZED);
     } else {
-        // Switch to the native state to avoid dead-locks.
-        kotlin::ThreadStateGuard guard(kotlin::ThreadState::kNative);
-        do {
-            localState = *state;
-            if (localState == FILE_FAILED_TO_INITIALIZE)
-                // Call of a Kotlin function.
-                kotlin::CallWithThreadState<kotlin::ThreadState::kRunnable>(ThrowFileFailedToInitializeException);
-        } while (localState != FILE_INITIALIZED);
+        CallInitGlobalAwaitInitialized(state);
     }
-}
-}
-
-extern "C" {
-
-NO_INLINE void CallInitGlobalPossiblyLock(int volatile* state, void (*init)()) {
-    callInitGlobalPossiblyLockImpl(state, init);
-    // Ensure proper synchronization around reading/writing of [state] (release barrier defined in callInitGlobalPossiblyLockImpl),
-    // also there is an acquire load of [state] in IrToBitcode.kt::evaluateFileGlobalInitializerCall.
-    std::atomic_thread_fence(std::memory_order_acquire);
 }
 
 void CallInitThreadLocal(int volatile* globalState, int* localState, void (*init)()) {

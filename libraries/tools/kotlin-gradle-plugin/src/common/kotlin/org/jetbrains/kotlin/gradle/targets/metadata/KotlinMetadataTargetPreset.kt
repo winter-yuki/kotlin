@@ -10,9 +10,9 @@ import org.gradle.api.Project
 import org.jetbrains.kotlin.gradle.dsl.kotlinExtension
 import org.jetbrains.kotlin.gradle.plugin.*
 import org.jetbrains.kotlin.gradle.plugin.mpp.pm20.hasKpmModel
-import org.jetbrains.kotlin.gradle.plugin.sources.applyLanguageSettingsToKotlinOptions
-import org.jetbrains.kotlin.gradle.targets.metadata.KotlinMetadataTargetConfigurator
+import org.jetbrains.kotlin.gradle.plugin.sources.applyLanguageSettingsToCompilerOptions
 import org.jetbrains.kotlin.gradle.targets.metadata.GradleKpmMetadataTargetConfigurator
+import org.jetbrains.kotlin.gradle.targets.metadata.KotlinMetadataTargetConfigurator
 
 class KotlinMetadataTargetPreset(
     project: Project
@@ -23,6 +23,8 @@ class KotlinMetadataTargetPreset(
         forTarget: KotlinMetadataTarget
     ): KotlinCompilationFactory<AbstractKotlinCompilation<*>> =
         object : KotlinCompilationFactory<AbstractKotlinCompilation<*>> {
+            override val target: KotlinTarget = forTarget
+
             override val itemClass: Class<AbstractKotlinCompilation<*>>
                 get() = AbstractKotlinCompilation::class.java
 
@@ -60,8 +62,8 @@ class KotlinMetadataTargetPreset(
             project.whenEvaluated {
                 if (!project.hasKpmModel) {
                     // Since there's no default source set, apply language settings from commonMain:
-                    mainCompilation.compileKotlinTaskProvider.configure { compileKotlinMetadata ->
-                        applyLanguageSettingsToKotlinOptions(commonMainSourceSet.languageSettings, compileKotlinMetadata.kotlinOptions)
+                    mainCompilation.compileTaskProvider.configure { compileKotlinMetadata ->
+                        applyLanguageSettingsToCompilerOptions(commonMainSourceSet.languageSettings, compileKotlinMetadata.compilerOptions)
                     }
                 }
             }

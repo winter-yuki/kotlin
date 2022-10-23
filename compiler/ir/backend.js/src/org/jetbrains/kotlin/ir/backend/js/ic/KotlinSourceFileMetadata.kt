@@ -46,6 +46,9 @@ open class KotlinSourceFileMap<out T>(files: Map<KotlinLibraryFile, Map<KotlinSo
     inline fun forEachFile(f: (KotlinLibraryFile, KotlinSourceFile, T) -> Unit) =
         forEach { (lib, files) -> files.forEach { (file, data) -> f(lib, file, data) } }
 
+    inline fun allFiles(p: (KotlinLibraryFile, KotlinSourceFile, T) -> Boolean) =
+        entries.all { (lib, files) -> files.entries.all { (file, data) -> p(lib, file, data) } }
+
     operator fun get(libFile: KotlinLibraryFile, sourceFile: KotlinSourceFile): T? = get(libFile)?.get(sourceFile)
 }
 
@@ -85,13 +88,6 @@ fun KotlinSourceFileMap<Set<IdSignature>>.flatSignatures(): Set<IdSignature> {
     val allSignatures = mutableSetOf<IdSignature>()
     forEachFile { _, _, signatures -> allSignatures += signatures }
     return allSignatures
-}
-
-fun KotlinSourceFileMutableMap<MutableSet<IdSignature>>.addSignature(
-    lib: KotlinLibraryFile, src: KotlinSourceFile, signature: IdSignature
-) = when (val signatures = this[lib, src]) {
-    null -> this[lib, src] = mutableSetOf(signature)
-    else -> signatures += signature
 }
 
 abstract class KotlinSourceFileExports {

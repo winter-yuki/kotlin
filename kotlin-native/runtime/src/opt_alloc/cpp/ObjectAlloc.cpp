@@ -5,12 +5,38 @@
 
 #include "ObjectAlloc.hpp"
 
+#include <mutex>
+
 #include "../../mimalloc/c/include/mimalloc.h"
 #include "Alignment.hpp"
+#include "CompilerConstants.hpp"
+#include "Memory.h"
+
+#if KONAN_SUPPORTS_GRAND_CENTRAL_DISPATCH
+#include <dispatch/dispatch.h>
+#endif
 
 using namespace kotlin;
 
+namespace {
+
+std::once_flag initOptions;
+
+#if KONAN_SUPPORTS_GRAND_CENTRAL_DISPATCH
+std::atomic_flag scheduledCompactOnMainThread = ATOMIC_FLAG_INIT;
+#endif
+
+} // namespace
+
 void kotlin::initObjectPool() noexcept {
+    if (!compiler::mimallocUseDefaultOptions()) {
+        std::call_once(initOptions, [] {
+            mi_option_enable(mi_option_reset_decommits);
+            if (compiler::mimallocUseCompaction()) {
+                mi_option_set(mi_option_reset_delay, 0);
+            }
+        });
+    }
     mi_thread_init();
 }
 
@@ -20,4 +46,25 @@ void* kotlin::allocateInObjectPool(size_t size) noexcept {
 
 void kotlin::freeInObjectPool(void* ptr) noexcept {
     mi_free(ptr);
+}
+
+void kotlin::compactObjectPoolInCurrentThread() noexcept {
+    if (!compiler::mimallocUseCompaction()) return;
+    mi_collect(true);
+}
+
+void kotlin::compactObjectPoolInMainThread() noexcept {
+    if (!compiler::mimallocUseCompaction()) return;
+#if KONAN_SUPPORTS_GRAND_CENTRAL_DISPATCH
+    if (scheduledCompactOnMainThread.test_and_set()) {
+        // If it's already scheduled, do nothing.
+        return;
+    }
+    dispatch_async_f(dispatch_get_main_queue(), nullptr, [](void*) {
+        if (mm::IsCurrentThreadRegistered()) {
+            kotlin::compactObjectPoolInCurrentThread();
+        }
+        scheduledCompactOnMainThread.clear();
+    });
+#endif
 }

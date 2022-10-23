@@ -16,10 +16,14 @@
 
 package org.jetbrains.kotlin.psi.stubs.elements;
 
-import com.intellij.psi.tree.TokenSet;
 import org.jetbrains.kotlin.psi.*;
 
 public interface KtStubElementTypes {
+    /**
+     * @deprecated use {@link KtFileElementType#INSTANCE}.
+     * Field is provided for the sake of binary compatibility with external usages. It will be deleted in the future.
+     */
+    @Deprecated
     KtFileElementType FILE = KtFileElementType.INSTANCE;
 
     KtClassElementType CLASS = new KtClassElementType("CLASS");
@@ -171,12 +175,4 @@ public interface KtStubElementTypes {
 
     KtScriptElementType SCRIPT = new KtScriptElementType("SCRIPT");
 
-    TokenSet DECLARATION_TYPES =
-            TokenSet.create(CLASS, OBJECT_DECLARATION, FUNCTION, PROPERTY, TYPEALIAS, CLASS_INITIALIZER, SECONDARY_CONSTRUCTOR, ENUM_ENTRY);
-
-    TokenSet SUPER_TYPE_LIST_ENTRIES = TokenSet.create(DELEGATED_SUPER_TYPE_ENTRY, SUPER_TYPE_CALL_ENTRY, SUPER_TYPE_ENTRY);
-
-    TokenSet TYPE_ELEMENT_TYPES = TokenSet.create(USER_TYPE, NULLABLE_TYPE, FUNCTION_TYPE, DYNAMIC_TYPE, INTERSECTION_TYPE);
-
-    TokenSet INSIDE_DIRECTIVE_EXPRESSIONS = TokenSet.create(REFERENCE_EXPRESSION, DOT_QUALIFIED_EXPRESSION);
 }

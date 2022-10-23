@@ -6,6 +6,7 @@
 package org.jetbrains.kotlin.analysis.api.fir.components
 
 import org.jetbrains.kotlin.analysis.api.calls.*
+import org.jetbrains.kotlin.analysis.api.diagnostics.KtDiagnostic
 import org.jetbrains.kotlin.analysis.api.diagnostics.KtNonBoundToPsiErrorDiagnostic
 import org.jetbrains.kotlin.analysis.api.fir.KtFirAnalysisSession
 import org.jetbrains.kotlin.analysis.api.fir.getCandidateSymbols
@@ -25,9 +26,8 @@ import org.jetbrains.kotlin.analysis.api.types.KtSubstitutor
 import org.jetbrains.kotlin.analysis.api.types.KtType
 import org.jetbrains.kotlin.analysis.low.level.api.fir.api.getOrBuildFir
 import org.jetbrains.kotlin.analysis.low.level.api.fir.resolver.AllCandidatesResolver
-import org.jetbrains.kotlin.analysis.low.level.api.fir.util.firErrorWithAttachment
-import org.jetbrains.kotlin.analysis.low.level.api.fir.util.withFirAttachment
-import org.jetbrains.kotlin.analysis.utils.errors.withPsiAttachment
+import org.jetbrains.kotlin.analysis.low.level.api.fir.util.errorWithFirSpecificEntries
+import org.jetbrains.kotlin.analysis.low.level.api.fir.util.withFirEntry
 import org.jetbrains.kotlin.analysis.utils.printer.parentOfType
 import org.jetbrains.kotlin.fir.FirElement
 import org.jetbrains.kotlin.fir.analysis.checkers.toRegularClassSymbol
@@ -69,7 +69,10 @@ import org.jetbrains.kotlin.util.OperatorNameConventions
 import org.jetbrains.kotlin.util.OperatorNameConventions.EQUALS
 import org.jetbrains.kotlin.utils.addIfNotNull
 import org.jetbrains.kotlin.utils.addToStdlib.safeAs
-import org.jetbrains.kotlin.utils.errorWithAttachment
+import org.jetbrains.kotlin.analysis.utils.errors.buildErrorWithAttachment
+import org.jetbrains.kotlin.analysis.utils.errors.shouldIjPlatformExceptionBeRethrown
+import org.jetbrains.kotlin.analysis.utils.errors.withPsiEntry
+import org.jetbrains.kotlin.fir.diagnostics.FirDiagnosticHolder
 
 internal class KtFirCallResolver(
     override val analysisSession: KtFirAnalysisSession,
@@ -86,28 +89,37 @@ internal class KtFirCallResolver(
     }
 
     override fun resolveCall(psi: KtElement): KtCallInfo? {
-        val ktCallInfos = getCallInfo(psi) { psiToResolve, resolveCalleeExpressionOfFunctionCall, resolveFragmentOfCall ->
-            listOfNotNull(
-                toKtCallInfo(
-                    psiToResolve,
-                    resolveCalleeExpressionOfFunctionCall,
-                    resolveFragmentOfCall
-                )
+        return wrapError(psi) {
+            val ktCallInfos = getCallInfo(
+                psi,
+                getErrorCallInfo = { psiToResolve ->
+                    listOf(KtErrorCallInfo(emptyList(), createKtDiagnostic(psiToResolve), token))
+                },
+                getCallInfo = { psiToResolve, resolveCalleeExpressionOfFunctionCall, resolveFragmentOfCall ->
+                    listOfNotNull(
+                        toKtCallInfo(
+                            psiToResolve,
+                            resolveCalleeExpressionOfFunctionCall,
+                            resolveFragmentOfCall
+                        )
+                    )
+                }
             )
+            check(ktCallInfos.size <= 1) { "Should only return 1 KtCallInfo" }
+            ktCallInfos.singleOrNull()
         }
-        check(ktCallInfos.size <= 1) { "Should only return 1 KtCallInfo" }
-        return ktCallInfos.singleOrNull()
     }
 
     private inline fun <T> getCallInfo(
         psi: KtElement,
+        getErrorCallInfo: FirDiagnosticHolder.(psiToResolve: KtElement) -> List<T>,
         getCallInfo: FirElement.(
             psiToResolve: KtElement,
             resolveCalleeExpressionOfFunctionCall: Boolean,
             resolveFragmentOfCall: Boolean
         ) -> List<T>
     ): List<T> {
-        if (psi.isNotResolvable()) return emptyList()
+        if (!canBeResolvedAsCall(psi)) return emptyList()
 
         val containingCallExpressionForCalleeExpression = psi.getContainingCallExpressionForCalleeExpression()
         val containingBinaryExpressionForLhs = psi.getContainingBinaryExpressionForIncompleteLhs()
@@ -118,6 +130,9 @@ internal class KtFirCallResolver(
             ?: containingUnaryExpressionForIncOrDec
             ?: psi
         val fir = psiToResolve.getOrBuildFir(analysisSession.firResolveSession) ?: return emptyList()
+        if (fir is FirDiagnosticHolder) {
+            return fir.getErrorCallInfo(psiToResolve)
+        }
         return fir.getCallInfo(
             psiToResolve,
             psiToResolve == containingCallExpressionForCalleeExpression,
@@ -155,13 +170,12 @@ internal class KtFirCallResolver(
                 when (val calleeReference = calleeReference) {
                     is FirResolvedNamedReference -> {
                         val call = createKtCall(psi, this, null, resolveFragmentOfCall)
-                            ?: firErrorWithAttachment("expect `createKtCall` to succeed for resolvable case", fir = this, psi = psi)
+                            ?: errorWithFirSpecificEntries("expect `createKtCall` to succeed for resolvable case", fir = this, psi = psi)
                         KtSuccessCallInfo(call)
                     }
                     is FirErrorNamedReference -> {
                         val diagnostic = calleeReference.diagnostic
-                        val ktDiagnostic = (source?.let { diagnostic.asKtDiagnostic(it, psi.toKtPsiSourceElement()) }
-                            ?: KtNonBoundToPsiErrorDiagnostic(factoryName = null, diagnostic.reason, token))
+                        val ktDiagnostic = calleeReference.createKtDiagnostic(psi)
 
                         if (diagnostic is ConeHiddenCandidateError)
                             return KtErrorCallInfo(emptyList(), ktDiagnostic, token)
@@ -199,6 +213,9 @@ internal class KtFirCallResolver(
                 psi,
                 resolveCalleeExpressionOfFunctionCall,
                 resolveFragmentOfCall
+            )
+            is FirSmartCastExpression -> originalExpression.toKtCallInfo(
+                psi, resolveCalleeExpressionOfFunctionCall, resolveFragmentOfCall
             )
             else -> null
         }
@@ -464,7 +481,7 @@ internal class KtFirCallResolver(
                     isImplicitInvoke
                 )
             }
-            is FirExpressionWithSmartcast -> createKtCall(psi, fir.originalExpression, candidate, resolveFragmentOfCall)
+            is FirSmartCastExpression -> (fir.originalExpression as? FirResolvable)?.let { createKtCall(psi, it, candidate, resolveFragmentOfCall) }
             else -> null
         }
     }
@@ -611,7 +628,6 @@ internal class KtFirCallResolver(
         )
     }
 
-    @OptIn(SymbolInternals::class)
     private fun getOperationPartiallyAppliedSymbolsForIncOrDecOperation(
         fir: FirFunctionCall,
         arrayAccessExpression: KtArrayAccessExpression,
@@ -704,11 +720,10 @@ internal class KtFirCallResolver(
         )
     }
 
-    @OptIn(SymbolInternals::class)
     private fun FirExpression.toKtReceiverValue(): KtReceiverValue? {
         val psi = psi
         return when (this) {
-            is FirExpressionWithSmartcast -> {
+            is FirSmartCastExpression -> {
                 val result = originalExpression.toKtReceiverValue()
                 if (result != null && isStable) {
                     KtSmartCastedReceiverValue(result, smartcastType.coneType.asKtType())
@@ -737,18 +752,14 @@ internal class KtFirCallResolver(
         }
     }
 
-    @OptIn(SymbolInternals::class)
     private fun FirCallableSymbol<*>.toKtSignature(): KtCallableSignature<KtCallableSymbol> =
         firSymbolBuilder.callableBuilder.buildCallableSignature(this)
 
-    @OptIn(SymbolInternals::class)
     private fun FirClassLikeSymbol<*>.toKtSymbol(): KtClassLikeSymbol = firSymbolBuilder.classifierBuilder.buildClassLikeSymbol(this)
 
-    @OptIn(SymbolInternals::class)
     private fun FirNamedFunctionSymbol.toKtSignature(): KtFunctionLikeSignature<KtFunctionSymbol> =
         firSymbolBuilder.functionLikeBuilder.buildFunctionSignature(this)
 
-    @OptIn(SymbolInternals::class)
     private fun FirVariableSymbol<*>.toKtSignature(): KtVariableLikeSignature<KtVariableLikeSymbol> =
         firSymbolBuilder.variableLikeBuilder.buildVariableLikeSignature(this)
 
@@ -792,14 +803,18 @@ internal class KtFirCallResolver(
         return mapOf(typeParameter to elementType)
     }
 
-    override fun collectCallCandidates(psi: KtElement): List<KtCallCandidateInfo> {
-        return getCallInfo(psi) { psiToResolve, resolveCalleeExpressionOfFunctionCall, resolveFragmentOfCall ->
-            collectCallCandidates(
-                psiToResolve,
-                resolveCalleeExpressionOfFunctionCall,
-                resolveFragmentOfCall
-            )
-        }
+    override fun collectCallCandidates(psi: KtElement): List<KtCallCandidateInfo> = wrapError(psi) {
+        getCallInfo(
+            psi,
+            getErrorCallInfo = { emptyList() },
+            getCallInfo = { psiToResolve, resolveCalleeExpressionOfFunctionCall, resolveFragmentOfCall ->
+                collectCallCandidates(
+                    psiToResolve,
+                    resolveCalleeExpressionOfFunctionCall,
+                    resolveFragmentOfCall
+                )
+            }
+        )
     }
 
     // TODO: Refactor common code with FirElement.toKtCallInfo() when other FirResolvables are handled
@@ -1167,9 +1182,27 @@ internal class KtFirCallResolver(
     }
 
     override fun unresolvedKtCallError(psi: KtElement): Nothing {
-        errorWithAttachment("${psi::class.simpleName}(${psi::class.simpleName}) should always resolve to a KtCallInfo") {
-            withPsiAttachment("psi", psi)
-            psi.getOrBuildFir(firResolveSession)?.let { withFirAttachment("fir", it) }
+        buildErrorWithAttachment("${psi::class.simpleName}(${psi::class.simpleName}) should always resolve to a KtCallInfo") {
+            withPsiEntry("psi", psi)
+            psi.getOrBuildFir(firResolveSession)?.let { withFirEntry("fir", it) }
         }
+    }
+
+    private inline fun <R> wrapError(element: KtElement, action: () -> R): R {
+        return try {
+            action()
+        } catch (e: Throwable) {
+            if (shouldIjPlatformExceptionBeRethrown(e)) throw e
+            buildErrorWithAttachment("Error during resolving call ${element::class.java.name}", cause = e) {
+                withPsiEntry("psi", element)
+                element.getOrBuildFir(firResolveSession)?.let { withFirEntry("fir", it) }
+            }
+        }
+
+    }
+
+    private fun FirDiagnosticHolder.createKtDiagnostic(psi: KtElement?): KtDiagnostic {
+        return (source?.let { diagnostic.asKtDiagnostic(it, psi?.toKtPsiSourceElement()) }
+            ?: KtNonBoundToPsiErrorDiagnostic(factoryName = null, diagnostic.reason, token))
     }
 }

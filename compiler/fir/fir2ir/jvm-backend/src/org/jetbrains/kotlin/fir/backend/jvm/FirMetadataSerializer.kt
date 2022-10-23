@@ -7,8 +7,6 @@ package org.jetbrains.kotlin.fir.backend.jvm
 
 import org.jetbrains.kotlin.backend.jvm.JvmBackendContext
 import org.jetbrains.kotlin.backend.jvm.JvmLoweredDeclarationOrigin
-import org.jetbrains.kotlin.backend.jvm.mapping.IrTypeMapper
-import org.jetbrains.kotlin.backend.jvm.mapping.mapClass
 import org.jetbrains.kotlin.backend.jvm.metadata.MetadataSerializer
 import org.jetbrains.kotlin.codegen.ClassBuilderMode
 import org.jetbrains.kotlin.codegen.serialization.JvmSerializationBindings
@@ -35,11 +33,9 @@ import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.ir.declarations.IrDeclarationOrigin
 import org.jetbrains.kotlin.ir.declarations.MetadataSource
-import org.jetbrains.kotlin.metadata.jvm.deserialization.JvmNameResolver
 import org.jetbrains.kotlin.metadata.jvm.serialization.JvmStringTable
 import org.jetbrains.kotlin.modules.TargetId
 import org.jetbrains.kotlin.name.ClassId
-import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.protobuf.MessageLite
 import org.jetbrains.kotlin.types.AbstractTypeApproximator
 import org.jetbrains.kotlin.types.TypeApproximatorConfiguration
@@ -61,7 +57,7 @@ fun makeFirMetadataSerializerForIrClass(
     } ?: emptyList()
     val firSerializerExtension = FirJvmSerializerExtension(
         session, serializationBindings, context.state, irClass.metadata, localDelegatedProperties,
-        approximator, context.typeMapper, components
+        approximator, context.defaultTypeMapper, components
     )
     return FirMetadataSerializer(
         context.state.globalSerializationBindings,
@@ -221,7 +217,10 @@ private fun FirFunction.copyToFreeAnonymousFunction(approximator: AbstractTypeAp
     }
 }
 
-private fun FirPropertyAccessor.copyToFreeAccessor(approximator: AbstractTypeApproximator): FirPropertyAccessor {
+private fun FirPropertyAccessor.copyToFreeAccessor(
+    approximator: AbstractTypeApproximator,
+    newPropertySymbol: FirPropertySymbol,
+): FirPropertyAccessor {
     val accessor = this
     return buildPropertyAccessor {
         val typeParameterSet = accessor.typeParameters.toMutableSet()
@@ -229,6 +228,7 @@ private fun FirPropertyAccessor.copyToFreeAccessor(approximator: AbstractTypeApp
         origin = FirDeclarationOrigin.Source
         returnTypeRef = accessor.returnTypeRef.approximated(approximator, typeParameterSet, toSuper = true)
         symbol = FirPropertyAccessorSymbol()
+        propertySymbol = newPropertySymbol
         isGetter = accessor.isGetter
         status = accessor.status
         accessor.valueParameters.mapTo(valueParameters) {
@@ -247,7 +247,9 @@ internal fun FirProperty.copyToFreeProperty(approximator: AbstractTypeApproximat
         val typeParameterSet = property.typeParameters.toMutableSet()
         moduleData = property.moduleData
         origin = FirDeclarationOrigin.Source
-        symbol = FirPropertySymbol(property.symbol.callableId)
+
+        val newPropertySymbol = FirPropertySymbol(property.symbol.callableId)
+        symbol = newPropertySymbol
         returnTypeRef = property.returnTypeRef.approximated(approximator, typeParameterSet, toSuper = true)
         receiverTypeRef = property.receiverTypeRef?.approximated(approximator, typeParameterSet, toSuper = false)
         name = property.name
@@ -256,8 +258,8 @@ internal fun FirProperty.copyToFreeProperty(approximator: AbstractTypeApproximat
         delegateFieldSymbol = property.delegateFieldSymbol?.let {
             FirDelegateFieldSymbol(it.callableId)
         }
-        getter = property.getter?.copyToFreeAccessor(approximator)
-        setter = property.setter?.copyToFreeAccessor(approximator)
+        getter = property.getter?.copyToFreeAccessor(approximator, newPropertySymbol)
+        setter = property.setter?.copyToFreeAccessor(approximator, newPropertySymbol)
         isVar = property.isVar
         isLocal = property.isLocal
         status = property.status

@@ -2,7 +2,7 @@ description = ''
 
 apply plugin: 'kotlin'
 
-JvmToolchain.configureJvmToolchain(project, JdkMajorVersion.JDK_1_6)
+JvmToolchain.configureJvmToolchain(project, JdkMajorVersion.JDK_1_8)
 
 def includeJava9 = BuildPropertiesExtKt.getIncludeJava9(project.kotlinBuildProperties)
 
@@ -51,8 +51,9 @@ compileKotlin {
                 "-Xallow-kotlin-package",
                 "-Xno-optimized-callable-references",
                 "-Xno-kotlin-nothing-value-exception",
-                "-Xsuppress-deprecated-jvm-target-warning",
                 "-opt-in=kotlin.RequiresOptIn",
+                "-opt-in=org.jetbrains.kotlin.utils.addToStdlib.UnsafeCastFunction",
+                "-Xno-new-java-annotation-targets",
         ]
         moduleName = "kotlin-reflection"
     }

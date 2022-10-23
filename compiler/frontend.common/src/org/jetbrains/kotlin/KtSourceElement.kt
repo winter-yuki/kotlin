@@ -135,9 +135,13 @@ sealed class KtFakeSourceElementKind : KtSourceElementKind() {
     // where componentN calls will have the fake source elements refer to the corresponding KtDestructuringDeclarationEntry
     object DesugaredComponentFunctionCall : KtFakeSourceElementKind()
 
-    // when smart casts applied to the expression, its wrapped into FirExpressionWithSmartcast
+    // when smart casts applied to the expression, it is wrapped into FirSmartCastExpression
     // which type reference will have a fake source refer to a original source element of it
     object SmartCastedTypeRef : KtFakeSourceElementKind()
+
+    // when smart casts applied to the expression, it is wrapped into FirSmartCastExpression
+    // this kind used for such FirSmartCastExpressions itself
+    object SmartCastExpression : KtFakeSourceElementKind()
 
     // for safe call expressions like a?.foo() the FirSafeCallExpression is generated
     // and it have a fake source
@@ -186,6 +190,22 @@ sealed class KtFakeSourceElementKind : KtSourceElementKind() {
     // for java annotations constructor implicit parameters are generated
     // with a fake source which refers to declared annotation methods
     object ImplicitAnnotationAnnotationConstructorParameter : KtFakeSourceElementKind()
+
+    // for java records implicit constructor is generated
+    // with a fake source which refers to containing class
+    object ImplicitJavaRecordConstructor : KtFakeSourceElementKind()
+
+    // for java record constructor implicit parameters are generated
+    // with a fake source which refers to declared record components
+    object ImplicitRecordConstructorParameter : KtFakeSourceElementKind()
+
+    // for java records implicit component functions are generated
+    // with a fake source which refers to corresponding component
+    object JavaRecordComponentFunction : KtFakeSourceElementKind()
+
+    // for java records implicit component fields are generated
+    // with a fake source which refers to corresponding component
+    object JavaRecordComponentField : KtFakeSourceElementKind()
 
     // for the implicit field storing the delegated object for class delegation
     // with a fake source that refers to the KtExpression that creates the delegate

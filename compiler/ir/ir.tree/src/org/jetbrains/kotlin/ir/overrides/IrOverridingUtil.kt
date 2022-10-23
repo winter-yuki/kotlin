@@ -5,56 +5,50 @@
 
 package org.jetbrains.kotlin.ir.overrides
 
-import org.jetbrains.kotlin.descriptors.CallableMemberDescriptor
-import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
-import org.jetbrains.kotlin.descriptors.DescriptorVisibility
-import org.jetbrains.kotlin.descriptors.Modality
+import org.jetbrains.kotlin.descriptors.*
+import org.jetbrains.kotlin.ir.ObsoleteDescriptorBasedAPI
 import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.symbols.*
 import org.jetbrains.kotlin.ir.types.*
-import org.jetbrains.kotlin.ir.util.collectAndFilterRealOverrides
-import org.jetbrains.kotlin.ir.util.fileOrNull
-import org.jetbrains.kotlin.ir.util.isReal
-import org.jetbrains.kotlin.ir.util.render
+import org.jetbrains.kotlin.ir.util.*
 import org.jetbrains.kotlin.resolve.OverridingUtil.OverrideCompatibilityInfo
 import org.jetbrains.kotlin.resolve.OverridingUtil.OverrideCompatibilityInfo.incompatible
 import org.jetbrains.kotlin.types.AbstractTypeChecker
 import org.jetbrains.kotlin.types.TypeCheckerState
 import org.jetbrains.kotlin.types.Variance
 
-abstract class FakeOverrideBuilderStrategy(private val friendModules: Map<String, Collection<String>>) {
-
+abstract class FakeOverrideBuilderStrategy(
+    private val friendModules: Map<String, Collection<String>>,
+    private val unimplementedOverridesStrategy: IrUnimplementedOverridesStrategy
+) {
     open fun fakeOverrideMember(superType: IrType, member: IrOverridableMember, clazz: IrClass): IrOverridableMember =
-        buildFakeOverrideMember(superType, member, clazz, friendModules)
+        buildFakeOverrideMember(superType, member, clazz, friendModules, unimplementedOverridesStrategy)
 
     fun linkFakeOverride(fakeOverride: IrOverridableMember, compatibilityMode: Boolean) {
         when (fakeOverride) {
-            is IrFakeOverrideFunction -> linkFunctionFakeOverride(fakeOverride, compatibilityMode)
-            is IrFakeOverrideProperty -> linkPropertyFakeOverride(fakeOverride, compatibilityMode)
+            is IrFunctionWithLateBinding -> linkFunctionFakeOverride(fakeOverride, compatibilityMode)
+            is IrPropertyWithLateBinding -> linkPropertyFakeOverride(fakeOverride, compatibilityMode)
             else -> error("Unexpected fake override: $fakeOverride")
         }
     }
 
-    protected abstract fun linkFunctionFakeOverride(declaration: IrFakeOverrideFunction, compatibilityMode: Boolean)
-    protected abstract fun linkPropertyFakeOverride(declaration: IrFakeOverrideProperty, compatibilityMode: Boolean)
+    protected abstract fun linkFunctionFakeOverride(declaration: IrFunctionWithLateBinding, compatibilityMode: Boolean)
+    protected abstract fun linkPropertyFakeOverride(declaration: IrPropertyWithLateBinding, compatibilityMode: Boolean)
 }
 
+@OptIn(ObsoleteDescriptorBasedAPI::class) // Because of the LazyIR, have to use descriptors here.
 private fun IrOverridableMember.isPrivateToThisModule(thisClass: IrClass, memberClass: IrClass, friendModules: Map<String, Collection<String>>): Boolean {
     if (visibility != DescriptorVisibilities.INTERNAL) return false
-    val thisModule = thisClass.fileOrNull?.module
-    val memberModule = memberClass.fileOrNull?.module
-    if (thisModule == memberModule) return false
 
-    //   Note: On WASM backend there is possible if `thisClass` is from `IrExternalPackageFragment` which module is null
+    val thisModule = thisClass.getPackageFragment().packageFragmentDescriptor.containingDeclaration
+    val memberModule = memberClass.getPackageFragment().packageFragmentDescriptor.containingDeclaration
 
-    if (thisModule == null || memberModule == null) return false
-
-    return !isInFriendModules(thisModule, memberModule, friendModules)
+    return thisModule != memberModule && !isInFriendModules(thisModule, memberModule, friendModules)
 }
 
 private fun isInFriendModules(
-    fromModule: IrModuleFragment,
-    toModule: IrModuleFragment,
+    fromModule: ModuleDescriptor,
+    toModule: ModuleDescriptor,
     friendModules: Map<String, Collection<String>>
 ): Boolean {
 
@@ -69,11 +63,13 @@ private fun isInFriendModules(
     return toModuleName in fromFriends
 }
 
-fun buildFakeOverrideMember(superType: IrType, member: IrOverridableMember, clazz: IrClass): IrOverridableMember {
-    return buildFakeOverrideMember(superType, member, clazz, emptyMap())
-}
-
-fun buildFakeOverrideMember(superType: IrType, member: IrOverridableMember, clazz: IrClass, friendModules: Map<String, Collection<String>>): IrOverridableMember {
+fun buildFakeOverrideMember(
+    superType: IrType,
+    member: IrOverridableMember,
+    clazz: IrClass,
+    friendModules: Map<String, Collection<String>> = emptyMap(),
+    unimplementedOverridesStrategy: IrUnimplementedOverridesStrategy = IrUnimplementedOverridesStrategy.ProcessAsFakeOverrides
+): IrOverridableMember {
     require(superType is IrSimpleType) { "superType is $superType, expected IrSimpleType" }
     val classifier = superType.classifier
     require(classifier is IrClassSymbol) { "superType classifier is not IrClassSymbol: $classifier" }
@@ -94,13 +90,12 @@ fun buildFakeOverrideMember(superType: IrType, member: IrOverridableMember, claz
         substitutionMap[tp.symbol] = ta.type
     }
 
-    val copier = DeepCopyIrTreeWithSymbolsForFakeOverrides(substitutionMap)
-    val deepCopyFakeOverride = copier.copy(member, clazz) as IrOverridableMember
-    deepCopyFakeOverride.parent = clazz
-    if (deepCopyFakeOverride.isPrivateToThisModule(clazz, classifier.owner, friendModules))
-        deepCopyFakeOverride.visibility = DescriptorVisibilities.INVISIBLE_FAKE
-
-    return deepCopyFakeOverride
+    return CopyIrTreeWithSymbolsForFakeOverrides(member, substitutionMap, clazz, unimplementedOverridesStrategy)
+        .copy()
+        .apply {
+            if (isPrivateToThisModule(clazz, classifier.owner, friendModules))
+                visibility = DescriptorVisibilities.INVISIBLE_FAKE
+        }
 }
 
 
@@ -149,7 +144,6 @@ class IrOverridingUtil(
     fun buildFakeOverridesForClass(clazz: IrClass, oldSignatures: Boolean) {
         val superTypes = clazz.superTypes
 
-        @Suppress("UNCHECKED_CAST")
         val fromCurrent = clazz.declarations.filterIsInstance<IrOverridableMember>()
 
         val allFromSuper = superTypes.flatMap { superType ->
@@ -179,7 +173,8 @@ class IrOverridingUtil(
     fun buildFakeOverridesForClassUsingOverriddenSymbols(
         clazz: IrClass,
         implementedMembers: List<IrOverridableMember> = emptyList(),
-        compatibilityMode: Boolean
+        compatibilityMode: Boolean,
+        ignoredParentSymbols: List<IrSymbol> = emptyList()
     ): List<IrOverridableMember> {
         val overriddenMembers = (clazz.declarations.filterIsInstance<IrOverridableMember>() + implementedMembers)
             .flatMap { member -> member.overriddenSymbols.map { it.owner } }
@@ -190,7 +185,7 @@ class IrOverridingUtil(
             superClass.declarations
                 .filterIsInstance<IrOverridableMember>()
                 .filterNot {
-                    it in overriddenMembers || it.isStaticMember || DescriptorVisibilities.isPrivate(it.visibility)
+                    it in overriddenMembers || it.symbol in ignoredParentSymbols || it.isStaticMember || DescriptorVisibilities.isPrivate(it.visibility)
                 }
                 .map { overriddenMember ->
                     val fakeOverride = fakeOverrideBuilder.fakeOverrideMember(superType, overriddenMember, clazz)
@@ -279,13 +274,26 @@ class IrOverridingUtil(
     ) {
         val fromSuper = notOverridden.toMutableSet()
         while (fromSuper.isNotEmpty()) {
-            val notOverriddenFromSuper = findMemberWithMaxVisibility(fromSuper)
-            val overridables = extractMembersOverridableInBothWays(
+            val notOverriddenFromSuper: IrOverridableMember = findMemberWithMaxVisibility(filterOutCustomizedFakeOverrides(fromSuper))
+            val overridables: Collection<IrOverridableMember> = extractMembersOverridableInBothWays(
                 notOverriddenFromSuper,
                 fromSuper
             )
             createAndBindFakeOverride(overridables, current, addedFakeOverrides, compatibilityMode)
         }
+    }
+
+    /**
+     * If there is a mix of [IrOverridableMember]s with origin=[IrDeclarationOrigin.FAKE_OVERRIDE]s (true "fake overrides")
+     * and [IrOverridableMember]s that were customized with the help of [IrUnimplementedOverridesStrategy] (customized "fake overrides"),
+     * then leave only true ones. Rationale: They should point to non-abstract callable members in one of super classes, so
+     * effectively they are implemented in the current class.
+     */
+    private fun filterOutCustomizedFakeOverrides(overridableMembers: Collection<IrOverridableMember>): Collection<IrOverridableMember> {
+        if (overridableMembers.size < 2) return overridableMembers
+
+        val (trueFakeOverrides, customizedFakeOverrides) = overridableMembers.partition { it.origin == IrDeclarationOrigin.FAKE_OVERRIDE }
+        return trueFakeOverrides.ifEmpty { customizedFakeOverrides }
     }
 
     private fun filterVisibleFakeOverrides(toFilter: Collection<IrOverridableMember>): Collection<IrOverridableMember> {
@@ -383,7 +391,7 @@ class IrOverridingUtil(
         newModality: Modality,
         newVisibility: DescriptorVisibility
     ): IrSimpleFunction? {
-        require(this is IrFakeOverrideFunction) {
+        require(this is IrFunctionWithLateBinding) {
             "Unexpected fake override accessor kind: $this"
         }
         // For descriptors it gets INVISIBLE_FAKE.
@@ -412,13 +420,13 @@ class IrOverridingUtil(
 
         val fakeOverride = mostSpecific.apply {
             when (this) {
-                is IrFakeOverrideProperty -> {
+                is IrPropertyWithLateBinding -> {
                     this.visibility = visibility
                     this.modality = modality
                     this.getter = this.getter?.updateAccessorModalityAndVisibility(modality, visibility)
                     this.setter = this.setter?.updateAccessorModalityAndVisibility(modality, visibility)
                 }
-                is IrFakeOverrideFunction -> {
+                is IrFunctionWithLateBinding -> {
                     this.visibility = visibility
                     this.modality = modality
                 }

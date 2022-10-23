@@ -4,6 +4,7 @@ import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContextImpl
 import org.jetbrains.kotlin.backend.common.overrides.FakeOverrideChecker
 import org.jetbrains.kotlin.backend.common.serialization.DescriptorByIdSignatureFinderImpl
+import org.jetbrains.kotlin.backend.common.serialization.linkerissues.checkNoUnboundSymbols
 import org.jetbrains.kotlin.backend.common.serialization.mangle.ManglerChecker
 import org.jetbrains.kotlin.backend.common.serialization.mangle.descriptor.Ir2DescriptorManglerAdapter
 import org.jetbrains.kotlin.backend.konan.descriptors.isForwardDeclarationModule
@@ -15,6 +16,7 @@ import org.jetbrains.kotlin.backend.konan.serialization.*
 import org.jetbrains.kotlin.config.CommonConfigurationKeys
 import org.jetbrains.kotlin.config.languageVersionSettings
 import org.jetbrains.kotlin.descriptors.ModuleDescriptor
+import org.jetbrains.kotlin.descriptors.PropertyDescriptor
 import org.jetbrains.kotlin.descriptors.konan.DeserializedKlibModuleOrigin
 import org.jetbrains.kotlin.descriptors.konan.KlibModuleOrigin
 import org.jetbrains.kotlin.descriptors.konan.isNativeStdlib
@@ -34,6 +36,12 @@ import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.CleanableBindingContext
 import org.jetbrains.kotlin.utils.DFS
 
+object KonanStubGeneratorExtensions : StubGeneratorExtensions() {
+    override fun isPropertyWithPlatformField(descriptor: PropertyDescriptor): Boolean {
+        return super.isPropertyWithPlatformField(descriptor) || descriptor.isLateInit
+    }
+}
+
 internal fun Context.psiToIr(
         symbolTable: SymbolTable,
         isProducingLibrary: Boolean,
@@ -43,9 +51,13 @@ internal fun Context.psiToIr(
     val expectActualLinker = config.configuration[CommonConfigurationKeys.EXPECT_ACTUAL_LINKER] ?: false
     val messageLogger = config.configuration[IrMessageLogger.IR_MESSAGE_LOGGER] ?: IrMessageLogger.None
 
-    val allowUnboundSymbols = config.configuration[KonanConfigKeys.PARTIAL_LINKAGE] ?: false
+    val partialLinkageEnabled = config.configuration[KonanConfigKeys.PARTIAL_LINKAGE] ?: false
 
-    val translator = Psi2IrTranslator(config.configuration.languageVersionSettings, Psi2IrConfiguration(ignoreErrors = false, allowUnboundSymbols = allowUnboundSymbols))
+    val translator = Psi2IrTranslator(
+            config.configuration.languageVersionSettings,
+            Psi2IrConfiguration(ignoreErrors = false, partialLinkageEnabled),
+            messageLogger::checkNoUnboundSymbols
+    )
     val generatorContext = translator.createGeneratorContext(moduleDescriptor, bindingContext, symbolTable)
 
     val pluginExtensions = IrGenerationExtension.getInstances(config.project)
@@ -61,15 +73,17 @@ internal fun Context.psiToIr(
             moduleDescriptor, symbolTable,
             generatorContext.irBuiltIns,
             DescriptorByIdSignatureFinderImpl(moduleDescriptor, KonanManglerDesc),
+            KonanStubGeneratorExtensions
     )
     val irBuiltInsOverDescriptors = generatorContext.irBuiltIns as IrBuiltInsOverDescriptors
     val functionIrClassFactory: KonanIrAbstractDescriptorBasedFunctionFactory =
-            if (config.lazyIrForCaches && !llvmModuleSpecification.containsModule(this.stdlibModule))
-                LazyIrFunctionFactory(symbolTable, stubGenerator, irBuiltInsOverDescriptors, reflectionTypes)
-            else
+            if (shouldDefineFunctionClasses || !config.lazyIrForCaches)
                 BuiltInFictitiousFunctionIrClassFactory(symbolTable, irBuiltInsOverDescriptors, reflectionTypes)
+            else
+                LazyIrFunctionFactory(symbolTable, stubGenerator, irBuiltInsOverDescriptors, reflectionTypes)
     irBuiltInsOverDescriptors.functionFactory = functionIrClassFactory
-    val symbols = KonanSymbols(this, generatorContext.irBuiltIns, symbolTable, symbolTable.lazyWrapper)
+    val descriptorsLookup = DescriptorsLookup(this.builtIns)
+    val symbols = KonanSymbols(this, descriptorsLookup, generatorContext.irBuiltIns, symbolTable, symbolTable.lazyWrapper)
 
     val irDeserializer = if (isProducingLibrary && !useLinkerWhenProducingLibrary) {
         // Enable lazy IR generation for newly-created symbols inside BE
@@ -108,8 +122,6 @@ internal fun Context.psiToIr(
                         config.resolve.includedLibraries.map { it.uniqueName }
                 ).associateWith { friendModules }
 
-        val unlinkedDeclarationsSupport = KonanUnlinkedDeclarationsSupport(generatorContext.irBuiltIns, allowUnboundSymbols)
-
         KonanIrLinker(
                 currentModule = moduleDescriptor,
                 translationPluginContext = translationContext,
@@ -121,9 +133,10 @@ internal fun Context.psiToIr(
                 stubGenerator = stubGenerator,
                 cenumsProvider = irProviderForCEnumsAndCStructs,
                 exportedDependencies = exportedDependencies,
+                partialLinkageEnabled = partialLinkageEnabled,
                 cachedLibraries = config.cachedLibraries,
                 lazyIrForCaches = config.lazyIrForCaches,
-                unlinkedDeclarationsSupport = unlinkedDeclarationsSupport,
+                libraryBeingCached = config.libraryToCache,
                 userVisibleIrModulesSupport = config.userVisibleIrModulesSupport
         ).also { linker ->
 
@@ -143,10 +156,11 @@ internal fun Context.psiToIr(
 
                 for (dependency in sortDependencies(dependencies).filter { it != moduleDescriptor }) {
                     val kotlinLibrary = (dependency.getCapability(KlibModuleOrigin.CAPABILITY) as? DeserializedKlibModuleOrigin)?.library
-                    val isCachedLibrary = kotlinLibrary != null && config.cachedLibraries.isLibraryCached(kotlinLibrary)
-                    if (isProducingLibrary || (config.lazyIrForCaches && isCachedLibrary))
+                    val isFullyCachedLibrary = kotlinLibrary != null &&
+                            config.cachedLibraries.isLibraryCached(kotlinLibrary) && kotlinLibrary != config.libraryToCache?.klib
+                    if (isProducingLibrary || (config.lazyIrForCaches && isFullyCachedLibrary))
                         linker.deserializeOnlyHeaderModule(dependency, kotlinLibrary)
-                    else if (isCachedLibrary)
+                    else if (isFullyCachedLibrary)
                         linker.deserializeHeadersWithInlineBodies(dependency, kotlinLibrary!!)
                     else
                         linker.deserializeIrModuleHeader(dependency, kotlinLibrary, dependency.name.asString())
@@ -201,7 +215,7 @@ internal fun Context.psiToIr(
     // Enable lazy IR genration for newly-created symbols inside BE
     stubGenerator.unboundSymbolGeneration = true
 
-    symbolTable.noUnboundLeft("Unbound symbols left after linker")
+    messageLogger.checkNoUnboundSymbols(symbolTable, "at the end of IR linkage process")
 
     mainModule.acceptVoid(ManglerChecker(KonanManglerIr, Ir2DescriptorManglerAdapter(KonanManglerDesc)))
 
@@ -216,6 +230,11 @@ internal fun Context.psiToIr(
 
     // Note: coupled with [shouldLower] below.
     irModules = modules.filterValues { llvmModuleSpecification.containsModule(it) }
+    // IR linker deserializes files in the order they lie on the disk, which might be inconvenient,
+    // so to make the pipeline more deterministic, the files are to be sorted.
+    // This concerns in the first place global initializers order for the eager initialization strategy,
+    // where the files are being initialized in order one by one.
+    irModules.values.forEach { module -> module.files.sortBy { it.fileEntry.name } }
 
     if (!isProducingLibrary)
         irLinker = irDeserializer as KonanIrLinker
@@ -225,9 +244,8 @@ internal fun Context.psiToIr(
     if (!isProducingLibrary) {
         // TODO: find out what should be done in the new builtins/symbols about it
         if (this.stdlibModule in modulesWithoutDCE) {
-            (functionIrClassFactory as BuiltInFictitiousFunctionIrClassFactory).buildAllClasses()
+            (functionIrClassFactory as? BuiltInFictitiousFunctionIrClassFactory)?.buildAllClasses()
         }
-        internalAbi.init(irModules.values + irModule!!)
         (functionIrClassFactory as? BuiltInFictitiousFunctionIrClassFactory)?.module =
                 (modules.values + irModule!!).single { it.descriptor.isNativeStdlib() }
     }

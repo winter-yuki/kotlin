@@ -22,9 +22,7 @@ extern "C" const void **Kotlin_callsCheckerKnownFunctions = nullptr;
 extern "C" int Kotlin_callsCheckerKnownFunctionsCount = 0;
 
 extern "C" const char* Kotlin_callsCheckerGoodFunctionNames[] = {
-        "\x01_close",
         "\x01_mprotect",
-        "close",
         "mprotect",
         "posix_memalign",
 
@@ -44,6 +42,7 @@ extern "C" const char* Kotlin_callsCheckerGoodFunctionNames[] = {
         "_ZNSt6chrono3_V212steady_clock3nowEv", // std::chrono::_V2::steady_clock::now()
         "_ZNSt8__detail15_List_node_base7_M_hookEPS0_", // std::__detail::_List_node_base::_M_hook(std::__detail::_List_node_base*)
         "_ZNSt8__detail15_List_node_base9_M_unhookEv", // std::__detail::_List_node_base::_M_unhook()
+        "_ZNSt8__detail15_List_node_base11_M_transferEPS0_S1_", // std::__detail::_List_node_base::_M_transfer(std::__detail::_List_node_base*, std::__detail::_List_node_base*)
         "_ZNSt9exceptionD2Ev", // std::exception::~exception()
         "_ZSt17current_exceptionv", // std::current_exception()
         "_ZSt17rethrow_exceptionSt13exception_ptr", // std::rethrow_exception(std::exception_ptr)
@@ -191,14 +190,6 @@ extern "C" const char* Kotlin_callsCheckerGoodFunctionNames[] = {
         "CFStringGetCharacters",
         "CFStringGetLength",
         "_Block_object_assign",
-        "class_addIvar",
-        "class_addMethod",
-        "class_addProtocol",
-        "class_copyMethodList",
-        "class_copyProtocolList",
-        "class_getClassMethod",
-        "class_getInstanceMethod",
-        "class_getInstanceVariable",
         "class_getName",
         "class_getSuperclass",
         "class_isMetaClass",
@@ -207,7 +198,6 @@ extern "C" const char* Kotlin_callsCheckerGoodFunctionNames[] = {
         "method_getTypeEncoding",
         "objc_alloc",
         "objc_alloc_init",
-        "objc_allocateClassPair",
         "objc_autorelease",
         "objc_autoreleasePoolPush",
         "objc_autoreleaseReturnValue",
@@ -215,18 +205,13 @@ extern "C" const char* Kotlin_callsCheckerGoodFunctionNames[] = {
         "objc_getClass",
         "objc_getProtocol",
         "objc_lookUpClass",
-        "objc_registerClassPair",
         "objc_retain",
         "objc_retainAutoreleaseReturnValue",
         "objc_retainBlock",
-        "objc_setAssociatedObject",
         "objc_storeWeak",
         "object_getClass",
         "object_isClass",
-        "protocol_copyProtocolList",
-        "protocol_getMethodDescription",
         "protocol_getName",
-        "sel_registerName",
 
         "llvm.assume",
         "llvm.ceil.*",

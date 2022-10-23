@@ -12,7 +12,6 @@ import org.jetbrains.kotlin.descriptors.Visibilities
 import org.jetbrains.kotlin.descriptors.Visibility
 import org.jetbrains.kotlin.fakeElement
 import org.jetbrains.kotlin.fir.FirSession
-import org.jetbrains.kotlin.fir.copyWithNewSourceKind
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.declarations.utils.isEnumClass
 import org.jetbrains.kotlin.fir.declarations.utils.isExpect
@@ -382,43 +381,76 @@ private fun FirTypeRef.hideLocalTypeIfNeeded(
     session: FirSession,
     isInlineFunction: Boolean = false
 ): FirTypeRef {
-    if (!shouldHideLocalType(containingCallableVisibility, isInlineFunction)) return this
+    if (this !is FirResolvedTypeRef || !shouldHideLocalType(containingCallableVisibility, isInlineFunction)) return this
+    return withReplacedConeType(type.approximateToOnlySupertype(session))
+}
 
-    val firClass =
-        (((this as? FirResolvedTypeRef)
-            ?.type as? ConeClassLikeType)
-            ?.lookupTag as? ConeClassLookupTagWithFixedSymbol)
-            ?.symbol?.fir
+private fun ConeKotlinType.approximateToOnlySupertype(session: FirSession): ConeKotlinType? {
+    if (this is ConeFlexibleType) {
+        val lower = lowerBound.approximateToOnlySupertype(session)?.coneLowerBoundIfFlexible()
+        val upper = upperBound.approximateToOnlySupertype(session)?.coneUpperBoundIfFlexible()
+        if (lower == null && upper == null) {
+            return null
+        }
+        return coneFlexibleOrSimpleType(session.typeContext, lower ?: lowerBound, upper ?: upperBound)
+    }
+
+    if (this !is ConeClassLikeType) {
+        return null
+    }
+    val firClass = (lookupTag as? ConeClassLookupTagWithFixedSymbol)?.symbol?.fir
     if (firClass !is FirAnonymousObject) {
         // NB: local classes are acceptable here, but reported by EXPOSED_* checkers as errors
-        return this
+        return null
     }
     if (firClass.superTypeRefs.size > 1) {
         // NB: don't approximate so members can be resolved. The error is reported by FirAmbiguousAnonymousTypeChecker.
-        return this
+        return null
     }
     val superType = firClass.superTypeRefs.single()
-    if (superType is FirResolvedTypeRef) {
-        val newKind = source?.kind
-        var result = superType
-        val resultTypeArguments = result.type.typeArguments
+    if (superType !is FirResolvedTypeRef) {
+        return null
+    }
+    val result = superType.type.withNullability(nullability, session.typeContext)
+    if (typeArguments.isNotEmpty()) {
+        val substitution = mutableMapOf<FirTypeParameterSymbol, ConeKotlinType>()
 
-        if (resultTypeArguments.isNotEmpty() && resultTypeArguments.size == coneType.typeArguments.size) {
-            val substitution = mutableMapOf<FirTypeParameterSymbol, ConeKotlinType>()
-            for (index in resultTypeArguments.indices) {
-                val key = resultTypeArguments[index]
-                val value = coneType.typeArguments[index]
-                val symbol = (key as? ConeTypeParameterType)?.lookupTag?.typeParameterSymbol ?: continue
-                substitution[symbol] = value.type!!
+        var index = 0
+        fun addSubstitution(projection: ConeTypeProjection): Boolean {
+            when (projection) {
+                is ConeTypeParameterType -> {
+                    val symbol = projection.lookupTag.typeParameterSymbol
+                    if (!substitution.containsKey(symbol)) {
+                        substitution[symbol] = typeArguments[index].type!!
+                        index++
+                    }
+                }
+                is ConeErrorType -> {
+                    return false
+                }
+                is ConeClassLikeType -> {
+                    for (typeArgument in projection.typeArguments) {
+                        if (!addSubstitution(typeArgument)) {
+                            return false
+                        }
+                    }
+                }
+                is ConeKotlinTypeProjection -> {
+                    if (!addSubstitution(projection.type)) {
+                        return false
+                    }
+                }
+                is ConeStarProjection -> {
+                    index++
+                }
             }
-
-            val substituted = ConeSubstitutorByMap(substitution, session).substituteOrSelf(result.type)
-            result = substituted.toFirResolvedTypeRef(superType.source, superType.delegatedTypeRef)
+            return true
         }
 
-        return if (newKind is KtFakeSourceElementKind) result.copyWithNewSourceKind(newKind) else result
+        addSubstitution(result)
+        return ConeSubstitutorByMap(substitution, session).substituteOrSelf(result)
     }
-    return this
+    return result
 }
 
 fun shouldHideLocalType(containingCallableVisibility: Visibility?, isInlineFunction: Boolean): Boolean {
