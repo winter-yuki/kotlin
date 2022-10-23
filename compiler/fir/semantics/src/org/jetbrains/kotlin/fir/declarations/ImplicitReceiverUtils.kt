@@ -14,8 +14,7 @@ import org.jetbrains.kotlin.fir.resolve.calls.*
 import org.jetbrains.kotlin.fir.scopes.FirScope
 import org.jetbrains.kotlin.fir.scopes.impl.FirLocalScope
 import org.jetbrains.kotlin.fir.scopes.impl.wrapNestedClassifierScopeWithSubstitutionForSuperType
-import org.jetbrains.kotlin.fir.types.ConeKotlinType
-import org.jetbrains.kotlin.fir.types.coneType
+import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.utils.addIfNotNull
 
@@ -89,7 +88,8 @@ fun SessionHolder.collectTowerDataElementsForClass(owner: FirClass, defaultType:
         }
     }
 
-    val thisReceiver = ImplicitDispatchReceiverValue(owner.symbol, defaultType, session, scopeSession)
+    val selfType = (defaultType as? ConeSimpleKotlinType)?.asSelfType(session.typeContext) ?: defaultType
+    val thisReceiver = ImplicitDispatchReceiverValue(owner.symbol, selfType, session, scopeSession)
     val contextReceivers = (owner as? FirRegularClass)?.contextReceivers?.mapIndexed { index, receiver ->
         ContextReceiverValueForClass(
             owner.symbol, receiver.typeRef.coneType, receiver.labelName, session, scopeSession,

@@ -1,3 +1,5 @@
+// INFERENCE_HELPERS
+
 interface A {
     fun f(): Self
 }
@@ -23,7 +25,7 @@ fun test(d: D, e: E) {
     val b2: B = Sbc.h()
     val c2: C = Sbc.g()
 
-    val SbSc = if (true) d.f() else e.f()
+    val SbSc = select(d.f(), e.f())
     val b3: B = SbSc.h()
     val c3: C = SbSc.g()
 }

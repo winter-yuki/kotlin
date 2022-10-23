@@ -38,15 +38,7 @@ FILE: intersection.kt
 
         lval b2: R|B| = R|<local>/Sbc|.R|/C.h|()
         lval c2: R|C| = R|<local>/Sbc|.R|/B.g|()
-        lval SbSc: R|it(B & C)| = when () {
-            Boolean(true) ->  {
-                R|<local>/d|.R|/A.f|()
-            }
-            else ->  {
-                R|<local>/e|.R|/A.f|()
-            }
-        }
-
+        lval SbSc: R|it(B & C)| = R|/select|<R|it(B & C)|>(vararg(R|<local>/d|.R|/A.f|(), R|<local>/e|.R|/A.f|()))
         lval b3: R|B| = R|<local>/SbSc|.R|/C.h|()
         lval c3: R|C| = R|<local>/SbSc|.R|/B.g|()
     }

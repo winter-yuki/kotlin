@@ -1,15 +1,17 @@
 // USE_STDLIB
 
-open class Lazy<out T>(val computation: () -> T) {
-    fun copy(): Self = Lazy { computation().apply {} }
+abstract class Lazy<T>(val computation: () -> T) {
+    abstract protected fun create(computation: () -> T): Self
+    fun copy(): Self = create { computation() }
 }
 
-open class LazyNumber<out T : Number>(computation: () -> T) : Lazy<T>(computation) {
-    fun shortify(): Self = LazyNumber { computation().shortValue() }
+abstract class LazyNumber<T : Number>(computation: () -> T) : Lazy<T>(computation) {
+    fun shortify(): Self = create { computation().toShort() }
 }
 
 class LazyInt(computation: () -> Int) : LazyNumber<Int>(computation) {
-    fun add(n: Int): Self = LazyInt { computation() + n }
+    override fun create(computation: () -> Int): Self = LazyInt(computation)
+    fun add(n: Int): Self = create { computation() + n }
 }
 
 fun test() {
