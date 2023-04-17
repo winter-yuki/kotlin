@@ -237,6 +237,7 @@ data class ConeSelfType(
 
     init {
         require(original.nullability == ConeNullability.NOT_NULL)
+        original
     }
 
     override val typeArguments: Array<out ConeTypeProjection>
@@ -246,6 +247,6 @@ data class ConeSelfType(
         get() = original.attributes
 
     companion object {
-        val SELF_NAME = Name.identifier("Self")
+        val SELF_NAME: Name = Name.identifier("Self")
     }
 }
