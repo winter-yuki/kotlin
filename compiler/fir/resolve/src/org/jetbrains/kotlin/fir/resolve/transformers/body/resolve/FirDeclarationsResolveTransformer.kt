@@ -46,6 +46,8 @@ import org.jetbrains.kotlin.fir.types.builder.buildResolvedTypeRef
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitTypeRefImplWithoutSource
 import org.jetbrains.kotlin.fir.visitors.FirTransformer
 import org.jetbrains.kotlin.fir.visitors.transformSingle
+import org.jetbrains.kotlin.name.ClassId
+import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 
 open class FirDeclarationsResolveTransformer(
@@ -582,6 +584,8 @@ open class FirDeclarationsResolveTransformer(
             return simpleFunction
         }
 
+        doTransformFunctionWithTraits(simpleFunction)
+
         val containingDeclaration = context.containerIfAny
         return context.withSimpleFunction(simpleFunction, session) {
             doTransformTypeParameters(simpleFunction)
@@ -602,6 +606,26 @@ open class FirDeclarationsResolveTransformer(
                 }
             }
         }
+    }
+
+    private fun <F : FirFunction> doTransformFunctionWithTraits(function: F) {
+        // TODO optimize
+        val newReceivers = function.contextReceivers.asSequence().flatMap ctxReceivers@{ contextReceiver ->
+            val classId = contextReceiver.typeRef.toExpectedTypeRef().type.classId ?: return@ctxReceivers emptySequence()
+            val cls = symbolProvider.getClassLikeSymbolByClassId(classId)?.fir as? FirRegularClass ?: return@ctxReceivers emptySequence()
+//            val traitAnnotation = ClassId(FqName("kotlin.annotations"), Name.identifier("Trait"))
+            val traitAnnotationId = ClassId(FqName.ROOT, Name.identifier("Trait"))
+            cls.declarations.asSequence().filterIsInstance<FirProperty>().filter { field ->
+                field.annotations.find { it.annotationTypeRef.toExpectedTypeRef().type.classId == traitAnnotationId } != null
+            }.map { field ->
+                buildContextReceiver {
+                    source = field.source
+                    typeRef = field.returnTypeRef
+                    labelNameFromTypeRef = field.name
+                }
+            }
+        }.toList()
+        function.replaceContextReceivers(function.contextReceivers + newReceivers)
     }
 
     private fun <F : FirFunction> transformFunctionWithGivenSignature(
