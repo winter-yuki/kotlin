@@ -1474,6 +1474,10 @@ sealed class KtFirDiagnostic<PSI : PsiElement> : KtDiagnosticWithPsi<PSI> {
         abstract val type: KtType
     }
 
+    abstract class DefinitelyNonNullableAsReified : KtFirDiagnostic<PsiElement>() {
+        override val diagnosticClass get() = DefinitelyNonNullableAsReified::class
+    }
+
     abstract class FinalUpperBound : KtFirDiagnostic<KtTypeReference>() {
         override val diagnosticClass get() = FinalUpperBound::class
         abstract val type: KtType
@@ -3212,17 +3216,9 @@ sealed class KtFirDiagnostic<PSI : PsiElement> : KtDiagnosticWithPsi<PSI> {
         override val diagnosticClass get() = IllegalJavaLangRecordSupertype::class
     }
 
-    abstract class JvmDefaultNotInInterface : KtFirDiagnostic<PsiElement>() {
-        override val diagnosticClass get() = JvmDefaultNotInInterface::class
-    }
-
     abstract class JvmDefaultInJvm6Target : KtFirDiagnostic<PsiElement>() {
         override val diagnosticClass get() = JvmDefaultInJvm6Target::class
         abstract val annotation: String
-    }
-
-    abstract class JvmDefaultRequiredForOverride : KtFirDiagnostic<KtDeclaration>() {
-        override val diagnosticClass get() = JvmDefaultRequiredForOverride::class
     }
 
     abstract class JvmDefaultInDeclaration : KtFirDiagnostic<KtElement>() {
@@ -3236,10 +3232,6 @@ sealed class KtFirDiagnostic<PSI : PsiElement> : KtDiagnosticWithPsi<PSI> {
 
     abstract class JvmDefaultWithCompatibilityNotOnInterface : KtFirDiagnostic<KtElement>() {
         override val diagnosticClass get() = JvmDefaultWithCompatibilityNotOnInterface::class
-    }
-
-    abstract class NonJvmDefaultOverridesJavaDefault : KtFirDiagnostic<KtDeclaration>() {
-        override val diagnosticClass get() = NonJvmDefaultOverridesJavaDefault::class
     }
 
     abstract class ExternalDeclarationCannotBeAbstract : KtFirDiagnostic<KtDeclaration>() {
@@ -3389,12 +3381,6 @@ sealed class KtFirDiagnostic<PSI : PsiElement> : KtDiagnosticWithPsi<PSI> {
 
     abstract class JavaSamInterfaceConstructorReference : KtFirDiagnostic<PsiElement>() {
         override val diagnosticClass get() = JavaSamInterfaceConstructorReference::class
-    }
-
-    abstract class JavaShadowedProtectedFieldReference : KtFirDiagnostic<PsiElement>() {
-        override val diagnosticClass get() = JavaShadowedProtectedFieldReference::class
-        abstract val containerClass: ClassId
-        abstract val shadowingClass: ClassId
     }
 
     abstract class ImplementingFunctionInterface : KtFirDiagnostic<KtClassOrObject>() {

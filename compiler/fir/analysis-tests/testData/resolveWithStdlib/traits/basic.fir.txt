@@ -10,11 +10,11 @@ FILE: basic.kt
             super<R|kotlin/Any|>()
         }
 
-        @R|Trait|() public final val int: R|kotlin/Int| = Int(0)
+        field:@R|Trait|() public final val int: R|kotlin/Int| = Int(0)
             public get(): R|kotlin/Int|
 
     }
-    context(R|Traits|, R|kotlin/Int|)
+    context(R|Traits|)
     public final fun test(): R|kotlin/Unit| {
         this@R|/test|.R|kotlin/Int.plus|(Int(42))
     }

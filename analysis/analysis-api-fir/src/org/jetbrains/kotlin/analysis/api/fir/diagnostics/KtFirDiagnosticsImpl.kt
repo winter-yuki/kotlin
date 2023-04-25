@@ -1772,6 +1772,11 @@ internal class ReifiedTypeForbiddenSubstitutionImpl(
     override val token: KtLifetimeToken,
 ) : KtFirDiagnostic.ReifiedTypeForbiddenSubstitution(), KtAbstractFirDiagnostic<PsiElement>
 
+internal class DefinitelyNonNullableAsReifiedImpl(
+    override val firDiagnostic: KtPsiDiagnostic,
+    override val token: KtLifetimeToken,
+) : KtFirDiagnostic.DefinitelyNonNullableAsReified(), KtAbstractFirDiagnostic<PsiElement>
+
 internal class FinalUpperBoundImpl(
     override val type: KtType,
     override val firDiagnostic: KtPsiDiagnostic,
@@ -3882,21 +3887,11 @@ internal class IllegalJavaLangRecordSupertypeImpl(
     override val token: KtLifetimeToken,
 ) : KtFirDiagnostic.IllegalJavaLangRecordSupertype(), KtAbstractFirDiagnostic<PsiElement>
 
-internal class JvmDefaultNotInInterfaceImpl(
-    override val firDiagnostic: KtPsiDiagnostic,
-    override val token: KtLifetimeToken,
-) : KtFirDiagnostic.JvmDefaultNotInInterface(), KtAbstractFirDiagnostic<PsiElement>
-
 internal class JvmDefaultInJvm6TargetImpl(
     override val annotation: String,
     override val firDiagnostic: KtPsiDiagnostic,
     override val token: KtLifetimeToken,
 ) : KtFirDiagnostic.JvmDefaultInJvm6Target(), KtAbstractFirDiagnostic<PsiElement>
-
-internal class JvmDefaultRequiredForOverrideImpl(
-    override val firDiagnostic: KtPsiDiagnostic,
-    override val token: KtLifetimeToken,
-) : KtFirDiagnostic.JvmDefaultRequiredForOverride(), KtAbstractFirDiagnostic<KtDeclaration>
 
 internal class JvmDefaultInDeclarationImpl(
     override val annotation: String,
@@ -3913,11 +3908,6 @@ internal class JvmDefaultWithCompatibilityNotOnInterfaceImpl(
     override val firDiagnostic: KtPsiDiagnostic,
     override val token: KtLifetimeToken,
 ) : KtFirDiagnostic.JvmDefaultWithCompatibilityNotOnInterface(), KtAbstractFirDiagnostic<KtElement>
-
-internal class NonJvmDefaultOverridesJavaDefaultImpl(
-    override val firDiagnostic: KtPsiDiagnostic,
-    override val token: KtLifetimeToken,
-) : KtFirDiagnostic.NonJvmDefaultOverridesJavaDefault(), KtAbstractFirDiagnostic<KtDeclaration>
 
 internal class ExternalDeclarationCannotBeAbstractImpl(
     override val firDiagnostic: KtPsiDiagnostic,
@@ -4098,13 +4088,6 @@ internal class JavaSamInterfaceConstructorReferenceImpl(
     override val firDiagnostic: KtPsiDiagnostic,
     override val token: KtLifetimeToken,
 ) : KtFirDiagnostic.JavaSamInterfaceConstructorReference(), KtAbstractFirDiagnostic<PsiElement>
-
-internal class JavaShadowedProtectedFieldReferenceImpl(
-    override val containerClass: ClassId,
-    override val shadowingClass: ClassId,
-    override val firDiagnostic: KtPsiDiagnostic,
-    override val token: KtLifetimeToken,
-) : KtFirDiagnostic.JavaShadowedProtectedFieldReference(), KtAbstractFirDiagnostic<PsiElement>
 
 internal class ImplementingFunctionInterfaceImpl(
     override val firDiagnostic: KtPsiDiagnostic,

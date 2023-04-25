@@ -9,7 +9,7 @@ annotation class Trait
 
 object Traits {
     @Trait
-    val int = 0
+    val int: Int = 0
 }
 
 context(Traits)

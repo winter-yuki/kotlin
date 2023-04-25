@@ -25,6 +25,7 @@ import org.jetbrains.kotlin.fir.resolve.inference.FirBuilderInferenceSession
 import org.jetbrains.kotlin.fir.resolve.inference.FirCallCompleter
 import org.jetbrains.kotlin.fir.resolve.inference.FirDelegatedPropertyInferenceSession
 import org.jetbrains.kotlin.fir.resolve.inference.FirInferenceSession
+import org.jetbrains.kotlin.fir.resolve.providers.symbolProvider
 import org.jetbrains.kotlin.fir.resolve.transformers.ReturnTypeCalculator
 import org.jetbrains.kotlin.fir.resolve.transformers.withScopeCleanup
 import org.jetbrains.kotlin.fir.scopes.FirScope
@@ -225,6 +226,7 @@ class BodyResolveContext(
         f: () -> T
     ): T = withTowerDataCleanup {
         replaceTowerDataContext(towerDataContext.addContextReceiverGroup(owner.createContextReceiverValues(holder)))
+        replaceTowerDataContext(towerDataContext.addTraitReceivers(holder, owner)) // TODO refactor
 
         if (type != null) {
             val receiver = ImplicitExtensionReceiverValue(

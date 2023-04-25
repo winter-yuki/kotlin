@@ -6748,6 +6748,12 @@ public class LLFirPreresolvedReversedDiagnosticCompilerFirTestDataTestGenerated 
             }
 
             @Test
+            @TestMetadata("FieldAnnotationWithClasses.kt")
+            public void testFieldAnnotationWithClasses() throws Exception {
+                runTest("compiler/fir/analysis-tests/testData/resolveWithStdlib/problems/FieldAnnotationWithClasses.kt");
+            }
+
+            @Test
             @TestMetadata("immutableName.kt")
             public void testImmutableName() throws Exception {
                 runTest("compiler/fir/analysis-tests/testData/resolveWithStdlib/problems/immutableName.kt");
@@ -7023,6 +7029,18 @@ public class LLFirPreresolvedReversedDiagnosticCompilerFirTestDataTestGenerated 
             @TestMetadata("basic.kt")
             public void testBasic() throws Exception {
                 runTest("compiler/fir/analysis-tests/testData/resolveWithStdlib/traits/basic.kt");
+            }
+
+            @Test
+            @TestMetadata("execute.kt")
+            public void testExecute() throws Exception {
+                runTest("compiler/fir/analysis-tests/testData/resolveWithStdlib/traits/execute.kt");
+            }
+
+            @Test
+            @TestMetadata("semigroup.kt")
+            public void testSemigroup() throws Exception {
+                runTest("compiler/fir/analysis-tests/testData/resolveWithStdlib/traits/semigroup.kt");
             }
         }
     }

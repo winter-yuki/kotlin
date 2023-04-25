@@ -273,3 +273,6 @@ class ImplicitReceiverValueForScript(
         ImplicitReceiverValueForScript(boundSymbol, type, labelName, useSiteSession, scopeSession, mutable = false, contextReceiverNumber)
 }
 
+//class TraitReceiverValue(
+//
+//) : ImplicitReceiverValue

@@ -5,8 +5,6 @@
 
 package org.jetbrains.kotlin.gradle.plugin
 
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.withContext
 import org.gradle.api.Project
 import org.gradle.api.provider.Property
 import org.jetbrains.kotlin.gradle.plugin.KotlinPluginLifecycle.*
@@ -127,7 +125,7 @@ internal fun Project.startKotlinPluginLifecycle() {
  * the currently running coroutine. Throws if this coroutine was not started using a [KotlinPluginLifecycle]
  */
 internal suspend fun currentKotlinPluginLifecycle(): KotlinPluginLifecycle {
-    return currentCoroutineContext()[KotlinPluginLifecycleCoroutineContextElement]?.lifecycle
+    return coroutineContext[KotlinPluginLifecycleCoroutineContextElement]?.lifecycle
         ?: error("Missing $KotlinPluginLifecycleCoroutineContextElement in currentCoroutineContext")
 }
 
@@ -137,6 +135,16 @@ internal suspend fun currentKotlinPluginLifecycle(): KotlinPluginLifecycle {
  */
 internal suspend fun Stage.await() {
     currentKotlinPluginLifecycle().await(this)
+}
+
+
+/**
+ * See [newProperty]
+ */
+internal inline fun <reified T : Any> Project.newKotlinPluginLifecycleAwareProperty(
+    finaliseIn: Stage = Stage.FinaliseDsl, initialValue: T? = null
+): LifecycleAwareProperty<T> {
+    return kotlinPluginLifecycle.newProperty(T::class.java, finaliseIn, initialValue)
 }
 
 /**
@@ -154,10 +162,10 @@ internal suspend fun Stage.await() {
  * }
  * ```
  */
-internal inline fun <reified T : Any> Project.newKotlinPluginLifecycleAwareProperty(
+internal inline fun <reified T : Any> KotlinPluginLifecycle.newProperty(
     finaliseIn: Stage = Stage.FinaliseDsl, initialValue: T? = null
 ): LifecycleAwareProperty<T> {
-    return kotlinPluginLifecycle.newLifecycleAwareProperty(T::class.java, finaliseIn, initialValue)
+    return newProperty(T::class.java, finaliseIn, initialValue)
 }
 
 /**
@@ -234,8 +242,17 @@ internal suspend fun <T> requireCurrentStage(block: suspend () -> T): T {
  * ```
  */
 internal suspend fun <T> withRestrictedStages(allowed: Set<Stage>, block: suspend () -> T): T {
-    return withContext(RestrictedLifecycleStages(currentKotlinPluginLifecycle(), allowed)) {
-        block()
+    val newCoroutineContext = coroutineContext + RestrictedLifecycleStages(currentKotlinPluginLifecycle(), allowed)
+    return suspendCoroutine { continuation ->
+        val newContinuation = object : Continuation<T> {
+            override val context: CoroutineContext
+                get() = newCoroutineContext
+
+            override fun resumeWith(result: Result<T>) {
+                continuation.resumeWith(result)
+            }
+        }
+        block.startCoroutine(newContinuation)
     }
 }
 
@@ -316,7 +333,7 @@ internal interface KotlinPluginLifecycle {
 
     suspend fun await(stage: Stage)
 
-    fun <T : Any> newLifecycleAwareProperty(
+    fun <T : Any> newProperty(
         type: Class<T>, finaliseIn: Stage, initialValue: T?
     ): LifecycleAwareProperty<T>
 
@@ -412,7 +429,7 @@ private class KotlinPluginLifecycleImpl(override val project: Project) : KotlinP
 
     override fun enqueue(stage: Stage, action: KotlinPluginLifecycle.() -> Unit) {
         if (stage < this.stage) {
-            throw IllegalLifecycleException("Cannot enqueue Action for stage '${this.stage}' in current stage '${this.stage}'")
+            throw IllegalLifecycleException("Cannot enqueue Action for stage '${stage}' in current stage '${this.stage}'")
         }
 
         /*
@@ -456,10 +473,11 @@ private class KotlinPluginLifecycleImpl(override val project: Project) : KotlinP
         }
     }
 
-    override fun <T : Any> newLifecycleAwareProperty(type: Class<T>, finaliseIn: Stage, initialValue: T?): LifecycleAwareProperty<T> {
+    override fun <T : Any> newProperty(type: Class<T>, finaliseIn: Stage, initialValue: T?): LifecycleAwareProperty<T> {
         val property = project.objects.property(type)
         if (initialValue != null) property.set(initialValue)
-        enqueue(finaliseIn) { property.finalizeValue() }
+        if (finaliseIn <= stage) property.finalizeValue()
+        else enqueue(finaliseIn) { property.finalizeValue() }
         val lifecycleAwareProperty = LifecycleAwarePropertyImpl(finaliseIn, property)
         properties[property] = WeakReference(lifecycleAwareProperty)
         return lifecycleAwareProperty

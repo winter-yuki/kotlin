@@ -20,7 +20,10 @@ import org.jetbrains.kotlin.fir.declarations.utils.*
 import org.jetbrains.kotlin.fir.descriptors.FirBuiltInsPackageFragment
 import org.jetbrains.kotlin.fir.descriptors.FirModuleDescriptor
 import org.jetbrains.kotlin.fir.descriptors.FirPackageFragmentDescriptor
-import org.jetbrains.kotlin.fir.expressions.*
+import org.jetbrains.kotlin.fir.expressions.FirComponentCall
+import org.jetbrains.kotlin.fir.expressions.FirConstExpression
+import org.jetbrains.kotlin.fir.expressions.FirExpression
+import org.jetbrains.kotlin.fir.expressions.FirQualifiedAccessExpression
 import org.jetbrains.kotlin.fir.expressions.impl.FirExpressionStub
 import org.jetbrains.kotlin.fir.lazy.Fir2IrLazyClass
 import org.jetbrains.kotlin.fir.lazy.Fir2IrLazyConstructor
@@ -54,7 +57,10 @@ import org.jetbrains.kotlin.ir.types.IrErrorType
 import org.jetbrains.kotlin.ir.types.IrSimpleType
 import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.ir.util.*
-import org.jetbrains.kotlin.name.*
+import org.jetbrains.kotlin.name.FqName
+import org.jetbrains.kotlin.name.Name
+import org.jetbrains.kotlin.name.NameUtils
+import org.jetbrains.kotlin.name.SpecialNames
 import org.jetbrains.kotlin.serialization.deserialization.descriptors.DeserializedContainerSource
 import org.jetbrains.kotlin.utils.KotlinExceptionWithAttachments
 import org.jetbrains.kotlin.utils.addToStdlib.runUnless
@@ -292,9 +298,9 @@ class Fir2IrDeclarationStorage(
         }
     }
 
-    private fun <T : IrFunction> T.declareDefaultSetterParameter(type: IrType): T {
+    private fun <T : IrFunction> T.declareDefaultSetterParameter(type: IrType, firValueParameter: FirValueParameter?): T {
         valueParameters = listOf(
-            createDefaultSetterParameter(startOffset, endOffset, type, parent = this)
+            createDefaultSetterParameter(startOffset, endOffset, type, parent = this, firValueParameter)
         )
         return this
     }
@@ -304,6 +310,7 @@ class Fir2IrDeclarationStorage(
         endOffset: Int,
         type: IrType,
         parent: IrFunction,
+        firValueParameter: FirValueParameter?,
         name: Name? = null,
         isCrossinline: Boolean = false,
         isNoinline: Boolean = false,
@@ -316,6 +323,9 @@ class Fir2IrDeclarationStorage(
             isHidden = false, isAssignable = false
         ).apply {
             this.parent = parent
+            if (firValueParameter != null) {
+                annotationGenerator.generate(this, firValueParameter)
+            }
         }
     }
 
@@ -333,12 +343,11 @@ class Fir2IrDeclarationStorage(
                 setTypeParameters(function)
             }
         }
-        val typeContext = ConversionTypeContext(
-            origin = if (forSetter) ConversionTypeOrigin.SETTER else ConversionTypeOrigin.DEFAULT
-        )
+        val typeContext = if (forSetter) ConversionTypeContext.IN_SETTER else ConversionTypeContext.DEFAULT
         if (function is FirDefaultPropertySetter) {
-            val type = function.valueParameters.first().returnTypeRef.toIrType(ConversionTypeContext.DEFAULT.inSetter())
-            declareDefaultSetterParameter(type)
+            val valueParameter = function.valueParameters.first()
+            val type = valueParameter.returnTypeRef.toIrType(ConversionTypeContext.IN_SETTER)
+            declareDefaultSetterParameter(type, valueParameter)
         } else if (function != null) {
             val contextReceivers = function.contextReceiversForFunctionOrContainingProperty()
 
@@ -526,7 +535,7 @@ class Fir2IrDeclarationStorage(
         val signature =
             runUnless(
                 isLocal ||
-                        !generateSignatures && irParent !is Fir2IrLazyClass &&
+                        !configuration.linkViaSignatures && irParent !is Fir2IrLazyClass &&
                         function.dispatchReceiverType?.isPrimitive != true && function.containerSource == null &&
                         updatedOrigin != IrDeclarationOrigin.FAKE_OVERRIDE && !function.isOverride
             ) {
@@ -632,7 +641,7 @@ class Fir2IrDeclarationStorage(
         val origin = constructor.computeIrOrigin(predefinedOrigin)
         val isPrimary = constructor.isPrimary
         val signature =
-            runUnless(isLocal || !generateSignatures) {
+            runUnless(isLocal || !configuration.linkViaSignatures) {
                 signatureComposer.composeSignature(constructor, forceTopLevelPrivate = forceTopLevelPrivate)
             }
         val visibility = if (irParent.isAnonymousObject) Visibilities.Public else constructor.visibility
@@ -731,9 +740,7 @@ class Fir2IrDeclarationStorage(
                 }
                 with(classifierStorage) {
                     setTypeParameters(
-                        property, ConversionTypeContext(
-                            origin = if (isSetter) ConversionTypeOrigin.SETTER else ConversionTypeOrigin.DEFAULT
-                        )
+                        property, if (isSetter) ConversionTypeContext.IN_SETTER else ConversionTypeContext.DEFAULT
                     )
                 }
                 // NB: we should enter accessor' scope before declaring its parameters
@@ -741,7 +748,8 @@ class Fir2IrDeclarationStorage(
                 enterScope(this)
                 if (propertyAccessor == null && isSetter) {
                     declareDefaultSetterParameter(
-                        property.returnTypeRef.toIrType(ConversionTypeContext.DEFAULT.inSetter())
+                        property.returnTypeRef.toIrType(ConversionTypeContext.IN_SETTER),
+                        firValueParameter = null
                     )
                 }
                 bindAndDeclareParameters(
@@ -868,7 +876,7 @@ class Fir2IrDeclarationStorage(
         val signature =
             runUnless(
                 isLocal ||
-                        !generateSignatures && irParent !is Fir2IrLazyClass &&
+                        !configuration.linkViaSignatures && irParent !is Fir2IrLazyClass &&
                         property.dispatchReceiverType?.isPrimitive != true && property.containerSource == null &&
                         origin != IrDeclarationOrigin.FAKE_OVERRIDE && !property.isOverride
             ) {
@@ -1161,6 +1169,7 @@ class Fir2IrDeclarationStorage(
                         )
                     )
                 }
+                annotationGenerator.generate(this, valueParameter)
             }
         }
         localStorage.putParameter(valueParameter, irParameter)
@@ -1671,11 +1680,6 @@ class Fir2IrDeclarationStorage(
             || origin == IrDeclarationOrigin.FAKE_OVERRIDE
         ) {
             annotationGenerator.generate(this, firAnnotationContainer)
-            if (this is IrFunction && firAnnotationContainer is FirSimpleFunction) {
-                valueParameters.zip(firAnnotationContainer.valueParameters).forEach { (irParameter, firParameter) ->
-                    annotationGenerator.generate(irParameter, firParameter)
-                }
-            }
         }
     }
 

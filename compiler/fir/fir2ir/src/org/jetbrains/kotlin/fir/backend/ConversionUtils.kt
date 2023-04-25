@@ -63,7 +63,7 @@ import org.jetbrains.kotlin.types.Variance
 import org.jetbrains.kotlin.util.OperatorNameConventions
 import org.jetbrains.kotlin.utils.addToStdlib.runIf
 
-private fun AbstractKtSourceElement?.startOffsetSkippingComments(): Int? {
+fun AbstractKtSourceElement?.startOffsetSkippingComments(): Int? {
     return when (this) {
         is KtPsiSourceElement -> this.psi.startOffsetSkippingComments
         is KtLightSourceElement -> this.startOffsetSkippingComments
@@ -109,11 +109,7 @@ internal enum class ConversionTypeOrigin {
     SETTER
 }
 
-class ConversionTypeContext internal constructor(internal val origin: ConversionTypeOrigin) {
-    fun inSetter() = ConversionTypeContext(
-        origin = ConversionTypeOrigin.SETTER
-    )
-
+class ConversionTypeContext private constructor(internal val origin: ConversionTypeOrigin) {
     companion object {
         internal val DEFAULT = ConversionTypeContext(
             origin = ConversionTypeOrigin.DEFAULT

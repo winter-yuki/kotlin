@@ -7,6 +7,7 @@ package org.jetbrains.kotlin.gradle.native
 
 import org.jetbrains.kotlin.gradle.BaseGradleIT
 import org.jetbrains.kotlin.gradle.GradleVersionRequired
+import org.jetbrains.kotlin.gradle.native.GeneralNativeIT.Companion.getOutputForTask
 import org.jetbrains.kotlin.gradle.testbase.DEFAULT_CURRENT_PLATFORM_TARGET_NAME_POSTFIX
 import org.jetbrains.kotlin.gradle.testbase.findParameterInOutput
 import org.jetbrains.kotlin.konan.library.KONAN_PLATFORM_LIBS_NAME_PREFIX
@@ -136,11 +137,9 @@ class NativeIrLinkerIssuesIT : BaseGradleIT() {
             |Project dependencies:
             |+--- org.sample:liba (org.sample:liba-native): 2.0
             ||    \--- stdlib: $kotlinNativeCompilerVersion
-            |+--- org.sample:libb (org.sample:libb-native): 1.0
-            ||    ^^^ This module requires symbol sample.liba/C|null[0].
-            ||    +--- org.sample:liba (org.sample:liba-native): 1.0 -> 2.0 (*)
-            ||    \--- stdlib: $kotlinNativeCompilerVersion
-            |\--- org.jetbrains.kotlin.native.platform.* (NNN libraries): $kotlinNativeCompilerVersion
+            |\--- org.sample:libb (org.sample:libb-native): 1.0
+            |     ^^^ This module requires symbol sample.liba/C|null[0].
+            |     +--- org.sample:liba (org.sample:liba-native): 1.0 -> 2.0 (*)
             |     \--- stdlib: $kotlinNativeCompilerVersion
             |
             |(*) - dependencies omitted (listed previously)
@@ -198,11 +197,9 @@ class NativeIrLinkerIssuesIT : BaseGradleIT() {
             |+--- org.sample:liba (org.sample:liba-native): 2.0
             ||    ^^^ This module contains symbol sample.liba/B|null[0] that is the cause of the conflict.
             ||    \--- stdlib: $kotlinNativeCompilerVersion
-            |+--- org.sample:libb (org.sample:libb-native): 1.0
-            ||    +--- org.sample:liba (org.sample:liba-native): 1.0 -> 2.0 (*)
-            ||    |    ^^^ This module contains symbol sample.liba/B|null[0] that is the cause of the conflict.
-            ||    \--- stdlib: $kotlinNativeCompilerVersion
-            |\--- org.jetbrains.kotlin.native.platform.* (NNN libraries): $kotlinNativeCompilerVersion
+            |\--- org.sample:libb (org.sample:libb-native): 1.0
+            |     +--- org.sample:liba (org.sample:liba-native): 1.0 -> 2.0 (*)
+            |     |    ^^^ This module contains symbol sample.liba/B|null[0] that is the cause of the conflict.
             |     \--- stdlib: $kotlinNativeCompilerVersion
             |
             |(*) - dependencies omitted (listed previously)
@@ -275,7 +272,7 @@ class NativeIrLinkerIssuesIT : BaseGradleIT() {
                 val kotlinNativeCompilerVersion = findKotlinNativeCompilerVersion(output)
                 assertNotNull(kotlinNativeCompilerVersion)
 
-                val errorMessage = ERROR_LINE_REGEX.findAll(getOutputForTask("linkDebugExecutableNative"))
+                val errorMessage = ERROR_LINE_REGEX.findAll(getOutputForTask(":linkDebugExecutableNative"))
                     .map { matchResult -> matchResult.groupValues[1] }
                     .filterNot { it.startsWith("w:") || it.startsWith("v:") || it.startsWith("i:") }
                     .map { line ->

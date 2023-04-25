@@ -126,6 +126,13 @@ abstract class Kotlin2JsCompile @Inject constructor(
     @get:Nested
     override val multiplatformStructure: K2MultiplatformStructure = objectFactory.newInstance()
 
+    @Suppress("DeprecatedCallableAddReplaceWith")
+    @Deprecated("KTIJ-25227: Necessary override for IDEs < 2023.2", level = DeprecationLevel.ERROR)
+    override fun setupCompilerArgs(args: K2JSCompilerArguments, defaultsOnly: Boolean, ignoreClasspathResolutionErrors: Boolean) {
+        @Suppress("DEPRECATION_ERROR")
+        super.setupCompilerArgs(args, defaultsOnly, ignoreClasspathResolutionErrors)
+    }
+
     override fun createCompilerArguments(context: CreateCompilerArgumentsContext) = context.create<K2JSCompilerArguments> {
         primitive { args ->
             args.multiPlatform = multiPlatformEnabled.get()
@@ -211,10 +218,7 @@ abstract class Kotlin2JsCompile @Inject constructor(
         .fileCollection()
         .from(friendPaths)
         .filter {
-            // .jar files are not required for js compilation as friend modules
-            // and, because of `@InputFiles` and different normalization strategy from `@Classpath`,
-            // they produce build cache misses
-            it.exists() && !it.name.endsWith(".jar") && libraryFilter(it)
+            it.exists() && libraryFilter(it)
         }
 
     @get:Internal

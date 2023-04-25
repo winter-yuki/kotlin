@@ -12,16 +12,17 @@ import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.labelName
 import org.jetbrains.kotlin.fir.resolve.*
 import org.jetbrains.kotlin.fir.resolve.calls.*
+import org.jetbrains.kotlin.fir.resolve.providers.FirSymbolProvider
+import org.jetbrains.kotlin.fir.resolve.providers.symbolProvider
 import org.jetbrains.kotlin.fir.scopes.FirContainingNamesAwareScope
 import org.jetbrains.kotlin.fir.scopes.FirScope
 import org.jetbrains.kotlin.fir.scopes.FirTypeScope
 import org.jetbrains.kotlin.fir.scopes.impl.FirLocalScope
 import org.jetbrains.kotlin.fir.scopes.impl.wrapNestedClassifierScopeWithSubstitutionForSuperType
 import org.jetbrains.kotlin.fir.symbols.impl.FirRegularClassSymbol
-import org.jetbrains.kotlin.fir.types.ConeErrorType
-import org.jetbrains.kotlin.fir.types.ConeKotlinType
-import org.jetbrains.kotlin.fir.types.ConeStubType
-import org.jetbrains.kotlin.fir.types.coneType
+import org.jetbrains.kotlin.fir.types.*
+import org.jetbrains.kotlin.name.ClassId
+import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.utils.addIfNotNull
 
@@ -195,6 +196,28 @@ class FirTowerDataContext private constructor(
             localScopes,
             nonLocalTowerDataElements.add(element)
         )
+    }
+
+    fun addTraitReceivers(holder: SessionHolder, declaration: FirCallableDeclaration): FirTowerDataContext {
+//        val receiverClassIds = listOfNotNull(declaration.receiverParameter)
+        // TODO optimize
+        val properties = declaration.contextReceivers.asSequence().flatMap ctxReceivers@{ contextReceiver ->
+            val classId = contextReceiver.typeRef.coneType.type.classId ?: return@ctxReceivers emptySequence()
+            val symbolProvider = holder.session.symbolProvider
+            val cls = symbolProvider.getClassLikeSymbolByClassId(classId)?.fir as? FirRegularClass ?: return@ctxReceivers emptySequence()
+//            val traitAnnotation = ClassId(FqName("kotlin.annotations"), Name.identifier("Trait"))
+            val traitAnnotationId = ClassId(FqName.ROOT, Name.identifier("Trait"))
+            cls.declarations.asSequence().filterIsInstance<FirProperty>().filter { field ->
+                field.backingField?.annotations?.find { it.annotationTypeRef.coneType.type.classId == traitAnnotationId } != null
+            }
+        }.toList()
+//        declaration.receiverParameter?.typeRef?.coneType?.type?.classId
+        return properties.fold(this) { context, property ->
+            val receiverValue = ImplicitExtensionReceiverValue(
+                declaration.symbol, property.returnTypeRef.coneType, holder.session, holder.scopeSession
+            )
+            context.addReceiver(property.name, receiverValue)
+        }
     }
 
     fun addNonLocalScopeIfNotNull(scope: FirScope?): FirTowerDataContext {

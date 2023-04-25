@@ -112,7 +112,6 @@ internal class ClassMemberGenerator(
                 val annotationMode = containingClass?.classKind == ClassKind.ANNOTATION_CLASS && irFunction is IrConstructor
                 for ((valueParameter, firValueParameter) in irParameters.zip(firFunction.valueParameters)) {
                     valueParameter.setDefaultValue(firValueParameter, annotationMode)
-                    annotationGenerator.generate(valueParameter, firValueParameter)
                 }
                 annotationGenerator.generate(irFunction, firFunction)
             }
@@ -268,7 +267,7 @@ internal class ClassMemberGenerator(
             }
             declarationStorage.leaveScope(this@initializeBackingField)
         }
-        annotationGenerator.generate(irField, property)
+        property.backingField?.let { annotationGenerator.generate(irField, it) }
     }
 
     private fun IrSimpleFunction.setPropertyAccessorContent(
@@ -315,7 +314,6 @@ internal class ClassMemberGenerator(
             }
 
         }
-        annotationGenerator.generate(this, property)
     }
 
     private fun IrFieldAccessExpression.setReceiver(declaration: IrDeclaration): IrFieldAccessExpression {

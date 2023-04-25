@@ -7,6 +7,7 @@ package kotlin.native.concurrent
 
 import kotlinx.cinterop.*
 import kotlin.native.internal.Frozen
+import kotlin.concurrent.AtomicNativePtr
 
 /**
  * Note: modern Kotlin/Native memory manager allows to share objects between threads without additional ceremonies,
@@ -36,6 +37,7 @@ import kotlin.native.internal.Frozen
  *  @see [kotlin.native.runtime.GC.collect].
  */
 // Not @FreezingIsDeprecated: every `Worker.execute` uses this.
+@ObsoleteWorkersApi
 public enum class TransferMode(val value: Int) {
     /**
      * Reachability check is performed.
@@ -54,6 +56,7 @@ public enum class TransferMode(val value: Int) {
  */
 @Frozen
 @FreezingIsDeprecated
+@ObsoleteWorkersApi
 public class DetachedObjectGraph<T> internal constructor(pointer: NativePtr) {
     @PublishedApi
     internal val stable = AtomicNativePtr(pointer)
@@ -84,6 +87,7 @@ public class DetachedObjectGraph<T> internal constructor(pointer: NativePtr) {
  * happen once.
  */
 @FreezingIsDeprecated
+@ObsoleteWorkersApi
 public inline fun <reified T> DetachedObjectGraph<T>.attach(): T {
     var rawStable: NativePtr
     do {

@@ -15,10 +15,13 @@ import org.jetbrains.kotlin.builtins.KotlinBuiltIns
 import org.jetbrains.kotlin.builtins.konan.KonanBuiltIns
 import org.jetbrains.kotlin.cli.common.CLIConfigurationKeys
 import org.jetbrains.kotlin.cli.common.fir.FirDiagnosticsCompilerResultsReporter
+import org.jetbrains.kotlin.config.CommonConfigurationKeys
 import org.jetbrains.kotlin.config.languageVersionSettings
+import org.jetbrains.kotlin.constant.EvaluatedConstTracker
 import org.jetbrains.kotlin.descriptors.deserialization.PlatformDependentTypeTransformer
 import org.jetbrains.kotlin.descriptors.isEmpty
 import org.jetbrains.kotlin.descriptors.konan.isNativeStdlib
+import org.jetbrains.kotlin.fir.backend.Fir2IrConfiguration
 import org.jetbrains.kotlin.diagnostics.DiagnosticReporterFactory
 import org.jetbrains.kotlin.fir.backend.*
 import org.jetbrains.kotlin.fir.descriptors.FirModuleDescriptor
@@ -72,14 +75,18 @@ internal fun PhaseContext.fir2Ir(
 
     val (irModuleFragment, components, pluginContext, irActualizedResult) = input.firResult.convertToIrAndActualize(
             fir2IrExtensions,
+            Fir2IrConfiguration(
+                    languageVersionSettings = configuration.languageVersionSettings,
+                    linkViaSignatures = false,
+                    evaluatedConstTracker = configuration
+                            .putIfAbsent(CommonConfigurationKeys.EVALUATED_CONST_TRACKER, EvaluatedConstTracker.create()),
+            ),
             IrGenerationExtension.getInstances(config.project),
-            linkViaSignatures = false,
             signatureComposerCreator = null,
             irMangler = KonanManglerIr,
             firManglerCreator = { FirNativeKotlinMangler() },
             visibilityConverter = Fir2IrVisibilityConverter.Default,
             diagnosticReporter = diagnosticsReporter,
-            languageVersionSettings = configuration.languageVersionSettings,
             kotlinBuiltIns = builtInsModule ?: DefaultBuiltIns.Instance,
             fir2IrResultPostCompute = {
                 // it's important to compare manglers before actualization, since IR will be actualized, while FIR won't

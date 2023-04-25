@@ -33,6 +33,12 @@ public class NativeCodegenBoxTestGenerated extends AbstractNativeCodegenBoxTest 
             KtTestUtil.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/codegen/box"), Pattern.compile("^(.+)\\.kt$"), null, TargetBackend.NATIVE, true);
         }
 
+        @Test
+        @TestMetadata("kt-57353.kt")
+        public void testKt_57353() throws Exception {
+            runTest("compiler/testData/codegen/box/kt-57353.kt");
+        }
+
         @Nested
         @TestMetadata("compiler/testData/codegen/box/annotations")
         @TestDataPath("$PROJECT_ROOT")
@@ -6016,6 +6022,12 @@ public class NativeCodegenBoxTestGenerated extends AbstractNativeCodegenBoxTest 
                     }
 
                     @Test
+                    @TestMetadata("callStackTrace.kt")
+                    public void testCallStackTrace() throws Exception {
+                        runTest("compiler/testData/codegen/box/compileKotlinAgainstKotlin/jvm8/defaults/callStackTrace.kt");
+                    }
+
+                    @Test
                     @TestMetadata("superCall.kt")
                     public void testSuperCall() throws Exception {
                         runTest("compiler/testData/codegen/box/compileKotlinAgainstKotlin/jvm8/defaults/superCall.kt");
@@ -6028,12 +6040,6 @@ public class NativeCodegenBoxTestGenerated extends AbstractNativeCodegenBoxTest 
                     }
 
                     @Test
-                    @TestMetadata("superCallFromInterface2.kt")
-                    public void testSuperCallFromInterface2() throws Exception {
-                        runTest("compiler/testData/codegen/box/compileKotlinAgainstKotlin/jvm8/defaults/superCallFromInterface2.kt");
-                    }
-
-                    @Test
                     @TestMetadata("superPropAccess.kt")
                     public void testSuperPropAccess() throws Exception {
                         runTest("compiler/testData/codegen/box/compileKotlinAgainstKotlin/jvm8/defaults/superPropAccess.kt");
@@ -6043,12 +6049,6 @@ public class NativeCodegenBoxTestGenerated extends AbstractNativeCodegenBoxTest 
                     @TestMetadata("superPropAccessFromInterface.kt")
                     public void testSuperPropAccessFromInterface() throws Exception {
                         runTest("compiler/testData/codegen/box/compileKotlinAgainstKotlin/jvm8/defaults/superPropAccessFromInterface.kt");
-                    }
-
-                    @Test
-                    @TestMetadata("superPropAccessFromInterface2.kt")
-                    public void testSuperPropAccessFromInterface2() throws Exception {
-                        runTest("compiler/testData/codegen/box/compileKotlinAgainstKotlin/jvm8/defaults/superPropAccessFromInterface2.kt");
                     }
 
                     @Nested
@@ -6177,31 +6177,6 @@ public class NativeCodegenBoxTestGenerated extends AbstractNativeCodegenBoxTest 
                         @TestMetadata("newAndOldSchemes3.kt")
                         public void testNewAndOldSchemes3() throws Exception {
                             runTest("compiler/testData/codegen/box/compileKotlinAgainstKotlin/jvm8/defaults/interop/newAndOldSchemes3.kt");
-                        }
-
-                        @Test
-                        @TestMetadata("newSchemeWithJvmDefault.kt")
-                        public void testNewSchemeWithJvmDefault() throws Exception {
-                            runTest("compiler/testData/codegen/box/compileKotlinAgainstKotlin/jvm8/defaults/interop/newSchemeWithJvmDefault.kt");
-                        }
-                    }
-
-                    @Nested
-                    @TestMetadata("compiler/testData/codegen/box/compileKotlinAgainstKotlin/jvm8/defaults/noDefaultImpls")
-                    @TestDataPath("$PROJECT_ROOT")
-                    @Tag("codegen")
-                    @Tag("k1Codegen")
-                    @UseExtTestCaseGroupProvider()
-                    public class NoDefaultImpls {
-                        @Test
-                        public void testAllFilesPresentInNoDefaultImpls() throws Exception {
-                            KtTestUtil.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/codegen/box/compileKotlinAgainstKotlin/jvm8/defaults/noDefaultImpls"), Pattern.compile("^(.+)\\.kt$"), null, TargetBackend.NATIVE, true);
-                        }
-
-                        @Test
-                        @TestMetadata("superPropAccessFromInterface.kt")
-                        public void testSuperPropAccessFromInterface() throws Exception {
-                            runTest("compiler/testData/codegen/box/compileKotlinAgainstKotlin/jvm8/defaults/noDefaultImpls/superPropAccessFromInterface.kt");
                         }
                     }
                 }
@@ -6371,6 +6346,12 @@ public class NativeCodegenBoxTestGenerated extends AbstractNativeCodegenBoxTest 
             @TestMetadata("kt9532.kt")
             public void testKt9532() throws Exception {
                 runTest("compiler/testData/codegen/box/constants/kt9532.kt");
+            }
+
+            @Test
+            @TestMetadata("literalToLongConversion.kt")
+            public void testLiteralToLongConversion() throws Exception {
+                runTest("compiler/testData/codegen/box/constants/literalToLongConversion.kt");
             }
 
             @Test
@@ -13009,6 +12990,12 @@ public class NativeCodegenBoxTestGenerated extends AbstractNativeCodegenBoxTest 
             }
 
             @Test
+            @TestMetadata("delegationToIntersectionType.kt")
+            public void testDelegationToIntersectionType() throws Exception {
+                runTest("compiler/testData/codegen/box/delegation/delegationToIntersectionType.kt");
+            }
+
+            @Test
             @TestMetadata("delegationWithPrivateConstructor.kt")
             public void testDelegationWithPrivateConstructor() throws Exception {
                 runTest("compiler/testData/codegen/box/delegation/delegationWithPrivateConstructor.kt");
@@ -13042,6 +13029,12 @@ public class NativeCodegenBoxTestGenerated extends AbstractNativeCodegenBoxTest 
             @TestMetadata("kt8154.kt")
             public void testKt8154() throws Exception {
                 runTest("compiler/testData/codegen/box/delegation/kt8154.kt");
+            }
+
+            @Test
+            @TestMetadata("smartCastedDelegation.kt")
+            public void testSmartCastedDelegation() throws Exception {
+                runTest("compiler/testData/codegen/box/delegation/smartCastedDelegation.kt");
             }
 
             @Test
@@ -24042,6 +24035,48 @@ public class NativeCodegenBoxTestGenerated extends AbstractNativeCodegenBoxTest 
             }
 
             @Test
+            @TestMetadata("booleanOperations.kt")
+            public void testBooleanOperations() throws Exception {
+                runTest("compiler/testData/codegen/box/involvesIrInterpreter/booleanOperations.kt");
+            }
+
+            @Test
+            @TestMetadata("byteOperations.kt")
+            public void testByteOperations() throws Exception {
+                runTest("compiler/testData/codegen/box/involvesIrInterpreter/byteOperations.kt");
+            }
+
+            @Test
+            @TestMetadata("charOperations.kt")
+            public void testCharOperations() throws Exception {
+                runTest("compiler/testData/codegen/box/involvesIrInterpreter/charOperations.kt");
+            }
+
+            @Test
+            @TestMetadata("doubleOperations.kt")
+            public void testDoubleOperations() throws Exception {
+                runTest("compiler/testData/codegen/box/involvesIrInterpreter/doubleOperations.kt");
+            }
+
+            @Test
+            @TestMetadata("floatOperations.kt")
+            public void testFloatOperations() throws Exception {
+                runTest("compiler/testData/codegen/box/involvesIrInterpreter/floatOperations.kt");
+            }
+
+            @Test
+            @TestMetadata("intOperations.kt")
+            public void testIntOperations() throws Exception {
+                runTest("compiler/testData/codegen/box/involvesIrInterpreter/intOperations.kt");
+            }
+
+            @Test
+            @TestMetadata("jvmFloatDoubleToString.kt")
+            public void testJvmFloatDoubleToString() throws Exception {
+                runTest("compiler/testData/codegen/box/involvesIrInterpreter/jvmFloatDoubleToString.kt");
+            }
+
+            @Test
             @TestMetadata("kt55912.kt")
             public void testKt55912() throws Exception {
                 runTest("compiler/testData/codegen/box/involvesIrInterpreter/kt55912.kt");
@@ -24054,9 +24089,39 @@ public class NativeCodegenBoxTestGenerated extends AbstractNativeCodegenBoxTest 
             }
 
             @Test
+            @TestMetadata("longOperations.kt")
+            public void testLongOperations() throws Exception {
+                runTest("compiler/testData/codegen/box/involvesIrInterpreter/longOperations.kt");
+            }
+
+            @Test
+            @TestMetadata("shortOperations.kt")
+            public void testShortOperations() throws Exception {
+                runTest("compiler/testData/codegen/box/involvesIrInterpreter/shortOperations.kt");
+            }
+
+            @Test
+            @TestMetadata("stdlibConst.kt")
+            public void testStdlibConst() throws Exception {
+                runTest("compiler/testData/codegen/box/involvesIrInterpreter/stdlibConst.kt");
+            }
+
+            @Test
+            @TestMetadata("stringConcatenation.kt")
+            public void testStringConcatenation() throws Exception {
+                runTest("compiler/testData/codegen/box/involvesIrInterpreter/stringConcatenation.kt");
+            }
+
+            @Test
             @TestMetadata("stringConcatenationWithObject.kt")
             public void testStringConcatenationWithObject() throws Exception {
                 runTest("compiler/testData/codegen/box/involvesIrInterpreter/stringConcatenationWithObject.kt");
+            }
+
+            @Test
+            @TestMetadata("stringOperations.kt")
+            public void testStringOperations() throws Exception {
+                runTest("compiler/testData/codegen/box/involvesIrInterpreter/stringOperations.kt");
             }
 
             @Test
@@ -24065,94 +24130,28 @@ public class NativeCodegenBoxTestGenerated extends AbstractNativeCodegenBoxTest 
                 runTest("compiler/testData/codegen/box/involvesIrInterpreter/thisPlusString.kt");
             }
 
+            @Test
+            @TestMetadata("unsignedConst.kt")
+            public void testUnsignedConst() throws Exception {
+                runTest("compiler/testData/codegen/box/involvesIrInterpreter/unsignedConst.kt");
+            }
+
             @Nested
-            @TestMetadata("compiler/testData/codegen/box/involvesIrInterpreter/dumpIrAndCheck")
+            @TestMetadata("compiler/testData/codegen/box/involvesIrInterpreter/intrinsicConst")
             @TestDataPath("$PROJECT_ROOT")
             @Tag("codegen")
             @Tag("k1Codegen")
             @UseExtTestCaseGroupProvider()
-            public class DumpIrAndCheck {
+            public class IntrinsicConst {
                 @Test
-                public void testAllFilesPresentInDumpIrAndCheck() throws Exception {
-                    KtTestUtil.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/codegen/box/involvesIrInterpreter/dumpIrAndCheck"), Pattern.compile("^(.+)\\.kt$"), null, TargetBackend.NATIVE, true);
-                }
-
-                @Test
-                @TestMetadata("booleanOperations.kt")
-                public void testBooleanOperations() throws Exception {
-                    runTest("compiler/testData/codegen/box/involvesIrInterpreter/dumpIrAndCheck/booleanOperations.kt");
-                }
-
-                @Test
-                @TestMetadata("byteOperations.kt")
-                public void testByteOperations() throws Exception {
-                    runTest("compiler/testData/codegen/box/involvesIrInterpreter/dumpIrAndCheck/byteOperations.kt");
-                }
-
-                @Test
-                @TestMetadata("charOperations.kt")
-                public void testCharOperations() throws Exception {
-                    runTest("compiler/testData/codegen/box/involvesIrInterpreter/dumpIrAndCheck/charOperations.kt");
-                }
-
-                @Test
-                @TestMetadata("doubleOperations.kt")
-                public void testDoubleOperations() throws Exception {
-                    runTest("compiler/testData/codegen/box/involvesIrInterpreter/dumpIrAndCheck/doubleOperations.kt");
-                }
-
-                @Test
-                @TestMetadata("floatOperations.kt")
-                public void testFloatOperations() throws Exception {
-                    runTest("compiler/testData/codegen/box/involvesIrInterpreter/dumpIrAndCheck/floatOperations.kt");
+                public void testAllFilesPresentInIntrinsicConst() throws Exception {
+                    KtTestUtil.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/codegen/box/involvesIrInterpreter/intrinsicConst"), Pattern.compile("^(.+)\\.kt$"), null, TargetBackend.NATIVE, true);
                 }
 
                 @Test
                 @TestMetadata("ifConstVal.kt")
                 public void testIfConstVal() throws Exception {
-                    runTest("compiler/testData/codegen/box/involvesIrInterpreter/dumpIrAndCheck/ifConstVal.kt");
-                }
-
-                @Test
-                @TestMetadata("intOperations.kt")
-                public void testIntOperations() throws Exception {
-                    runTest("compiler/testData/codegen/box/involvesIrInterpreter/dumpIrAndCheck/intOperations.kt");
-                }
-
-                @Test
-                @TestMetadata("longOperations.kt")
-                public void testLongOperations() throws Exception {
-                    runTest("compiler/testData/codegen/box/involvesIrInterpreter/dumpIrAndCheck/longOperations.kt");
-                }
-
-                @Test
-                @TestMetadata("shortOperations.kt")
-                public void testShortOperations() throws Exception {
-                    runTest("compiler/testData/codegen/box/involvesIrInterpreter/dumpIrAndCheck/shortOperations.kt");
-                }
-
-                @Test
-                @TestMetadata("stdlibConst.kt")
-                public void testStdlibConst() throws Exception {
-                    runTest("compiler/testData/codegen/box/involvesIrInterpreter/dumpIrAndCheck/stdlibConst.kt");
-                }
-
-                @Test
-                @TestMetadata("stringConcatenation.kt")
-                public void testStringConcatenation() throws Exception {
-                    runTest("compiler/testData/codegen/box/involvesIrInterpreter/dumpIrAndCheck/stringConcatenation.kt");
-                }
-
-                @Test
-                @TestMetadata("stringOperations.kt")
-                public void testStringOperations() throws Exception {
-                    runTest("compiler/testData/codegen/box/involvesIrInterpreter/dumpIrAndCheck/stringOperations.kt");
-                }
-
-                @Test
-                @TestMetadata("unsignedConst.kt")
-                public void testUnsignedConst() throws Exception {
-                    runTest("compiler/testData/codegen/box/involvesIrInterpreter/dumpIrAndCheck/unsignedConst.kt");
+                    runTest("compiler/testData/codegen/box/involvesIrInterpreter/intrinsicConst/ifConstVal.kt");
                 }
             }
 
@@ -24835,19 +24834,6 @@ public class NativeCodegenBoxTestGenerated extends AbstractNativeCodegenBoxTest 
                 }
 
                 @Nested
-                @TestMetadata("compiler/testData/codegen/box/jvm8/defaults/compatibility")
-                @TestDataPath("$PROJECT_ROOT")
-                @Tag("codegen")
-                @Tag("k1Codegen")
-                @UseExtTestCaseGroupProvider()
-                public class Compatibility {
-                    @Test
-                    public void testAllFilesPresentInCompatibility() throws Exception {
-                        KtTestUtil.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/codegen/box/jvm8/defaults/compatibility"), Pattern.compile("^(.+)\\.kt$"), null, TargetBackend.NATIVE, true);
-                    }
-                }
-
-                @Nested
                 @TestMetadata("compiler/testData/codegen/box/jvm8/defaults/delegationBy")
                 @TestDataPath("$PROJECT_ROOT")
                 @Tag("codegen")
@@ -24909,19 +24895,6 @@ public class NativeCodegenBoxTestGenerated extends AbstractNativeCodegenBoxTest 
                         public void testAllFilesPresentInWithCompatibility() throws Exception {
                             KtTestUtil.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/codegen/box/jvm8/defaults/noDefaultImpls/withCompatibility"), Pattern.compile("^(.+)\\.kt$"), null, TargetBackend.NATIVE, true);
                         }
-                    }
-                }
-
-                @Nested
-                @TestMetadata("compiler/testData/codegen/box/jvm8/defaults/noDelegation")
-                @TestDataPath("$PROJECT_ROOT")
-                @Tag("codegen")
-                @Tag("k1Codegen")
-                @UseExtTestCaseGroupProvider()
-                public class NoDelegation {
-                    @Test
-                    public void testAllFilesPresentInNoDelegation() throws Exception {
-                        KtTestUtil.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/codegen/box/jvm8/defaults/noDelegation"), Pattern.compile("^(.+)\\.kt$"), null, TargetBackend.NATIVE, true);
                     }
                 }
 
@@ -26478,6 +26451,12 @@ public class NativeCodegenBoxTestGenerated extends AbstractNativeCodegenBoxTest 
                     @TestMetadata("expectActualMultiCommon.kt")
                     public void testExpectActualMultiCommon() throws Exception {
                         runTest("compiler/testData/codegen/box/multiplatform/k2/basic/expectActualMultiCommon.kt");
+                    }
+
+                    @Test
+                    @TestMetadata("expectActualNullabilityBasedOverloads.kt")
+                    public void testExpectActualNullabilityBasedOverloads() throws Exception {
+                        runTest("compiler/testData/codegen/box/multiplatform/k2/basic/expectActualNullabilityBasedOverloads.kt");
                     }
 
                     @Test
@@ -40690,6 +40669,12 @@ public class NativeCodegenBoxTestGenerated extends AbstractNativeCodegenBoxTest 
             @TestMetadata("forInUnsignedUntil.kt")
             public void testForInUnsignedUntil() throws Exception {
                 runTest("compiler/testData/codegen/box/unsignedTypes/forInUnsignedUntil.kt");
+            }
+
+            @Test
+            @TestMetadata("implicitIntegerCoercionNamedArg.kt")
+            public void testImplicitIntegerCoercionNamedArg() throws Exception {
+                runTest("compiler/testData/codegen/box/unsignedTypes/implicitIntegerCoercionNamedArg.kt");
             }
 
             @Test

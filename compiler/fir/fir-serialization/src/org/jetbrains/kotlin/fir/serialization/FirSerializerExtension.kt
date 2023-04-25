@@ -8,13 +8,12 @@ package org.jetbrains.kotlin.fir.serialization
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.expressions.FirAnnotation
+import org.jetbrains.kotlin.fir.serialization.constant.ConstValueProviderInternals
 import org.jetbrains.kotlin.fir.serialization.constant.ConstValueProvider
-import org.jetbrains.kotlin.fir.serialization.constant.buildValueProtoBufIfPropertyHasConst
 import org.jetbrains.kotlin.fir.types.ConeErrorType
 import org.jetbrains.kotlin.fir.types.ConeFlexibleType
 import org.jetbrains.kotlin.metadata.ProtoBuf
 import org.jetbrains.kotlin.metadata.deserialization.BinaryVersion
-import org.jetbrains.kotlin.metadata.deserialization.Flags
 import org.jetbrains.kotlin.metadata.serialization.MutableVersionRequirementTable
 import org.jetbrains.kotlin.name.FqName
 
@@ -25,9 +24,19 @@ abstract class FirSerializerExtension {
 
     abstract val metadataVersion: BinaryVersion
 
-    val annotationSerializer by lazy { FirAnnotationSerializer(session, stringTable) }
+    val annotationSerializer by lazy { FirAnnotationSerializer(session, stringTable, constValueProvider) }
 
     protected abstract val constValueProvider: ConstValueProvider?
+
+    @OptIn(ConstValueProviderInternals::class)
+    internal inline fun <T> processFile(firFile: FirFile, action: () -> T): T {
+        constValueProvider?.processingFirFile = firFile
+        return try {
+            action()
+        } finally {
+            constValueProvider?.processingFirFile = null
+        }
+    }
 
     open fun shouldUseTypeTable(): Boolean = false
     open fun shouldUseNormalizedVisibility(): Boolean = false
@@ -83,8 +92,7 @@ abstract class FirSerializerExtension {
 
     open fun serializeTypeAlias(typeAlias: FirTypeAlias, proto: ProtoBuf.TypeAlias.Builder) {
         for (annotation in typeAlias.nonSourceAnnotations(session)) {
-            val annotationWithConstants = constValueProvider?.getNewFirAnnotationWithConstantValues(typeAlias, annotation) ?: annotation
-            proto.addAnnotation(annotationSerializer.serializeAnnotation(annotationWithConstants))
+            proto.addAnnotation(annotationSerializer.serializeAnnotation(annotation))
         }
     }
 

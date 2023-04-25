@@ -220,15 +220,13 @@ abstract class AbstractKotlinNativeCompile<
         get() = false
 
     @get:Input
-    val kotlinNativeVersion: String
-        get() = project.konanVersion.toString()
+    val kotlinNativeVersion: String = project.konanVersion
 
     @get:Input
     val artifactVersion = project.version.toString()
 
     @get:Input
-    internal val useEmbeddableCompilerJar: Boolean
-        get() = project.nativeUseEmbeddableCompilerJar
+    internal val useEmbeddableCompilerJar: Boolean = project.nativeUseEmbeddableCompilerJar
 
     @get:Internal
     open val outputFile: Provider<File>
@@ -419,6 +417,13 @@ internal constructor(
     private val isAllowCommonizer: Boolean by lazy { project.isAllowCommonizer() }
     // endregion.
 
+    @Suppress("DeprecatedCallableAddReplaceWith")
+    @Deprecated("KTIJ-25227: Necessary override for IDEs < 2023.2", level = DeprecationLevel.ERROR)
+    override fun setupCompilerArgs(args: K2NativeCompilerArguments, defaultsOnly: Boolean, ignoreClasspathResolutionErrors: Boolean) {
+        @Suppress("DEPRECATION_ERROR")
+        super.setupCompilerArgs(args, defaultsOnly, ignoreClasspathResolutionErrors)
+    }
+
     override fun createCompilerArguments(context: CreateCompilerArgumentsContext) = context.create<K2NativeCompilerArguments> {
         val sharedCompilationData = createSharedCompilationDataOrNull()
 
@@ -445,7 +450,8 @@ internal constructor(
 
             args.pluginOptions = compilerPlugins.flatMap { it.options.arguments }.toTypedArray()
 
-            if (compilerOptions.usesK2.get()) {
+            /* Shared native compilations in K2 still use -Xcommon-sources and klib dependencies */
+            if (compilerOptions.usesK2.get() && sharedCompilationData == null) {
                 args.fragments = multiplatformStructure.fragmentsCompilerArgs
                 args.fragmentRefines = multiplatformStructure.fragmentRefinesCompilerArgs
             }
@@ -468,14 +474,9 @@ internal constructor(
         }
 
         sources { args ->
-            if (compilerOptions.usesK2.get()) {
-                /*
-                For now, we only pass multiplatform structure to K2 for platform compilations
-                Metadata compilations will compile against pre-compiled klibs from their dependsOn
-                */
-                if (sharedCompilationData == null) {
-                    args.fragmentSources = multiplatformStructure.fragmentSourcesCompilerArgs
-                }
+            /* Shared native compilations in K2 still use -Xcommon-sources and klib dependencies */
+            if (compilerOptions.usesK2.get() && sharedCompilationData == null) {
+                args.fragmentSources = multiplatformStructure.fragmentSourcesCompilerArgs
             } else {
                 args.commonSources = commonSourcesTree.files.takeIf { it.isNotEmpty() }?.toPathsArray()
             }

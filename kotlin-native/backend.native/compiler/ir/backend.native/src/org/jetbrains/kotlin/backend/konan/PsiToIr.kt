@@ -106,6 +106,8 @@ internal fun PsiToIrContext.psiToIr(
             override fun resolveBySignatureInModule(signature: IdSignature, kind: IrDeserializer.TopLevelSymbolKind, moduleName: Name): IrSymbol {
                 error("Should not be called")
             }
+
+            override fun postProcess(inOrAfterLinkageStep: Boolean) = Unit
         }
     } else {
         val exportedDependencies = (moduleDescriptor.getExportedDependencies(config) + libraryToCacheModule?.let { listOf(it) }.orEmpty()).distinct()
@@ -143,7 +145,12 @@ internal fun PsiToIrContext.psiToIr(
                 stubGenerator = stubGenerator,
                 cenumsProvider = irProviderForCEnumsAndCStructs,
                 exportedDependencies = exportedDependencies,
-                partialLinkageSupport = createPartialLinkageSupportForLinker(partialLinkageConfig, generatorContext.irBuiltIns, messageLogger),
+                partialLinkageSupport = createPartialLinkageSupportForLinker(
+                        partialLinkageConfig = partialLinkageConfig,
+                        allowErrorTypes = false, // Kotlin/Native does not support error types.
+                        builtIns = generatorContext.irBuiltIns,
+                        messageLogger = messageLogger
+                ),
                 cachedLibraries = config.cachedLibraries,
                 lazyIrForCaches = config.lazyIrForCaches,
                 libraryBeingCached = config.libraryToCache,
@@ -219,7 +226,7 @@ internal fun PsiToIrContext.psiToIr(
             expectDescriptorToSymbol = if (expectActualLinker) expectDescriptorToSymbol else null
     ).toKonanModule()
 
-    irDeserializer.postProcess()
+    irDeserializer.postProcess(inOrAfterLinkageStep = true)
 
     // Enable lazy IR genration for newly-created symbols inside BE
     stubGenerator.unboundSymbolGeneration = true

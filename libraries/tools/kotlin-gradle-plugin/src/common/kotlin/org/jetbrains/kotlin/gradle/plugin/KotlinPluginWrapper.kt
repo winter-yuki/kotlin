@@ -27,6 +27,7 @@ import org.gradle.tooling.provider.model.ToolingModelBuilderRegistry
 import org.jetbrains.kotlin.compilerRunner.maybeCreateCommonizerClasspathConfiguration
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.*
+import org.jetbrains.kotlin.gradle.internal.KOTLIN_BUILD_TOOLS_API_IMPL
 import org.jetbrains.kotlin.gradle.internal.KOTLIN_COMPILER_EMBEDDABLE
 import org.jetbrains.kotlin.gradle.internal.KOTLIN_MODULE_GROUP
 import org.jetbrains.kotlin.gradle.logging.kotlinDebug
@@ -93,17 +94,11 @@ abstract class DefaultKotlinBasePlugin : KotlinBasePlugin {
         }
 
         val kotlinGradleBuildServices = KotlinGradleBuildServices.registerIfAbsent(project.gradle).get()
-        if (!isProjectIsolationEnabled(project.gradle)) {
+        if (!project.isProjectIsolationEnabled) {
             kotlinGradleBuildServices.detectKotlinPluginLoadedInMultipleProjects(project, kotlinPluginVersion)
         }
 
-        BuildMetricsService.registerIfAbsent(project)?.also { buildMetricsService ->
-            val buildEventsListenerRegistryHolder = BuildEventsListenerRegistryHolder.getInstance(project)
-            buildEventsListenerRegistryHolder.listenerRegistry.onTaskCompletion(buildMetricsService)
-            BuildReportsService.registerIfAbsent(project, buildMetricsService).also {
-                buildEventsListenerRegistryHolder.listenerRegistry.onTaskCompletion(it)
-            }
-        }
+        BuildMetricsService.registerIfAbsent(project)
     }
 
     private fun addKotlinCompilerConfiguration(project: Project) {
@@ -117,11 +112,26 @@ abstract class DefaultKotlinBasePlugin : KotlinBasePlugin {
                 )
             }
         project
+            .configurations
+            .maybeCreate(BUILD_TOOLS_API_CLASSPATH_CONFIGURATION_NAME)
+            .markResolvable()
+            .defaultDependencies {
+                it.add(
+                    project.dependencies.create("$KOTLIN_MODULE_GROUP:$KOTLIN_BUILD_TOOLS_API_IMPL:${project.getKotlinPluginVersion()}")
+                )
+            }
+        project
             .tasks
             .withType(AbstractKotlinCompileTool::class.java)
             .configureEach { task ->
                 task.defaultCompilerClasspath.setFrom(
-                    project.configurations.named(COMPILER_CLASSPATH_CONFIGURATION_NAME)
+                    {
+                        val classpathConfiguration = when (task.runViaBuildToolsApi.get()) {
+                            true -> BUILD_TOOLS_API_CLASSPATH_CONFIGURATION_NAME
+                            false -> COMPILER_CLASSPATH_CONFIGURATION_NAME
+                        }
+                        project.configurations.named(classpathConfiguration)
+                    }
                 )
             }
     }
@@ -166,6 +176,11 @@ abstract class DefaultKotlinBasePlugin : KotlinBasePlugin {
         factories.putIfAbsent(
             ArtifactTypeAttributeAccessor.ArtifactTypeAttributeAccessorVariantFactory::class,
             DefaultArtifactTypeAttributeAccessorVariantFactory()
+        )
+
+        factories.putIfAbsent(
+            ProjectIsolationStartParameterAccessor.Factory::class,
+            DefaultProjectIsolationStartParameterAccessorVariantFactory()
         )
     }
 

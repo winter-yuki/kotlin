@@ -13,6 +13,8 @@ import org.gradle.api.internal.plugins.DslObject
 import org.gradle.jvm.toolchain.JavaLanguageVersion
 import org.gradle.jvm.toolchain.JavaToolchainSpec
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import org.jetbrains.kotlin.gradle.internal.KOTLIN_BUILD_TOOLS_API_IMPL
+import org.jetbrains.kotlin.gradle.internal.KOTLIN_MODULE_GROUP
 import org.jetbrains.kotlin.gradle.plugin.*
 import org.jetbrains.kotlin.gradle.plugin.PropertiesProvider.Companion.kotlinPropertiesProvider
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinAndroidTarget
@@ -139,6 +141,17 @@ abstract class KotlinTopLevelExtension(internal val project: Project) : KotlinTo
                 named(name).configure(configure)
             }
         }
+    }
+
+    /**
+     * Allows to use a different version of the Kotlin Build Tools API implementation and effectively a different version of the compiler.
+     *
+     * By default, the Kotlin Build Tools API implementation of the same version as the KGP is used.
+     *
+     * Currently only has an effect if the `kotlin.compiler.runViaBuildToolsApi` Gradle property is set to `true`.
+     */
+    fun useCompilerVersion(version: String) {
+        project.dependencies.add(BUILD_TOOLS_API_CLASSPATH_CONFIGURATION_NAME, "$KOTLIN_MODULE_GROUP:$KOTLIN_BUILD_TOOLS_API_IMPL:$version")
     }
 }
 

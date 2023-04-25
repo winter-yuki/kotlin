@@ -6,14 +6,15 @@
 package org.jetbrains.kotlin.gradle.report
 
 import org.gradle.api.Project
+import org.jetbrains.kotlin.build.report.FileReportSettings
+import org.jetbrains.kotlin.build.report.HttpReportSettings
 import org.jetbrains.kotlin.build.report.metrics.BuildPerformanceMetric
 import org.jetbrains.kotlin.build.report.metrics.BuildTime
 import org.jetbrains.kotlin.gradle.plugin.PropertiesProvider
 import org.jetbrains.kotlin.gradle.plugin.PropertiesProvider.PropertyNames.KOTLIN_BUILD_REPORT_SINGLE_FILE
 import org.jetbrains.kotlin.gradle.plugin.PropertiesProvider.PropertyNames.KOTLIN_BUILD_REPORT_HTTP_URL
-import org.jetbrains.kotlin.gradle.utils.isProjectIsolationEnabled
+import org.jetbrains.kotlin.gradle.plugin.internal.isProjectIsolationEnabled
 import org.jetbrains.kotlin.util.capitalizeDecapitalize.toUpperCaseAsciiOnly
-
 
 private val availableMetrics = BuildTime.values().map { it.name } + BuildPerformanceMetric.values().map { it.name }
 
@@ -29,7 +30,7 @@ internal fun reportingSettings(project: Project): ReportingSettings {
             else -> BuildReportMode.VERBOSE
         }
     val fileReportSettings = if (buildReportOutputTypes.contains(BuildReportType.FILE)) {
-        val buildReportDir = properties.buildReportFileOutputDir ?: (if (isProjectIsolationEnabled(project.gradle)) {
+        val buildReportDir = properties.buildReportFileOutputDir ?: (if (project.isProjectIsolationEnabled) {
             // TODO: it's a workaround for KT-52963, should be reworked – KT-55763
             project.rootDir.resolve("build")
         } else {
