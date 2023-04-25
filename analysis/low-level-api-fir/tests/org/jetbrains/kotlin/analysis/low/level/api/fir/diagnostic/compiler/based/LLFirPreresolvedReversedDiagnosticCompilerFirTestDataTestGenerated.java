@@ -7032,12 +7032,6 @@ public class LLFirPreresolvedReversedDiagnosticCompilerFirTestDataTestGenerated 
             }
 
             @Test
-            @TestMetadata("execute.kt")
-            public void testExecute() throws Exception {
-                runTest("compiler/fir/analysis-tests/testData/resolveWithStdlib/traits/execute.kt");
-            }
-
-            @Test
             @TestMetadata("semigroup.kt")
             public void testSemigroup() throws Exception {
                 runTest("compiler/fir/analysis-tests/testData/resolveWithStdlib/traits/semigroup.kt");

@@ -30,17 +30,3 @@ object TraitBunch {
     @Trait
     val stringMonoid: Monoid<String> = StringMonoid
 }
-
-context(TraitBunch)
-fun testSadd() = if (1 sadd 2 == 3 && "a" sadd "b" == "ab") "OK" else "NOK"
-
-fun runSadd(): String = with(TraitBunch) {
-    testSadd()
-}
-
-context(TraitBunch)
-fun testConcat() = if (concat<Int>(1, 2, 3) == 6 && concat<String>("a", "b", "c") == "abc") "OK" else "NOK"
-
-fun runConcat(): String = with(TraitBunch) {
-    testConcat()
-}

@@ -1,10 +1,4 @@
 FILE: basic.kt
-    @R|kotlin/annotation/Target|(allowedTargets = vararg(Q|kotlin/annotation/AnnotationTarget|.R|kotlin/annotation/AnnotationTarget.FIELD|)) @R|kotlin/annotation/Retention|(value = Q|kotlin/annotation/AnnotationRetention|.R|kotlin/annotation/AnnotationRetention.BINARY|) public final annotation class Trait : R|kotlin/Annotation| {
-        public constructor(): R|Trait| {
-            super<R|kotlin/Any|>()
-        }
-
-    }
     public final object Traits : R|kotlin/Any| {
         private constructor(): R|Traits| {
             super<R|kotlin/Any|>()

@@ -51,4 +51,11 @@ object AdditionalFilesDirectives : SimpleDirectivesContainer() {
             See file ./compiler/testData/diagnostics/helpers/inference/inferenceUtils.kt
         """.trimIndent()
     )
+
+    val TRAIT_HELPERS by directive(
+        description = """
+            Add util functions for traits testing
+            See file ./compiler/testData/diagnostics/helpers/traits/traitUtils.kt
+        """.trimIndent()
+    )
 }

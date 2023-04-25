@@ -195,7 +195,6 @@ class ImplicitExtensionReceiverValue(
         get() = false
 }
 
-
 class InaccessibleImplicitReceiverValue(
     boundSymbol: FirClassSymbol<*>,
     type: ConeKotlinType,
@@ -272,7 +271,3 @@ class ImplicitReceiverValueForScript(
     override fun createSnapshot(): ContextReceiverValue<FirScriptSymbol> =
         ImplicitReceiverValueForScript(boundSymbol, type, labelName, useSiteSession, scopeSession, mutable = false, contextReceiverNumber)
 }
-
-//class TraitReceiverValue(
-//
-//) : ImplicitReceiverValue

@@ -8,6 +8,7 @@ package org.jetbrains.kotlin.test.services.sourceProviders
 import org.jetbrains.kotlin.test.directives.AdditionalFilesDirectives
 import org.jetbrains.kotlin.test.directives.AdditionalFilesDirectives.CHECK_TYPE
 import org.jetbrains.kotlin.test.directives.AdditionalFilesDirectives.INFERENCE_HELPERS
+import org.jetbrains.kotlin.test.directives.AdditionalFilesDirectives.TRAIT_HELPERS
 import org.jetbrains.kotlin.test.directives.model.DirectivesContainer
 import org.jetbrains.kotlin.test.directives.model.RegisteredDirectives
 import org.jetbrains.kotlin.test.directives.model.SimpleDirective
@@ -21,7 +22,8 @@ class AdditionalDiagnosticsSourceFilesProvider(testServices: TestServices, baseD
     private val helpersPath = "$baseDir/compiler/testData/diagnostics/helpers"
     private val directiveToFileMap: Map<SimpleDirective, String> = mapOf(
         CHECK_TYPE to "$helpersPath/types/checkType.kt",
-        INFERENCE_HELPERS to "$helpersPath/inference/inferenceUtils.kt"
+        INFERENCE_HELPERS to "$helpersPath/inference/inferenceUtils.kt",
+        TRAIT_HELPERS to "$helpersPath/traits/traitUtils.kt",
     )
 
     override val directiveContainers: List<DirectivesContainer> =

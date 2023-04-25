@@ -12,7 +12,6 @@ import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.labelName
 import org.jetbrains.kotlin.fir.resolve.*
 import org.jetbrains.kotlin.fir.resolve.calls.*
-import org.jetbrains.kotlin.fir.resolve.providers.FirSymbolProvider
 import org.jetbrains.kotlin.fir.resolve.providers.symbolProvider
 import org.jetbrains.kotlin.fir.scopes.FirContainingNamesAwareScope
 import org.jetbrains.kotlin.fir.scopes.FirScope
@@ -24,6 +23,7 @@ import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
+import org.jetbrains.kotlin.name.StandardClassIds
 import org.jetbrains.kotlin.utils.addIfNotNull
 
 fun SessionHolder.collectImplicitReceivers(
@@ -198,25 +198,10 @@ class FirTowerDataContext private constructor(
         )
     }
 
-    fun addTraitReceivers(holder: SessionHolder, declaration: FirCallableDeclaration): FirTowerDataContext {
-//        val receiverClassIds = listOfNotNull(declaration.receiverParameter)
-        // TODO optimize
-        val properties = declaration.contextReceivers.asSequence().flatMap ctxReceivers@{ contextReceiver ->
-            val classId = contextReceiver.typeRef.coneType.type.classId ?: return@ctxReceivers emptySequence()
-            val symbolProvider = holder.session.symbolProvider
-            val cls = symbolProvider.getClassLikeSymbolByClassId(classId)?.fir as? FirRegularClass ?: return@ctxReceivers emptySequence()
-//            val traitAnnotation = ClassId(FqName("kotlin.annotations"), Name.identifier("Trait"))
-            val traitAnnotationId = ClassId(FqName.ROOT, Name.identifier("Trait"))
-            cls.declarations.asSequence().filterIsInstance<FirProperty>().filter { field ->
-                field.backingField?.annotations?.find { it.annotationTypeRef.coneType.type.classId == traitAnnotationId } != null
-            }
-        }.toList()
-//        declaration.receiverParameter?.typeRef?.coneType?.type?.classId
-        return properties.fold(this) { context, property ->
-            val receiverValue = ImplicitExtensionReceiverValue(
-                declaration.symbol, property.returnTypeRef.coneType, holder.session, holder.scopeSession
-            )
-            context.addReceiver(property.name, receiverValue)
+    fun addTraitReceiverGroup(traitReceiverGroup: TraitReceiverGroup): FirTowerDataContext {
+        // TODO need to create new TowerDataElement?
+        return traitReceiverGroup.fold(this) { context, (name, receiver) ->
+            context.addReceiver(name, receiver)
         }
     }
 
@@ -313,3 +298,27 @@ fun FirCallableDeclaration.createContextReceiverValues(
             contextReceiverNumber = index,
         )
     }
+
+typealias TraitReceiverGroup = List<Pair<Name, ImplicitExtensionReceiverValue>>
+
+fun FirCallableDeclaration.createTraitReceiverValues(sessionHolder: SessionHolder): TraitReceiverGroup {
+    val receiverClassIds = contextReceivers.asSequence()
+        .map { it.typeRef }
+        .plus(this.receiverParameter?.typeRef)
+        .mapNotNull { it?.coneType?.type?.classId }
+    // TODO optimize search with caches
+    val properties = receiverClassIds.flatMap { classId ->
+        val symbolProvider = sessionHolder.session.symbolProvider
+        val cls = symbolProvider.getClassLikeSymbolByClassId(classId)?.fir as? FirRegularClass ?: return@flatMap emptySequence()
+        cls.declarations.asSequence().filterIsInstance<FirProperty>().filter { field ->
+            field.backingField?.annotations?.find {
+                it.annotationTypeRef.coneType.type.classId == StandardClassIds.Annotations.Trait
+            } != null
+        }
+    }
+    return properties.map { property ->
+        property.name to ImplicitExtensionReceiverValue(
+            this@createTraitReceiverValues.symbol, property.returnTypeRef.coneType, sessionHolder.session, sessionHolder.scopeSession
+        )
+    }.toList()
+}

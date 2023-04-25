@@ -5,6 +5,7 @@
 
 package kotlin.annotations
 
+// TODO make visible for tests
 @ExperimentalStdlibApi
 @Target(AnnotationTarget.FIELD)
 @Retention(AnnotationRetention.BINARY)

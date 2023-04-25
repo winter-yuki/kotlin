@@ -1,11 +1,4 @@
-// !LANGUAGE: +ContextReceivers
-// WITH_STDLIB
-
-//import kotlin.annotation.Trait
-
-@Target(AnnotationTarget.FIELD)
-@Retention(AnnotationRetention.BINARY)
-annotation class Trait
+// TRAIT_HELPERS
 
 object Traits {
     @Trait
