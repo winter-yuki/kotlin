@@ -48415,6 +48415,28 @@ public class BlackBoxCodegenTestGenerated extends AbstractBlackBoxCodegenTest {
     }
 
     @Nested
+    @TestMetadata("compiler/testData/codegen/box/trueTraits")
+    @TestDataPath("$PROJECT_ROOT")
+    public class TrueTraits {
+        @Test
+        public void testAllFilesPresentInTrueTraits() throws Exception {
+            KtTestUtil.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/codegen/box/trueTraits"), Pattern.compile("^(.+)\\.kt$"), null, TargetBackend.JVM, true);
+        }
+
+        @Test
+        @TestMetadata("traitsFromContext.kt")
+        public void testTraitsFromContext() throws Exception {
+            runTest("compiler/testData/codegen/box/trueTraits/traitsFromContext.kt");
+        }
+
+        @Test
+        @TestMetadata("traitsFromReceiver.kt")
+        public void testTraitsFromReceiver() throws Exception {
+            runTest("compiler/testData/codegen/box/trueTraits/traitsFromReceiver.kt");
+        }
+    }
+
+    @Nested
     @TestMetadata("compiler/testData/codegen/box/typeInfo")
     @TestDataPath("$PROJECT_ROOT")
     public class TypeInfo {

@@ -39360,6 +39360,29 @@ public class LightAnalysisModeTestGenerated extends AbstractLightAnalysisModeTes
         }
     }
 
+    @TestMetadata("compiler/testData/codegen/box/trueTraits")
+    @TestDataPath("$PROJECT_ROOT")
+    @RunWith(JUnit3RunnerWithInners.class)
+    public static class TrueTraits extends AbstractLightAnalysisModeTest {
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, TargetBackend.JVM, testDataFilePath);
+        }
+
+        public void testAllFilesPresentInTrueTraits() throws Exception {
+            KtTestUtil.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/codegen/box/trueTraits"), Pattern.compile("^(.+)\\.kt$"), null, TargetBackend.JVM, true);
+        }
+
+        @TestMetadata("traitsFromContext.kt")
+        public void testTraitsFromContext() throws Exception {
+            runTest("compiler/testData/codegen/box/trueTraits/traitsFromContext.kt");
+        }
+
+        @TestMetadata("traitsFromReceiver.kt")
+        public void testTraitsFromReceiver() throws Exception {
+            runTest("compiler/testData/codegen/box/trueTraits/traitsFromReceiver.kt");
+        }
+    }
+
     @TestMetadata("compiler/testData/codegen/box/typeInfo")
     @TestDataPath("$PROJECT_ROOT")
     @RunWith(JUnit3RunnerWithInners.class)
