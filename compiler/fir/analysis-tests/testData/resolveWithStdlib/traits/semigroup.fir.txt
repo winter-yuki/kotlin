@@ -1,8 +1,30 @@
 FILE: semigroup.kt
     context(R|TraitBunch|)
-    public final fun test(): R|kotlin/Unit| {
-        (this@R|/test|, Int(1)).R|SubstitutionOverride</Monoid.sadd: R|kotlin/Int|>|(Int(2))
-        (this@R|/test|, String(a)).R|SubstitutionOverride</Monoid.sadd: R|kotlin/String|>|(String(b))
+    public final fun testContext(): R|kotlin/Unit| {
+        (this@R|/testContext|, Int(1)).R|SubstitutionOverride</Monoid.sadd: R|kotlin/Int|>|(Int(2))
+        (this@R|/testContext|, String(a)).R|SubstitutionOverride</Monoid.sadd: R|kotlin/String|>|(String(b))
+        R|/concat|<R|kotlin/Int|>(vararg(Int(1), Int(2), Int(3)))
+        R|/concat|<R|kotlin/String|>(vararg(String(a), String(b), String(C)))
+    }
+    context(R|TraitBunch|)
+    public final fun testLabel(): R|kotlin/Unit| {
+        R|kotlin/with|<R|Monoid<kotlin/Int>|, R|kotlin/Int|>(this@R|/testLabel|, <L> = with@fun R|Monoid<kotlin/Int>|.<anonymous>(): R|kotlin/Int| <inline=Inline, kind=EXACTLY_ONCE>  {
+            ^ R|/concat|<R|kotlin/Int|>(vararg(Int(1), Int(2), Int(3)))
+        }
+        )
+    }
+    public final fun testReceiver(): R|kotlin/Unit| {
+        R|kotlin/with|<R|TraitBunch|, R|kotlin/String|>(Q|TraitBunch|, <L> = with@fun R|TraitBunch|.<anonymous>(): R|kotlin/String| <inline=Inline, kind=EXACTLY_ONCE>  {
+            (this@R|special/anonymous|, Int(1)).R|SubstitutionOverride</Monoid.sadd: R|kotlin/Int|>|(Int(2))
+            (this@R|special/anonymous|, String(a)).R|SubstitutionOverride</Monoid.sadd: R|kotlin/String|>|(String(b))
+            R|/concat|<R|kotlin/Int|>(vararg(Int(1), Int(2), Int(3)))
+            ^ R|/concat|<R|kotlin/String|>(vararg(String(a), String(b), String(C)))
+        }
+        )
+    }
+    public final fun R|TraitBunch|.withReceiver(): R|kotlin/Unit| {
+        (this@R|/withReceiver|, Int(1)).R|SubstitutionOverride</Monoid.sadd: R|kotlin/Int|>|(Int(2))
+        (this@R|/withReceiver|, String(a)).R|SubstitutionOverride</Monoid.sadd: R|kotlin/String|>|(String(b))
         R|/concat|<R|kotlin/Int|>(vararg(Int(1), Int(2), Int(3)))
         R|/concat|<R|kotlin/String|>(vararg(String(a), String(b), String(C)))
     }

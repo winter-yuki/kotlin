@@ -40156,6 +40156,12 @@ public class NativeCodegenBoxTestGenerated extends AbstractNativeCodegenBoxTest 
             }
 
             @Test
+            @TestMetadata("basic.kt")
+            public void testBasic() throws Exception {
+                runTest("compiler/testData/codegen/box/trueTraits/basic.kt");
+            }
+
+            @Test
             @TestMetadata("traitsFromContext.kt")
             public void testTraitsFromContext() throws Exception {
                 runTest("compiler/testData/codegen/box/trueTraits/traitsFromContext.kt");

@@ -200,8 +200,8 @@ class FirTowerDataContext private constructor(
 
     fun addTraitReceiverGroup(traitReceiverGroup: TraitReceiverGroup): FirTowerDataContext {
         // TODO need to create new TowerDataElement?
-        return traitReceiverGroup.fold(this) { context, (name, receiver) ->
-            context.addReceiver(name, receiver)
+        return traitReceiverGroup.fold(this) { context, trait ->
+            context.addReceiver(trait.label, trait)
         }
     }
 
@@ -299,26 +299,27 @@ fun FirCallableDeclaration.createContextReceiverValues(
         )
     }
 
-typealias TraitReceiverGroup = List<Pair<Name, ImplicitExtensionReceiverValue>>
+typealias TraitReceiverGroup = List<TraitReceiverValue>
 
-fun FirCallableDeclaration.createTraitReceiverValues(sessionHolder: SessionHolder): TraitReceiverGroup {
-    val receiverClassIds = contextReceivers.asSequence()
-        .map { it.typeRef }
-        .plus(this.receiverParameter?.typeRef)
-        .mapNotNull { it?.coneType?.type?.classId }
-    // TODO optimize search with caches
-    val properties = receiverClassIds.flatMap { classId ->
+fun FirCallableDeclaration.createTraitReceiverValues(
+    sessionHolder: SessionHolder,
+    extensionReceiver: ImplicitReceiverValue<*>?,
+    contextReceiverGroup: ContextReceiverGroup,
+): TraitReceiverGroup {
+    val receiverToClassId = contextReceiverGroup.asSequence()
+        .plus(extensionReceiver)
+        .mapNotNull { receiver -> receiver?.type?.classId?.let { receiver to it } }
+    val traitOrigins = receiverToClassId.flatMap { (receiver, classId) ->
         val symbolProvider = sessionHolder.session.symbolProvider
         val cls = symbolProvider.getClassLikeSymbolByClassId(classId)?.fir as? FirRegularClass ?: return@flatMap emptySequence()
-        cls.declarations.asSequence().filterIsInstance<FirProperty>().filter { field ->
-            field.backingField?.annotations?.find {
-                it.annotationTypeRef.coneType.type.classId == StandardClassIds.Annotations.Trait
-            } != null
-        }
+        cls.declarations.asSequence()
+            .filterIsInstance<FirProperty>()
+            .filter { field ->
+                field.backingField?.annotations?.find {
+                    it.annotationTypeRef.coneType.type.classId == StandardClassIds.Annotations.Trait
+                } != null
+            }
+            .map { TraitReceiverOrigin(receiver, it.symbol) }
     }
-    return properties.map { property ->
-        property.name to ImplicitExtensionReceiverValue(
-            this@createTraitReceiverValues.symbol, property.returnTypeRef.coneType, sessionHolder.session, sessionHolder.scopeSession
-        )
-    }.toList()
+    return traitOrigins.map { TraitReceiverValue(this.symbol, it, sessionHolder.session, sessionHolder.scopeSession) }.toList()
 }

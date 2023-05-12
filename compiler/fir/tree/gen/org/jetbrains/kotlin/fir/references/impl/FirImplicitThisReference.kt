@@ -8,6 +8,7 @@
 package org.jetbrains.kotlin.fir.references.impl
 
 import org.jetbrains.kotlin.KtSourceElement
+import org.jetbrains.kotlin.fir.expressions.FirQualifiedAccessExpression
 import org.jetbrains.kotlin.fir.references.FirThisReference
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
 import org.jetbrains.kotlin.fir.visitors.*
@@ -20,13 +21,17 @@ import org.jetbrains.kotlin.fir.visitors.*
 internal class FirImplicitThisReference(
     override val boundSymbol: FirBasedSymbol<*>?,
     override var contextReceiverNumber: Int,
+    override var traitOrigin: FirQualifiedAccessExpression?,
 ) : FirThisReference() {
     override val source: KtSourceElement? get() = null
     override val labelName: String? get() = null
 
-    override fun <R, D> acceptChildren(visitor: FirVisitor<R, D>, data: D) {}
+    override fun <R, D> acceptChildren(visitor: FirVisitor<R, D>, data: D) {
+        traitOrigin?.accept(visitor, data)
+    }
 
     override fun <D> transformChildren(transformer: FirTransformer<D>, data: D): FirImplicitThisReference {
+        traitOrigin = traitOrigin?.transform(transformer, data)
         return this
     }
 

@@ -6,6 +6,19 @@ object Traits {
 }
 
 context(Traits)
-fun test() {
+fun testContext() {
     plus(42)
+}
+
+context(Traits)
+fun testLabel() {
+    with(this@int) {
+        plus(42)
+    }
+}
+
+fun testReceiver() {
+    with(Traits) {
+        plus(42)
+    }
 }

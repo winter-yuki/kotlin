@@ -95,6 +95,7 @@ val exhaustivenessStatusType = generatedType("expressions", "ExhaustivenessStatu
 val callableReferenceMappedArgumentsType = type("fir.resolve.calls", "CallableReferenceMappedArguments")
 
 val functionCallOrigin = type("fir.expressions", "FirFunctionCallOrigin")
+val qualifiedAccessExpression = type("fir.expressions", "FirQualifiedAccessExpression")
 
 val resolvedDeclarationStatusImplType = type("fir.declarations.impl", "FirResolvedDeclarationStatusImpl")
 

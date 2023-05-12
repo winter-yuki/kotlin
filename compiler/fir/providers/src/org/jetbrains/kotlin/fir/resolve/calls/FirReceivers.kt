@@ -12,9 +12,11 @@ import org.jetbrains.kotlin.fir.copyWithNewSourceKind
 import org.jetbrains.kotlin.fir.declarations.FirResolvePhase
 import org.jetbrains.kotlin.fir.diagnostics.ConeIntermediateDiagnostic
 import org.jetbrains.kotlin.fir.expressions.*
+import org.jetbrains.kotlin.fir.expressions.builder.buildPropertyAccessExpression
 import org.jetbrains.kotlin.fir.expressions.builder.buildSmartCastExpression
 import org.jetbrains.kotlin.fir.expressions.builder.buildThisReceiverExpression
 import org.jetbrains.kotlin.fir.references.builder.buildImplicitThisReference
+import org.jetbrains.kotlin.fir.references.builder.buildPropertyFromParameterResolvedNamedReference
 import org.jetbrains.kotlin.fir.renderWithType
 import org.jetbrains.kotlin.fir.resolve.ScopeSession
 import org.jetbrains.kotlin.fir.resolve.fullyExpandedType
@@ -25,6 +27,7 @@ import org.jetbrains.kotlin.fir.scopes.FirTypeScope
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirCallableSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirClassSymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirPropertySymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirScriptSymbol
 import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.fir.types.builder.buildResolvedTypeRef
@@ -82,6 +85,7 @@ sealed class ImplicitReceiverValue<S : FirBasedSymbol<*>>(
     protected val scopeSession: ScopeSession,
     private val mutable: Boolean,
     val contextReceiverNumber: Int = -1,
+    traitReceiverOrigin: TraitReceiverOrigin? = null,
 ) : ReceiverValue {
     final override var type: ConeKotlinType = type
         private set
@@ -98,9 +102,17 @@ sealed class ImplicitReceiverValue<S : FirBasedSymbol<*>>(
 
     override fun scope(useSiteSession: FirSession, scopeSession: ScopeSession): FirTypeScope? = implicitScope
 
-    private val originalReceiverExpression: FirThisReceiverExpression = receiverExpression(boundSymbol, type, contextReceiverNumber)
+    private val originalReceiverExpression: FirThisReceiverExpression =
+        receiverExpression(boundSymbol, type, contextReceiverNumber, traitReceiverOrigin)
+
     final override var receiverExpression: FirExpression = originalReceiverExpression
         private set
+
+    init {
+        assert((if (contextReceiverNumber != -1) 1 else 0) + (if (traitReceiverOrigin != null) 1 else 0) < 2) {
+            "Receiver can't be context and trait at once"
+        }
+    }
 
     @RequiresOptIn
     annotation class ImplicitReceiverInternals
@@ -145,6 +157,7 @@ private fun receiverExpression(
     symbol: FirBasedSymbol<*>,
     type: ConeKotlinType,
     contextReceiverNumber: Int,
+    traitReceiverOrigin: TraitReceiverOrigin?,
 ): FirThisReceiverExpression =
     buildThisReceiverExpression {
         // NB: we can't use `symbol.fir.source` as the source of `this` receiver. For instance, if this is an implicit receiver for a class,
@@ -153,6 +166,16 @@ private fun receiverExpression(
         calleeReference = buildImplicitThisReference {
             boundSymbol = symbol
             this.contextReceiverNumber = contextReceiverNumber
+            this.traitOrigin = traitReceiverOrigin?.let {
+                buildPropertyAccessExpression {
+                    explicitReceiver = traitReceiverOrigin.receiver.receiverExpression
+                    typeRef = traitReceiverOrigin.propertySymbol.resolvedReturnTypeRef
+                    calleeReference = buildPropertyFromParameterResolvedNamedReference {
+                        name = traitReceiverOrigin.propertySymbol.name
+                        resolvedSymbol = traitReceiverOrigin.propertySymbol
+                    }
+                }
+            }
         }
         typeRef = type.toFirResolvedTypeRef()
         isImplicit = true
@@ -193,6 +216,36 @@ class ImplicitExtensionReceiverValue(
 
     override val isContextReceiver: Boolean
         get() = false
+}
+
+data class TraitReceiverOrigin(
+    val receiver: ReceiverValue,
+    val propertySymbol: FirPropertySymbol,
+)
+
+class TraitReceiverValue(
+    boundSymbol: FirCallableSymbol<*>,
+    val origin: TraitReceiverOrigin,
+    useSiteSession: FirSession,
+    scopeSession: ScopeSession,
+    mutable: Boolean = true,
+) : ImplicitReceiverValue<FirCallableSymbol<*>>(
+    boundSymbol,
+    origin.propertySymbol.resolvedReturnType.type,
+    useSiteSession,
+    scopeSession,
+    mutable,
+    traitReceiverOrigin = origin,
+) {
+    override fun createSnapshot(): TraitReceiverValue {
+        return TraitReceiverValue(boundSymbol, origin, useSiteSession, scopeSession, false)
+    }
+
+    override val isContextReceiver: Boolean
+        get() = false
+
+    val label: Name
+        get() = origin.propertySymbol.name
 }
 
 class InaccessibleImplicitReceiverValue(

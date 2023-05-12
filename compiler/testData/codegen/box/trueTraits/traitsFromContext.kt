@@ -7,7 +7,7 @@ fun runInContext(): String {
     if ("a" sadd "b" != "ab") return "Fail: ${"a" sadd "b"}"
     // TODO remove <Int>
     if (concat<Int>(1, 2, 3) != 6) return "Fail: ${concat<Int>(1, 2, 3)}"
-    if (concat("a", "b", "c") != "abc") return "Fail: ${concat<String>("a", "b", "c")}"
+    if (concat("a", "b", "c") != "abc") return "Fail: ${concat("a", "b", "c")}"
     return "OK"
 }
 
