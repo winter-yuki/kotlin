@@ -265,7 +265,7 @@ private const val ERROR_TYPE_STUB = CommonClassNames.JAVA_LANG_OBJECT
 private fun ConeKotlinType.mapToCanonicalString(session: FirSession): String {
     return when (this) {
         is ConeClassLikeType -> mapToCanonicalString(session)
-        is ConeTypeVariableType, is ConeFlexibleType, is ConeCapturedType,
+        is ConeTypeVariableType, is ConeFlexibleType, is ConeCapturedType, is ConeSelfType,
         is ConeDefinitelyNotNullType, is ConeIntersectionType, is ConeStubType, is ConeIntegerLiteralType ->
             error("Unexpected type: $this [${this::class}]")
         is ConeLookupTagBasedType -> lookupTag.name.asString()

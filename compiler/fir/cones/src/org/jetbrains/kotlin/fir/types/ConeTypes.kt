@@ -10,6 +10,7 @@ import org.jetbrains.kotlin.fir.symbols.ConeClassLikeLookupTag
 import org.jetbrains.kotlin.fir.symbols.ConeClassifierLookupTag
 import org.jetbrains.kotlin.fir.types.impl.ConeClassLikeTypeImpl
 import org.jetbrains.kotlin.name.ClassId
+import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.types.model.*
 import org.jetbrains.kotlin.utils.addToStdlib.foldMap
 
@@ -117,7 +118,7 @@ fun ConeSimpleKotlinType.unwrapDefinitelyNotNull(): ConeSimpleKotlinType {
 class ConeCapturedTypeConstructor(
     val projection: ConeTypeProjection,
     var supertypes: List<ConeKotlinType>? = null,
-    val typeParameterMarker: TypeParameterMarker? = null
+    val typeParameterMarker: TypeParameterMarker? = null,
 ) : CapturedTypeConstructorMarker
 
 data class ConeCapturedType(
@@ -243,5 +244,27 @@ class ConeIntersectionType(
     override fun hashCode(): Int {
         if (hashCode != 0) return hashCode
         return intersectedTypes.hashCode().also { hashCode = it }
+    }
+}
+
+data class ConeSelfType(
+    val bound: ConeSimpleKotlinType,
+    override val nullability: ConeNullability,
+) : ConeSimpleKotlinType(), TypeConstructorMarker {
+
+    init {
+        assert(bound.nullability == ConeNullability.NOT_NULL) {
+            "Self-type bound should always be NOT_NULL"
+        }
+    }
+
+    override val typeArguments: Array<out ConeTypeProjection>
+        get() = emptyArray()
+
+    override val attributes: ConeAttributes
+        get() = bound.attributes
+
+    companion object {
+        val CODE_NAME: Name = Name.identifier("Self")
     }
 }

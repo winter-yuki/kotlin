@@ -789,6 +789,7 @@ fun ConeKotlinType?.collectUpperBounds(): Set<ConeClassLikeType> {
         is ConeCapturedType -> constructor.supertypes?.flatMap { it.collectUpperBounds() }?.toSet().orEmpty()
         is ConeIntegerConstantOperatorType -> setOf(getApproximatedType())
         is ConeStubType, is ConeIntegerLiteralConstantType -> throw IllegalStateException("$this should not reach here")
+        is ConeSelfType -> TODO("SelfType upper bounds")
     }
 }
 

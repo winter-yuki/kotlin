@@ -131,6 +131,12 @@ open class ConeTypeRenderer {
             is ConeIntegerLiteralType -> {
                 render(type)
             }
+
+            is ConeSelfType -> {
+                builder.append("SelfType(")
+                render(type.bound)
+                builder.append(")")
+            }
         }
         if (type !is ConeFlexibleType && type !is ConeErrorType) {
             builder.append(type.nullability.suffix)

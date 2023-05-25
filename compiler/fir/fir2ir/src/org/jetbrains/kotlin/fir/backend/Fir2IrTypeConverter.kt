@@ -223,6 +223,7 @@ class Fir2IrTypeConverter(
             }
             is ConeStubType -> createErrorType()
             is ConeIntegerLiteralType -> createErrorType()
+            is ConeSelfType -> bound.toIrType(typeContext, annotations)
         }
     }
 
