@@ -154,6 +154,7 @@ interface ConeTypeContext : TypeSystemContext, TypeSystemOptimizationContext, Ty
             is ConeStubType -> constructor
             is ConeDefinitelyNotNullType -> original.typeConstructor()
             is ConeIntegerLiteralType -> this
+            is ConeSelfType -> this
             else -> error("?: $this")
         }
     }
@@ -292,6 +293,7 @@ interface ConeTypeContext : TypeSystemContext, TypeSystemOptimizationContext, Ty
             is ConeCapturedTypeConstructor -> supertypes.orEmpty()
             is ConeIntersectionType -> intersectedTypes
             is ConeIntegerLiteralType -> supertypes
+            is ConeSelfType -> listOf(bound)
             else -> unknownConstructorError()
         }
     }
@@ -410,6 +412,7 @@ interface ConeTypeContext : TypeSystemContext, TypeSystemOptimizationContext, Ty
         if (this is ConeIntegerLiteralType) return true
         if (this is ConeStubType) return true
         if (this is ConeDefinitelyNotNullType) return true
+        if (this is ConeSelfType) return true
         require(this is ConeLookupTagBasedType)
         val typeConstructor = this.typeConstructor()
         return typeConstructor is ConeClassLikeLookupTag ||

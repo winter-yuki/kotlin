@@ -14,11 +14,18 @@ import org.jetbrains.kotlin.fir.declarations.FirDeclarationOrigin
 import org.jetbrains.kotlin.fir.declarations.FirVariable
 import org.jetbrains.kotlin.fir.declarations.builder.buildProperty
 import org.jetbrains.kotlin.fir.declarations.impl.FirDeclarationStatusImpl
+import org.jetbrains.kotlin.fir.diagnostics.ConeSimpleDiagnostic
 import org.jetbrains.kotlin.fir.diagnostics.ConeSyntaxDiagnostic
+import org.jetbrains.kotlin.fir.diagnostics.DiagnosticKind
 import org.jetbrains.kotlin.fir.expressions.*
 import org.jetbrains.kotlin.fir.expressions.builder.*
 import org.jetbrains.kotlin.fir.symbols.impl.FirPropertySymbol
+import org.jetbrains.kotlin.fir.types.ConeClassLikeType
+import org.jetbrains.kotlin.fir.types.ConeNullability
+import org.jetbrains.kotlin.fir.types.ConeSelfType
 import org.jetbrains.kotlin.fir.types.FirTypeRef
+import org.jetbrains.kotlin.fir.types.builder.FirErrorTypeRefBuilder
+import org.jetbrains.kotlin.fir.types.builder.FirResolvedTypeRefBuilder
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitTypeRefImplWithoutSource
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.psi.*
@@ -158,3 +165,24 @@ internal fun generateDestructuringBlock(
         }
     }
 }
+
+// TODO: extension receivers
+fun createConeSelfTypeBuilder(
+    dispatchReceiver: ConeClassLikeType?,
+    source: KtSourceElement,
+    isNullable: Boolean,
+): FirAnnotationContainerBuilder =
+    if (dispatchReceiver != null) {
+        FirResolvedTypeRefBuilder().apply {
+            this.source = source
+            this.type = ConeSelfType(dispatchReceiver, ConeNullability.create(isNullable))
+        }
+    } else {
+        FirErrorTypeRefBuilder().apply {
+            this.source = source
+            this.diagnostic = ConeSimpleDiagnostic(
+                "Self type is allowed only in method declaration",
+                DiagnosticKind.NoThis
+            )
+        }
+    }

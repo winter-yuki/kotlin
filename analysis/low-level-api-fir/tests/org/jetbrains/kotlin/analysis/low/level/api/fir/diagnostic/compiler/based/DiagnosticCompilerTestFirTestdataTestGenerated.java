@@ -4251,6 +4251,22 @@ public class DiagnosticCompilerTestFirTestdataTestGenerated extends AbstractDiag
         }
 
         @Nested
+        @TestMetadata("compiler/fir/analysis-tests/testData/resolve/selftype")
+        @TestDataPath("$PROJECT_ROOT")
+        public class Selftype {
+            @Test
+            public void testAllFilesPresentInSelftype() throws Exception {
+                KtTestUtil.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/fir/analysis-tests/testData/resolve/selftype"), Pattern.compile("^([^.]+)\\.kt$"), null, true);
+            }
+
+            @Test
+            @TestMetadata("typeResolve.kt")
+            public void testTypeResolve() throws Exception {
+                runTest("compiler/fir/analysis-tests/testData/resolve/selftype/typeResolve.kt");
+            }
+        }
+
+        @Nested
         @TestMetadata("compiler/fir/analysis-tests/testData/resolve/smartcasts")
         @TestDataPath("$PROJECT_ROOT")
         public class Smartcasts {
