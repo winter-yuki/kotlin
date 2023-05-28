@@ -350,6 +350,14 @@ interface ClassicTypeSystemContext : TypeSystemInferenceExtensionContext, TypeSy
         return KotlinBuiltIns.isTypeConstructorForGivenClass(this, FqNames.nothing)
     }
 
+    override fun SimpleTypeMarker.isSelfType(): Boolean {
+        error("Self-types are note supported")
+    }
+
+    override fun SimpleTypeMarker.selfBound(): SimpleTypeMarker {
+        error("Self-types are not supported")
+    }
+
     override fun KotlinTypeMarker.asTypeArgument(): TypeArgumentMarker {
         require(this is KotlinType, this::errorMessage)
         return this.asTypeProjection()

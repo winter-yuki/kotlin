@@ -589,6 +589,14 @@ interface IrTypeSystemContext : TypeSystemContext, TypeSystemCommonSuperTypesCon
     override fun KotlinTypeMarker.isTypeVariableType(): Boolean {
         return false
     }
+
+    override fun SimpleTypeMarker.isSelfType(): Boolean {
+        error("There should be no Self-types at backend")
+    }
+
+    override fun SimpleTypeMarker.selfBound(): SimpleTypeMarker {
+        error("There should be no Self-types at backend")
+    }
 }
 
 fun extractTypeParameters(parent: IrDeclarationParent): List<IrTypeParameter> {

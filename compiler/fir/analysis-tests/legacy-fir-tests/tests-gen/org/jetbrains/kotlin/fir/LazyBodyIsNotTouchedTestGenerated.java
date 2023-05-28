@@ -3757,6 +3757,16 @@ public class LazyBodyIsNotTouchedTestGenerated extends AbstractLazyBodyIsNotTouc
             KtTestUtil.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/fir/analysis-tests/testData/resolve/selftype"), Pattern.compile("^([^.]+)\\.kt$"), null, true);
         }
 
+        @TestMetadata("overriding.kt")
+        public void testOverriding() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/selftype/overriding.kt");
+        }
+
+        @TestMetadata("positions.kt")
+        public void testPositions() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/selftype/positions.kt");
+        }
+
         @TestMetadata("typeResolve.kt")
         public void testTypeResolve() throws Exception {
             runTest("compiler/fir/analysis-tests/testData/resolve/selftype/typeResolve.kt");

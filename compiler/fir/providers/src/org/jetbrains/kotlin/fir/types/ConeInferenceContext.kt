@@ -566,6 +566,15 @@ interface ConeInferenceContext : TypeSystemInferenceExtensionContext, ConeTypeCo
     override fun createSubstitutorForSuperTypes(baseType: KotlinTypeMarker): TypeSubstitutorMarker? =
         if (baseType is ConeLookupTagBasedType) createSubstitutionForSupertype(baseType, session) else null
 
+    override fun SimpleTypeMarker.isSelfType(): Boolean {
+        return this is ConeSelfType
+    }
+
+    override fun SimpleTypeMarker.selfBound(): SimpleTypeMarker {
+        require(this is ConeSelfType)
+        return bound
+    }
+
     override val isK2: Boolean
         get() = true
 }

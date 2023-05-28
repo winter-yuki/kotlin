@@ -404,6 +404,9 @@ interface TypeSystemContext : TypeSystemOptimizationContext {
     fun SimpleTypeMarker.isStubTypeForBuilderInference(): Boolean
     fun TypeConstructorMarker.unwrapStubTypeVariableConstructor(): TypeConstructorMarker
 
+    fun SimpleTypeMarker.isSelfType(): Boolean
+    fun SimpleTypeMarker.selfBound(): SimpleTypeMarker
+
     fun KotlinTypeMarker.asTypeArgument(): TypeArgumentMarker
 
     fun CapturedTypeMarker.lowerType(): KotlinTypeMarker?

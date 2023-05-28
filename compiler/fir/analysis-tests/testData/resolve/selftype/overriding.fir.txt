@@ -1,0 +1,37 @@
+FILE: overriding.kt
+    public abstract interface In<in T> : R|kotlin/Any| {
+    }
+    public abstract interface Out<out T> : R|kotlin/Any| {
+    }
+    public abstract interface Inv<T> : R|kotlin/Any| {
+    }
+    public abstract class Base : R|kotlin/Any| {
+        public constructor(): R|Base| {
+            super<R|kotlin/Any|>()
+        }
+
+        public abstract fun viaReturn(): R|SelfType(Base)|
+
+        public abstract fun viaReturnGeneric(): R|Out<SelfType(Base)>|
+
+        public abstract fun viaInputConsumer(consumer: R|(SelfType(Base)) -> kotlin/Unit|): R|kotlin/Unit|
+
+    }
+    public final class Derived : R|Base| {
+        public constructor(): R|Derived| {
+            super<R|Base|>()
+        }
+
+        public open override fun viaReturn(): R|SelfType(Derived)| {
+            ^viaReturn Null(null)!!
+        }
+
+        public open override fun viaReturnGeneric(): R|Out<SelfType(Derived)>| {
+            ^viaReturnGeneric Null(null)!!
+        }
+
+        public open override fun viaInputConsumer(consumer: R|(SelfType(Derived)) -> kotlin/Unit|): R|kotlin/Nothing| {
+            ^viaInputConsumer Null(null)!!
+        }
+
+    }

@@ -4260,6 +4260,18 @@ public class FirPsiDiagnosticTestGenerated extends AbstractFirPsiDiagnosticTest 
             }
 
             @Test
+            @TestMetadata("overriding.kt")
+            public void testOverriding() throws Exception {
+                runTest("compiler/fir/analysis-tests/testData/resolve/selftype/overriding.kt");
+            }
+
+            @Test
+            @TestMetadata("positions.kt")
+            public void testPositions() throws Exception {
+                runTest("compiler/fir/analysis-tests/testData/resolve/selftype/positions.kt");
+            }
+
+            @Test
             @TestMetadata("typeResolve.kt")
             public void testTypeResolve() throws Exception {
                 runTest("compiler/fir/analysis-tests/testData/resolve/selftype/typeResolve.kt");

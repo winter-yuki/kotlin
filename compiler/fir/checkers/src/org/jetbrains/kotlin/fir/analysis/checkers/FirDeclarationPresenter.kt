@@ -104,7 +104,12 @@ interface FirDeclarationPresenter {
             is ConeStubType -> {
                 append("ERROR")
             }
-            is ConeSelfType -> TODO("SelfType append representation")
+            is ConeSelfType -> {
+                append("SelfType(")
+                appendRepresentation(it.bound)
+                append(")")
+                append(it.nullability.suffix)
+            }
         }
     }
 
