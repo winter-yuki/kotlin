@@ -186,3 +186,10 @@ fun createConeSelfTypeBuilder(
             )
         }
     }
+
+fun createConeSelfType(dispatchReceiver: ConeClassLikeType?, source: KtSourceElement, isNullable: Boolean): FirTypeRef =
+    when (val builder = createConeSelfTypeBuilder(dispatchReceiver, source, isNullable)) {
+        is FirResolvedTypeRefBuilder -> builder.build()
+        is FirErrorTypeRefBuilder -> builder.build()
+        else -> error("Unreachable code reached")
+    }

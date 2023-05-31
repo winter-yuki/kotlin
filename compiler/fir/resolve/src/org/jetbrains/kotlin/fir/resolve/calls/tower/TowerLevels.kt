@@ -19,6 +19,7 @@ import org.jetbrains.kotlin.fir.resolve.calls.*
 import org.jetbrains.kotlin.fir.resolve.providers.symbolProvider
 import org.jetbrains.kotlin.fir.resolve.transformers.body.resolve.resultType
 import org.jetbrains.kotlin.fir.scopes.*
+import org.jetbrains.kotlin.fir.scopes.impl.FirClassUseSiteMaterializationScope
 import org.jetbrains.kotlin.fir.scopes.impl.FirDefaultStarImportingScope
 import org.jetbrains.kotlin.fir.scopes.impl.importedFromObjectOrStaticData
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
@@ -84,7 +85,9 @@ class MemberScopeTowerLevel(
         output: TowerScopeLevelProcessor<T>,
         processScopeMembers: FirScope.(processor: (T) -> Unit) -> Unit
     ): ProcessResult {
-        val scope = dispatchReceiverValue.scope(session, scopeSession) ?: return ProcessResult.SCOPE_EMPTY
+        val scope = dispatchReceiverValue.scope(session, scopeSession)
+            ?.let { FirClassUseSiteMaterializationScope(it, dispatchReceiverValue.type, session.typeContext) }
+            ?: return ProcessResult.SCOPE_EMPTY
         var (empty, candidates) = scope.collectCandidates(processScopeMembers)
 
         val scopeWithoutSmartcast = getOriginalReceiverExpressionIfStableSmartCast()?.typeRef

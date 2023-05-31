@@ -1,3 +1,7 @@
+interface In<in T>
+interface Out<out T>
+interface Inv<T>
+
 class C {
     fun invalid1(): In<Self> = null!!
 

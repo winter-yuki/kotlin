@@ -582,23 +582,20 @@ object AbstractTypeChecker {
         return null
     }
 
-    /*
-     * B <: A => Self(B) <: Self(A) | rightNullability
-     * B <: A => Self(B) <: A | rightNullability
-     * rightNullability = sub.nullable -> sup.nullable
-     */
     private fun checkSubtypeForSelfType(
         state: TypeCheckerState,
         subType: SimpleTypeMarker,
         superType: SimpleTypeMarker
     ): Boolean? = with(state.typeSystemContext) {
-        fun rightNullability(sub: SimpleTypeMarker, sup: SimpleTypeMarker): Boolean =
-            !sub.isMarkedNullable() || sup.isMarkedNullable()
+        fun correctNullability(sub: SimpleTypeMarker, sup: SimpleTypeMarker): Boolean =
+            !sub.isMarkedNullable() || sup.isMarkedNullable() // sub.nullable -> sup.nullable
         when {
             subType.isSelfType() && superType.isSelfType() ->
-                rightNullability(subType, superType) && isSubtypeOf(state, subType.selfBound(), superType.selfBound())
+                correctNullability(subType, superType) && isSubtypeOf(state, subType.selfBound(), superType.selfBound())
             subType.isSelfType() && !superType.isSelfType() ->
-                rightNullability(subType, superType) && isSubtypeOf(state, subType.selfBound(), superType.withNullability(false))
+                correctNullability(subType, superType) && isSubtypeOf(state, subType.selfBound(), superType.withNullability(false))
+            !subType.isSelfType() && superType.isSelfType() ->
+                correctNullability(subType, superType) && subType.typeConstructor().isNothingConstructor()
             else -> null
         }
     }

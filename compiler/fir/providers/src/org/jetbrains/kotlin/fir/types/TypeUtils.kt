@@ -747,3 +747,18 @@ fun ConeKotlinType.convertToNonRawVersion(): ConeKotlinType {
 
     return withAttributes(attributes.remove(CompilerConeAttributes.RawType))
 }
+
+fun ConeSimpleKotlinType.asSelfType(typeContext: ConeTypeContext, nullability: ConeNullability? = null): ConeSelfType =
+    ConeSelfType(
+        bound = withNullability(ConeNullability.NOT_NULL, typeContext),
+        nullability = nullability ?: this.nullability
+    )
+
+fun FirResolvedTypeRef.asSelfTypeRefOrNull(typeContext: ConeTypeContext): FirResolvedTypeRef? =
+    type.let { if (it !is ConeSimpleKotlinType) null else withReplacedConeType(it.asSelfType(typeContext)) }
+
+fun FirResolvedTypeRef.asSelfTypeRef(typeContext: ConeTypeContext): FirResolvedTypeRef =
+    asSelfTypeRefOrNull(typeContext) ?: error("Only ${ConeSimpleKotlinType::class.simpleName} can be wrapped as Self type")
+
+fun ConeSelfType.boundWithOriginalNullability(typeContext: ConeTypeContext): ConeSimpleKotlinType =
+    bound.withNullability(nullability, typeContext)

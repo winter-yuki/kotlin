@@ -4260,6 +4260,12 @@ public class DiagnosticCompilerTestFirTestdataTestGenerated extends AbstractDiag
             }
 
             @Test
+            @TestMetadata("generics.kt")
+            public void testGenerics() throws Exception {
+                runTest("compiler/fir/analysis-tests/testData/resolve/selftype/generics.kt");
+            }
+
+            @Test
             @TestMetadata("overriding.kt")
             public void testOverriding() throws Exception {
                 runTest("compiler/fir/analysis-tests/testData/resolve/selftype/overriding.kt");
@@ -4269,6 +4275,18 @@ public class DiagnosticCompilerTestFirTestdataTestGenerated extends AbstractDiag
             @TestMetadata("positions.kt")
             public void testPositions() throws Exception {
                 runTest("compiler/fir/analysis-tests/testData/resolve/selftype/positions.kt");
+            }
+
+            @Test
+            @TestMetadata("scopes.kt")
+            public void testScopes() throws Exception {
+                runTest("compiler/fir/analysis-tests/testData/resolve/selftype/scopes.kt");
+            }
+
+            @Test
+            @TestMetadata("thisIsSelf.kt")
+            public void testThisIsSelf() throws Exception {
+                runTest("compiler/fir/analysis-tests/testData/resolve/selftype/thisIsSelf.kt");
             }
 
             @Test

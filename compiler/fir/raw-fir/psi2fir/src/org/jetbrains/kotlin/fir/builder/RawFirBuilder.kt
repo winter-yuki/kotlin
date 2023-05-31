@@ -2670,6 +2670,10 @@ open class RawFirBuilder(
                     source = sourceElement.fakeElement(KtFakeSourceElementKind.ReferenceInAtomicQualifiedAccess)
                     labelName = expression.getLabelName()
                 }
+                val dispatchReceiver = context.dispatchReceiverTypesStack.lastOrNull()
+                if (expression.getLabelName() == null && dispatchReceiver != null) {
+                    typeRef = createConeSelfType(dispatchReceiver, sourceElement, isNullable = false)
+                }
             }
         }
 

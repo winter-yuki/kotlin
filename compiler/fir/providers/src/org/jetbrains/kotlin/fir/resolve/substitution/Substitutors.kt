@@ -72,7 +72,7 @@ abstract class AbstractConeSubstitutor(protected val typeContext: ConeTypeContex
             is ConeIntersectionType -> this.substituteIntersectedTypes()
             is ConeStubType -> return null
             is ConeIntegerLiteralType -> return null
-            is ConeSelfType -> TODO("SelfType substitute")
+            is ConeSelfType -> this.substituteSelfType()
         }
     }
 
@@ -167,7 +167,12 @@ abstract class AbstractConeSubstitutor(protected val typeContext: ConeTypeContex
         return null
     }
 
-
+    private fun ConeSelfType.substituteSelfType(): ConeKotlinType? {
+        val materialized = substituteType(this)
+        if (materialized != null) return materialized
+        val bound = bound.substituteRecursive() ?: return null
+        return this.copy(bound as ConeSimpleKotlinType)
+    }
 }
 
 fun substitutorByMap(substitution: Map<FirTypeParameterSymbol, ConeKotlinType>, useSiteSession: FirSession): ConeSubstitutor {
@@ -336,4 +341,14 @@ fun ConeSubstitutor.replaceStubsAndTypeVariablesToErrors(
     stubTypesToReplace: Collection<ConeStubTypeConstructor>
 ): ConeSubstitutor {
     return ChainedSubstitutor(this, ConeStubAndTypeVariableToErrorTypeSubstitutor(typeContext, stubTypesToReplace))
+}
+
+class ConeSelfTypeMaterializationSubstitutor(
+    typeContext: ConeTypeContext,
+    private val target: ConeKotlinType,
+) : AbstractConeSubstitutor(typeContext) {
+    override fun substituteType(type: ConeKotlinType): ConeKotlinType? {
+        if (type !is ConeSelfType) return null
+        return target
+    }
 }

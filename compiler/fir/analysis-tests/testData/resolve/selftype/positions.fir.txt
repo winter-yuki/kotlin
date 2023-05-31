@@ -1,1 +1,33 @@
 FILE: positions.kt
+    public abstract interface In<in T> : R|kotlin/Any| {
+    }
+    public abstract interface Out<out T> : R|kotlin/Any| {
+    }
+    public abstract interface Inv<T> : R|kotlin/Any| {
+    }
+    public final class C : R|kotlin/Any| {
+        public constructor(): R|C| {
+            super<R|kotlin/Any|>()
+        }
+
+        public final fun invalid1(): R|In<SelfType(C)>| {
+            ^invalid1 Null(null)!!
+        }
+
+        public final fun invalid2(x: R|SelfType(C)|): R|kotlin/Unit| {
+            Null(null)!!
+        }
+
+        public final fun invalid3(produce: R|() -> SelfType(C)|): R|kotlin/Unit| {
+            Null(null)!!
+        }
+
+        public final fun invalid4(): R|Inv<SelfType(C)>| {
+            ^invalid4 Null(null)!!
+        }
+
+        public final fun invalid5(xs: R|Inv<SelfType(C)>|): R|kotlin/Unit| {
+            Null(null)!!
+        }
+
+    }

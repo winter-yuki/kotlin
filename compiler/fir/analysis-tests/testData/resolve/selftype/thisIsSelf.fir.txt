@@ -1,0 +1,31 @@
+FILE: thisIsSelf.kt
+    public final class A : R|kotlin/Any| {
+        public constructor(): R|A| {
+            super<R|kotlin/Any|>()
+        }
+
+        public final fun f1(): R|SelfType(A)| {
+            ^f1 this#
+        }
+
+        public final fun f2(): R|kotlin/collections/List<SelfType(A)>| {
+            ^f2 R|kotlin/collections/listOf|<R|A|>(vararg(this#, this#))
+        }
+
+        public final fun f3(): R|kotlin/collections/List<SelfType(A)>| {
+            ^f3 R|kotlin/collections/listOf<Inapplicable(INAPPLICABLE): kotlin/collections/listOf>#|<R|SelfType(A)|>(this#, this#)
+        }
+
+        public final fun f4(): R|SelfType(A)| {
+            ^f4 R|/A.A|()
+        }
+
+        public final fun f5(): R|SelfType(A)| {
+            ^f5 this#
+        }
+
+        public final fun f6(): R|SelfType(A)| {
+            ^f6 R|/A.A|()
+        }
+
+    }

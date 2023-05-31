@@ -1,0 +1,45 @@
+FILE: scopes.kt
+    public open class A : R|kotlin/Any| {
+        public constructor(): R|A| {
+            super<R|kotlin/Any|>()
+        }
+
+        public final fun self1(): R|SelfType(A)| {
+            ^self1 this#
+        }
+
+        public final fun self2(): R|SelfType(A)| {
+            ^self2 this#
+        }
+
+        public final fun self3(): R|SelfType(A)| {
+            ^self3 this#.R|/A.self4|()
+        }
+
+        public final fun self4(): R|SelfType(A)| {
+            ^self4 this@R|/A|.R|/A.self3|()
+        }
+
+    }
+    public final class B : R|A| {
+        public constructor(): R|B| {
+            super<R|A|>()
+        }
+
+        public final fun bOnly(): R|kotlin/Unit| {
+        }
+
+        public final fun derived1(): R|SelfType(B)| {
+            ^derived1 this#.R|/A.self1|()
+        }
+
+        public final fun derived2(): R|SelfType(B)| {
+            ^derived2 this@R|/B|.R|/A.self2|()
+        }
+
+    }
+    public final fun test(a: R|A|): R|A| {
+        lval x: R|A| = R|<local>/a|.R|/A.self1|()
+        R|/B.B|().R|/A.self2|().R|/B.bOnly|()
+        ^test R|<local>/a|
+    }
