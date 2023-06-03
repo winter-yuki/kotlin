@@ -1,0 +1,21 @@
+FILE: values.kt
+    public open class A : R|kotlin/Any| {
+        public constructor(): R|A| {
+            super<R|kotlin/Any|>()
+        }
+
+        public final fun newA(): R|SelfType(A)| {
+            ^newA R|/A.A|()
+        }
+
+    }
+    public final class B : R|A| {
+        public constructor(): R|B| {
+            super<R|A|>()
+        }
+
+        public final fun newB(): R|SelfType(B)| {
+            ^newB R|/B.B|()
+        }
+
+    }

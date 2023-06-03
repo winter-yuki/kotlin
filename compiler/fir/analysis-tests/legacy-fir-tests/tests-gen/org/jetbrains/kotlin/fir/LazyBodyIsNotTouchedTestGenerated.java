@@ -3786,6 +3786,11 @@ public class LazyBodyIsNotTouchedTestGenerated extends AbstractLazyBodyIsNotTouc
         public void testTypeResolve() throws Exception {
             runTest("compiler/fir/analysis-tests/testData/resolve/selftype/typeResolve.kt");
         }
+
+        @TestMetadata("values.kt")
+        public void testValues() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/selftype/values.kt");
+        }
     }
 
     @TestMetadata("compiler/fir/analysis-tests/testData/resolve/smartcasts")

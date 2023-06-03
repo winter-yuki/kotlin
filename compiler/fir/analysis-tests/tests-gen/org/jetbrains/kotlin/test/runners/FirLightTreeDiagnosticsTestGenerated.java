@@ -4294,6 +4294,12 @@ public class FirLightTreeDiagnosticsTestGenerated extends AbstractFirLightTreeDi
             public void testTypeResolve() throws Exception {
                 runTest("compiler/fir/analysis-tests/testData/resolve/selftype/typeResolve.kt");
             }
+
+            @Test
+            @TestMetadata("values.kt")
+            public void testValues() throws Exception {
+                runTest("compiler/fir/analysis-tests/testData/resolve/selftype/values.kt");
+            }
         }
 
         @Nested
