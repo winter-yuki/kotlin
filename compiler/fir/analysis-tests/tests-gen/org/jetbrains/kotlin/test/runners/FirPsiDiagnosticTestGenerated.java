@@ -4251,6 +4251,58 @@ public class FirPsiDiagnosticTestGenerated extends AbstractFirPsiDiagnosticTest 
         }
 
         @Nested
+        @TestMetadata("compiler/fir/analysis-tests/testData/resolve/selftype")
+        @TestDataPath("$PROJECT_ROOT")
+        public class Selftype {
+            @Test
+            public void testAllFilesPresentInSelftype() throws Exception {
+                KtTestUtil.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/fir/analysis-tests/testData/resolve/selftype"), Pattern.compile("^([^.]+)\\.kt$"), null, true);
+            }
+
+            @Test
+            @TestMetadata("generics.kt")
+            public void testGenerics() throws Exception {
+                runTest("compiler/fir/analysis-tests/testData/resolve/selftype/generics.kt");
+            }
+
+            @Test
+            @TestMetadata("overriding.kt")
+            public void testOverriding() throws Exception {
+                runTest("compiler/fir/analysis-tests/testData/resolve/selftype/overriding.kt");
+            }
+
+            @Test
+            @TestMetadata("positions.kt")
+            public void testPositions() throws Exception {
+                runTest("compiler/fir/analysis-tests/testData/resolve/selftype/positions.kt");
+            }
+
+            @Test
+            @TestMetadata("scopes.kt")
+            public void testScopes() throws Exception {
+                runTest("compiler/fir/analysis-tests/testData/resolve/selftype/scopes.kt");
+            }
+
+            @Test
+            @TestMetadata("thisIsSelf.kt")
+            public void testThisIsSelf() throws Exception {
+                runTest("compiler/fir/analysis-tests/testData/resolve/selftype/thisIsSelf.kt");
+            }
+
+            @Test
+            @TestMetadata("typeResolve.kt")
+            public void testTypeResolve() throws Exception {
+                runTest("compiler/fir/analysis-tests/testData/resolve/selftype/typeResolve.kt");
+            }
+
+            @Test
+            @TestMetadata("values.kt")
+            public void testValues() throws Exception {
+                runTest("compiler/fir/analysis-tests/testData/resolve/selftype/values.kt");
+            }
+        }
+
+        @Nested
         @TestMetadata("compiler/fir/analysis-tests/testData/resolve/smartcasts")
         @TestDataPath("$PROJECT_ROOT")
         public class Smartcasts {

@@ -254,6 +254,7 @@ object ConeTypeCompatibilityChecker {
             is ConeCapturedType -> constructor.supertypes?.flatMap { it.collectLowerBounds() }?.toSet().orEmpty()
             is ConeIntegerConstantOperatorType -> setOf(getApproximatedType())
             is ConeStubType, is ConeIntegerLiteralConstantType -> throw IllegalStateException("$this should not reach here")
+            is ConeSelfType -> TODO("SelfType lower bounds")
         }
     }
 
@@ -274,7 +275,7 @@ object ConeTypeCompatibilityChecker {
     private fun MutableMap<FirTypeParameterSymbol, BoundTypeArguments>.collectTypeArgumentMapping(
         coneType: ConeClassLikeType,
         ctx: ConeInferenceContext,
-        compatibilityUpperBound: Compatibility
+        compatibilityUpperBound: Compatibility,
     ) {
         val queue = ArrayDeque<TypeArgumentMapping>()
         queue.addLast(coneType.toTypeArgumentMapping(ctx) ?: return)

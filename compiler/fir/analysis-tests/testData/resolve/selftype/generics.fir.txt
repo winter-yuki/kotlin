@@ -1,0 +1,33 @@
+FILE: generics.kt
+    public abstract interface PCollection<E> : R|kotlin/Any| {
+        public abstract fun add(elem: R|E|): R|SelfType(PCollection<E>)|
+
+        public abstract fun selfs(): R|kotlin/collections/List<SelfType(PCollection<E>)>|
+
+    }
+    public abstract interface PList<E> : R|PCollection<E>| {
+        public abstract fun listSpecific(): R|kotlin/Unit|
+
+    }
+    public final fun testReturn(xs: R|PList<kotlin/Int>|): R|kotlin/Unit| {
+        lval newXs: R|PList<kotlin/Int>| = R|<local>/xs|.R|SubstitutionOverride</PList.add: R|PList<kotlin/Int>|>|(Int(42))
+        R|<local>/newXs|.R|SubstitutionOverride</PList.listSpecific: R|kotlin/Unit|>|()
+        R|<local>/xs|.R|SubstitutionOverride</PList.selfs: R|kotlin/collections/List<PList<kotlin/Int>>|>|().R|kotlin/collections/forEach|<R|PList<kotlin/Int>|>(<L> = forEach@fun <anonymous>(it: R|PList<kotlin/Int>|): R|kotlin/Unit| <inline=Inline, kind=UNKNOWN>  {
+            R|<local>/it|.R|SubstitutionOverride</PList.listSpecific: R|kotlin/Unit|>|()
+        }
+        )
+    }
+    public abstract interface BaseButton : R|kotlin/Any| {
+        public abstract fun onClick(observer: R|(CheckBoxButton) -> kotlin/Unit|): R|kotlin/Unit|
+
+    }
+    public abstract interface CheckBoxButton : R|BaseButton| {
+        public abstract fun isChecked(): R|kotlin/Boolean|
+
+    }
+    public final fun testParams(button: R|CheckBoxButton|): R|kotlin/Unit| {
+        R|<local>/button|.R|/BaseButton.onClick|(<L> = onClick@fun <anonymous>(it: R|CheckBoxButton|): R|kotlin/Unit| <inline=NoInline>  {
+            R|<local>/it|.R|/CheckBoxButton.isChecked|()
+        }
+        )
+    }

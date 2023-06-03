@@ -12,6 +12,7 @@ import org.jetbrains.kotlin.fakeElement
 import org.jetbrains.kotlin.fir.*
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.declarations.utils.isExternal
+import org.jetbrains.kotlin.fir.declarations.utils.isFinal
 import org.jetbrains.kotlin.fir.declarations.utils.isLocal
 import org.jetbrains.kotlin.fir.diagnostics.*
 import org.jetbrains.kotlin.fir.expressions.*
@@ -38,6 +39,7 @@ import org.jetbrains.kotlin.fir.symbols.impl.FirCallableSymbol
 import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.fir.types.builder.buildErrorTypeRef
 import org.jetbrains.kotlin.fir.types.builder.buildResolvedTypeRef
+import org.jetbrains.kotlin.fir.types.builder.buildResolvedTypeRefCopy
 import org.jetbrains.kotlin.fir.visitors.FirDefaultTransformer
 import org.jetbrains.kotlin.fir.visitors.FirTransformer
 import org.jetbrains.kotlin.fir.visitors.TransformData
@@ -448,6 +450,7 @@ open class FirExpressionsResolveTransformer(transformer: FirAbstractBodyResolveT
                     callCompleter.completeCall(resultExpression, data)
                 }
             val result = completeInference.transformToIntegerOperatorCallOrApproximateItIfNeeded(data)
+            result.dematerializeTypesIfNeeded()
             if (!resolvingAugmentedAssignment) {
                 dataFlowAnalyzer.exitFunctionCall(result, callCompleted)
             }
@@ -522,6 +525,18 @@ open class FirExpressionsResolveTransformer(transformer: FirAbstractBodyResolveT
             )
         } else {
             integerOperatorCall
+        }
+    }
+
+    private fun FirFunctionCall.dematerializeTypesIfNeeded() {
+        val cls = context.containingClass ?: return
+        val typeRef = this.resultType as? FirResolvedTypeRef ?: return
+        val type = typeRef.coneType as? ConeClassLikeType ?: return
+        if (cls.isFinal && cls.name == type.lookupTag.name) {
+            val newTypeRef = buildResolvedTypeRefCopy(typeRef) {
+                this.type = type.asSelfType(session.typeContext)
+            }
+            this.replaceTypeRef(newTypeRef)
         }
     }
 

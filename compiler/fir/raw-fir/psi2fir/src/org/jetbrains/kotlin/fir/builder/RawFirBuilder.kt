@@ -1943,7 +1943,10 @@ open class RawFirBuilder(
                 }
                 is KtUserType -> {
                     var referenceExpression = unwrappedElement.referenceExpression
-                    if (referenceExpression != null) {
+                    if (referenceExpression?.getReferencedNameAsName() == ConeSelfType.CODE_NAME) {
+                        val dispatchReceiver = context.dispatchReceiverTypesStack.lastOrNull()
+                        createConeSelfTypeBuilder(dispatchReceiver, source, isNullable)
+                    } else if (referenceExpression != null) {
                         FirUserTypeRefBuilder().apply {
                             this.source = source
                             isMarkedNullable = isNullable
@@ -2666,6 +2669,10 @@ open class RawFirBuilder(
                 calleeReference = buildExplicitThisReference {
                     source = sourceElement.fakeElement(KtFakeSourceElementKind.ReferenceInAtomicQualifiedAccess)
                     labelName = expression.getLabelName()
+                }
+                val dispatchReceiver = context.dispatchReceiverTypesStack.lastOrNull()
+                if (expression.getLabelName() == null && dispatchReceiver != null) {
+                    typeRef = createConeSelfType(dispatchReceiver, sourceElement, isNullable = false)
                 }
             }
         }

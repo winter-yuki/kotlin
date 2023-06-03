@@ -1,0 +1,51 @@
+FILE: typeResolve.kt
+    public abstract interface Out<out T> : R|kotlin/Any| {
+    }
+    public final class A : R|kotlin/Any| {
+        public constructor(): R|A| {
+            super<R|kotlin/Any|>()
+        }
+
+        public final fun f1(): R|SelfType(A)| {
+            ^f1 Null(null)!!
+        }
+
+        public final fun f2(): R|SelfType(A)?| {
+            ^f2 Null(null)!!
+        }
+
+        public final fun f3(): R|Out<SelfType(A)>| {
+            ^f3 Null(null)!!
+        }
+
+        public final fun f4(): R|Out<SelfType(A)?>| {
+            ^f4 Null(null)!!
+        }
+
+        public final class B : R|kotlin/Any| {
+            public constructor(): R|A.B| {
+                super<R|kotlin/Any|>()
+            }
+
+        }
+
+        public final fun R|A.B|.both1(): R|SelfType(A)| {
+            ^both1 Null(null)!!
+        }
+
+        public final fun R|A.B?|.both2(): R|SelfType(A)| {
+            ^both2 Null(null)!!
+        }
+
+    }
+    public final fun R|A|.g(): <ERROR TYPE REF: Self type is allowed only in method declaration> {
+        local final fun R|A.B|.h1(): <ERROR TYPE REF: Self type is allowed only in method declaration> {
+            ^h1 Null(null)!!
+        }
+
+        local final fun R|A.B?|.h2(): <ERROR TYPE REF: Self type is allowed only in method declaration> {
+            ^h2 Null(null)!!
+        }
+
+        Null(null)!!
+    }

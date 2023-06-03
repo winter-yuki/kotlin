@@ -3745,6 +3745,54 @@ public class LazyBodyIsNotTouchedTestGenerated extends AbstractLazyBodyIsNotTouc
         }
     }
 
+    @TestMetadata("compiler/fir/analysis-tests/testData/resolve/selftype")
+    @TestDataPath("$PROJECT_ROOT")
+    @RunWith(JUnit3RunnerWithInners.class)
+    public static class Selftype extends AbstractLazyBodyIsNotTouchedTest {
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        public void testAllFilesPresentInSelftype() throws Exception {
+            KtTestUtil.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/fir/analysis-tests/testData/resolve/selftype"), Pattern.compile("^([^.]+)\\.kt$"), null, true);
+        }
+
+        @TestMetadata("generics.kt")
+        public void testGenerics() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/selftype/generics.kt");
+        }
+
+        @TestMetadata("overriding.kt")
+        public void testOverriding() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/selftype/overriding.kt");
+        }
+
+        @TestMetadata("positions.kt")
+        public void testPositions() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/selftype/positions.kt");
+        }
+
+        @TestMetadata("scopes.kt")
+        public void testScopes() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/selftype/scopes.kt");
+        }
+
+        @TestMetadata("thisIsSelf.kt")
+        public void testThisIsSelf() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/selftype/thisIsSelf.kt");
+        }
+
+        @TestMetadata("typeResolve.kt")
+        public void testTypeResolve() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/selftype/typeResolve.kt");
+        }
+
+        @TestMetadata("values.kt")
+        public void testValues() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/selftype/values.kt");
+        }
+    }
+
     @TestMetadata("compiler/fir/analysis-tests/testData/resolve/smartcasts")
     @TestDataPath("$PROJECT_ROOT")
     @RunWith(JUnit3RunnerWithInners.class)

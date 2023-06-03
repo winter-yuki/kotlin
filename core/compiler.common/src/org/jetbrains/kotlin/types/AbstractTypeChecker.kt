@@ -577,7 +577,27 @@ object AbstractTypeChecker {
             }
         }
 
+        checkSubtypeForSelfType(state, subType, superType)?.let { return it }
+
         return null
+    }
+
+    private fun checkSubtypeForSelfType(
+        state: TypeCheckerState,
+        subType: SimpleTypeMarker,
+        superType: SimpleTypeMarker
+    ): Boolean? = with(state.typeSystemContext) {
+        fun correctNullability(sub: SimpleTypeMarker, sup: SimpleTypeMarker): Boolean =
+            !sub.isMarkedNullable() || sup.isMarkedNullable() // sub.nullable -> sup.nullable
+        when {
+            subType.isSelfType() && superType.isSelfType() ->
+                correctNullability(subType, superType) && isSubtypeOf(state, subType.selfBound(), superType.selfBound())
+            subType.isSelfType() && !superType.isSelfType() ->
+                correctNullability(subType, superType) && isSubtypeOf(state, subType.selfBound(), superType.withNullability(false))
+            !subType.isSelfType() && superType.isSelfType() ->
+                correctNullability(subType, superType) && subType.typeConstructor().isNothingConstructor()
+            else -> null
+        }
     }
 
     private fun TypeSystemContext.getTypeParameterForArgumentInBaseIfItEqualToTarget(
