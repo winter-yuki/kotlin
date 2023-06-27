@@ -10,6 +10,7 @@ package org.jetbrains.kotlin.fir.references.builder
 import kotlin.contracts.*
 import org.jetbrains.kotlin.KtSourceElement
 import org.jetbrains.kotlin.fir.builder.FirBuilderDsl
+import org.jetbrains.kotlin.fir.expressions.FirQualifiedAccessExpression
 import org.jetbrains.kotlin.fir.references.FirThisReference
 import org.jetbrains.kotlin.fir.references.impl.FirImplicitThisReference
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
@@ -24,11 +25,13 @@ import org.jetbrains.kotlin.fir.visitors.*
 class FirImplicitThisReferenceBuilder {
     var boundSymbol: FirBasedSymbol<*>? = null
     var contextReceiverNumber: Int = -1
+    var traitOrigin: FirQualifiedAccessExpression? = null
 
     fun build(): FirThisReference {
         return FirImplicitThisReference(
             boundSymbol,
             contextReceiverNumber,
+            traitOrigin,
         )
     }
 

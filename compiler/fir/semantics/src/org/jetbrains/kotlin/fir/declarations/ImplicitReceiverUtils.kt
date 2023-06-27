@@ -12,17 +12,18 @@ import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.labelName
 import org.jetbrains.kotlin.fir.resolve.*
 import org.jetbrains.kotlin.fir.resolve.calls.*
+import org.jetbrains.kotlin.fir.resolve.providers.symbolProvider
 import org.jetbrains.kotlin.fir.scopes.FirContainingNamesAwareScope
 import org.jetbrains.kotlin.fir.scopes.FirScope
 import org.jetbrains.kotlin.fir.scopes.FirTypeScope
 import org.jetbrains.kotlin.fir.scopes.impl.FirLocalScope
 import org.jetbrains.kotlin.fir.scopes.impl.wrapNestedClassifierScopeWithSubstitutionForSuperType
 import org.jetbrains.kotlin.fir.symbols.impl.FirRegularClassSymbol
-import org.jetbrains.kotlin.fir.types.ConeErrorType
-import org.jetbrains.kotlin.fir.types.ConeKotlinType
-import org.jetbrains.kotlin.fir.types.ConeStubType
-import org.jetbrains.kotlin.fir.types.coneType
+import org.jetbrains.kotlin.fir.types.*
+import org.jetbrains.kotlin.name.ClassId
+import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
+import org.jetbrains.kotlin.name.StandardClassIds
 import org.jetbrains.kotlin.utils.addIfNotNull
 
 fun SessionHolder.collectImplicitReceivers(
@@ -197,6 +198,13 @@ class FirTowerDataContext private constructor(
         )
     }
 
+    fun addTraitReceiverGroup(traitReceiverGroup: TraitReceiverGroup): FirTowerDataContext {
+        // TODO need to create new TowerDataElement?
+        return traitReceiverGroup.fold(this) { context, trait ->
+            context.addReceiver(trait.label, trait)
+        }
+    }
+
     fun addNonLocalScopeIfNotNull(scope: FirScope?): FirTowerDataContext {
         if (scope == null) return this
         return addNonLocalScope(scope)
@@ -314,3 +322,28 @@ fun FirCallableDeclaration.createContextReceiverValues(
             contextReceiverNumber = index,
         )
     }
+
+typealias TraitReceiverGroup = List<TraitReceiverValue>
+
+fun FirCallableDeclaration.createTraitReceiverValues(
+    sessionHolder: SessionHolder,
+    extensionReceiver: ImplicitReceiverValue<*>?,
+    contextReceiverGroup: ContextReceiverGroup,
+): TraitReceiverGroup {
+    val receiverToClassId = contextReceiverGroup.asSequence()
+        .plus(extensionReceiver)
+        .mapNotNull { receiver -> receiver?.type?.classId?.let { receiver to it } }
+    val traitOrigins = receiverToClassId.flatMap { (receiver, classId) ->
+        val symbolProvider = sessionHolder.session.symbolProvider
+        val cls = symbolProvider.getClassLikeSymbolByClassId(classId)?.fir as? FirRegularClass ?: return@flatMap emptySequence()
+        cls.declarations.asSequence()
+            .filterIsInstance<FirProperty>()
+            .filter { field ->
+                field.backingField?.annotations?.find {
+                    it.annotationTypeRef.coneType.type.classId == StandardClassIds.Annotations.Trait
+                } != null
+            }
+            .map { TraitReceiverOrigin(receiver, it.symbol) }
+    }
+    return traitOrigins.map { TraitReceiverValue(this.symbol, it, sessionHolder.session, sessionHolder.scopeSession) }.toList()
+}

@@ -32714,6 +32714,34 @@ public class IrCodegenBoxWasmTestGenerated extends AbstractIrCodegenBoxWasmTest 
         }
     }
 
+    @TestMetadata("compiler/testData/codegen/box/trueTraits")
+    @TestDataPath("$PROJECT_ROOT")
+    @RunWith(JUnit3RunnerWithInners.class)
+    public static class TrueTraits extends AbstractIrCodegenBoxWasmTest {
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest0(this::doTest, TargetBackend.WASM, testDataFilePath);
+        }
+
+        public void testAllFilesPresentInTrueTraits() throws Exception {
+            KtTestUtil.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/codegen/box/trueTraits"), Pattern.compile("^([^_](.+))\\.kt$"), null, TargetBackend.WASM, true);
+        }
+
+        @TestMetadata("basic.kt")
+        public void testBasic() throws Exception {
+            runTest("compiler/testData/codegen/box/trueTraits/basic.kt");
+        }
+
+        @TestMetadata("traitsFromContext.kt")
+        public void testTraitsFromContext() throws Exception {
+            runTest("compiler/testData/codegen/box/trueTraits/traitsFromContext.kt");
+        }
+
+        @TestMetadata("traitsFromReceiver.kt")
+        public void testTraitsFromReceiver() throws Exception {
+            runTest("compiler/testData/codegen/box/trueTraits/traitsFromReceiver.kt");
+        }
+    }
+
     @TestMetadata("compiler/testData/codegen/box/typeInfo")
     @TestDataPath("$PROJECT_ROOT")
     @RunWith(JUnit3RunnerWithInners.class)

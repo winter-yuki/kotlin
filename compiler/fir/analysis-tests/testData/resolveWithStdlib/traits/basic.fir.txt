@@ -1,0 +1,27 @@
+FILE: basic.kt
+    public final object Traits : R|kotlin/Any| {
+        private constructor(): R|Traits| {
+            super<R|kotlin/Any|>()
+        }
+
+        field:@R|Trait|() public final val int: R|kotlin/Int| = Int(0)
+            public get(): R|kotlin/Int|
+
+    }
+    context(R|Traits|)
+    public final fun testContext(): R|kotlin/Unit| {
+        this@R|/testContext|.R|kotlin/Int.plus|(Int(42))
+    }
+    context(R|Traits|)
+    public final fun testLabel(): R|kotlin/Unit| {
+        R|kotlin/with|<R|kotlin/Int|, R|kotlin/Int|>(this@R|/testLabel|, <L> = with@fun R|kotlin/Int|.<anonymous>(): R|kotlin/Int| <inline=Inline, kind=EXACTLY_ONCE>  {
+            ^ this@R|special/anonymous|.R|kotlin/Int.plus|(Int(42))
+        }
+        )
+    }
+    public final fun testReceiver(): R|kotlin/Unit| {
+        R|kotlin/with|<R|Traits|, R|kotlin/Int|>(Q|Traits|, <L> = with@fun R|Traits|.<anonymous>(): R|kotlin/Int| <inline=Inline, kind=EXACTLY_ONCE>  {
+            ^ this@R|special/anonymous|.R|kotlin/Int.plus|(Int(42))
+        }
+        )
+    }

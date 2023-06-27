@@ -615,6 +615,10 @@ class Fir2IrVisitor(
                 else -> null
             }
 
+            calleeReference.traitOrigin?.let {
+                return visitQualifiedAccessExpression(it, data)
+            }
+
             val receiver = irFunction?.let { function ->
                 if (calleeReference.contextReceiverNumber != -1)
                     function.valueParameters[calleeReference.contextReceiverNumber]

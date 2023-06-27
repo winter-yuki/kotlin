@@ -224,18 +224,24 @@ class BodyResolveContext(
         additionalLabelName: Name? = null,
         f: () -> T
     ): T = withTowerDataCleanup {
-        replaceTowerDataContext(towerDataContext.addContextReceiverGroup(owner.createContextReceiverValues(holder)))
-
-        if (type != null) {
-            val receiver = ImplicitExtensionReceiverValue(
+        val contextReceiverGroup = owner.createContextReceiverValues(holder)
+        val extensionReceiver = type?.let {
+            ImplicitExtensionReceiverValue(
                 owner.symbol,
                 type,
                 holder.session,
                 holder.scopeSession
             )
-            addReceiver(labelName, receiver, additionalLabelName)
-            (inferenceSession as? FirBuilderInferenceSession)?.addLambdaImplicitReceiver(receiver)
         }
+        extensionReceiver?.let {
+            addReceiver(labelName, extensionReceiver, additionalLabelName)
+            (inferenceSession as? FirBuilderInferenceSession)?.addLambdaImplicitReceiver(extensionReceiver)
+        }
+
+        replaceTowerDataContext(towerDataContext.addContextReceiverGroup(contextReceiverGroup))
+
+        val traitReceiverValues = owner.createTraitReceiverValues(holder, extensionReceiver, contextReceiverGroup)
+        replaceTowerDataContext(towerDataContext.addTraitReceiverGroup(traitReceiverValues))
 
         f()
     }

@@ -7021,5 +7021,27 @@ public class FirLightTreeDiagnosticsTestGenerated extends AbstractFirLightTreeDi
                 runTest("compiler/fir/analysis-tests/testData/resolveWithStdlib/smartcasts/tryWithLambdaInside.kt");
             }
         }
+
+        @Nested
+        @TestMetadata("compiler/fir/analysis-tests/testData/resolveWithStdlib/traits")
+        @TestDataPath("$PROJECT_ROOT")
+        public class Traits {
+            @Test
+            public void testAllFilesPresentInTraits() throws Exception {
+                KtTestUtil.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/fir/analysis-tests/testData/resolveWithStdlib/traits"), Pattern.compile("^([^.]+)\\.kt$"), null, true);
+            }
+
+            @Test
+            @TestMetadata("basic.kt")
+            public void testBasic() throws Exception {
+                runTest("compiler/fir/analysis-tests/testData/resolveWithStdlib/traits/basic.kt");
+            }
+
+            @Test
+            @TestMetadata("semigroup.kt")
+            public void testSemigroup() throws Exception {
+                runTest("compiler/fir/analysis-tests/testData/resolveWithStdlib/traits/semigroup.kt");
+            }
+        }
     }
 }
